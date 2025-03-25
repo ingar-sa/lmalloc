@@ -624,7 +624,7 @@ SDB_END_EXTERN_C
 
 // WARN: Only one file in a program should define SDB_H_IMPLEMENTATION, otherwise you will get
 // redefintion errors
-#define SDB_H_IMPLEMENTATION
+// #define SDB_H_IMPLEMENTATION
 #ifdef SDB_H_IMPLEMENTATION
 
 // NOTE(ingar): The reason this is done is so that functions inside Sdb.h don't use the trace

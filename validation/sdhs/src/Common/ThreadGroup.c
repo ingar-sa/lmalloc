@@ -76,9 +76,9 @@ TgMonitor(void *Arg)
     SdbCondSignal(&Group->Manager->Cond);
     SdbMutexUnlock(&Group->Manager->Mutex);
 
-    SdbLogInfo(
-        "Manager has been notified that thread group %lu has completed. Monitor, signing out o7",
-        Group->GroupId);
+    SdbLogInfo("Manager has been notified that thread group %lu has completed. Monitor %lu, "
+               "signing out o7",
+               Group->GroupId, Group->GroupId);
 
     return NULL;
 }
