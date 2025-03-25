@@ -1,6 +1,7 @@
 #include "arena_u.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -16,6 +17,7 @@ void arena_u_init(arena_u *a, bool contiguous, size_t alignment, size_t cap,
 	a->cur = 0;
 	a->cap = cap;
 	a->mem = mem;
+	printf("arena: %p, mem %p\n", a, mem);
 
 	if (POWER_OF_TWO(alignment))
 		a->alignment = alignment;
@@ -24,7 +26,7 @@ void arena_u_init(arena_u *a, bool contiguous, size_t alignment, size_t cap,
 		a->alignment = 16;
 }
 
-arena_u *arena_u_create(size_t cap, bool contiguous)
+arena_u *arena_u_create(size_t cap, bool contiguous, size_t alignment)
 {
 	arena_u *arena;
 	uint8_t *mem;
@@ -38,6 +40,7 @@ arena_u *arena_u_create(size_t cap, bool contiguous)
 
 		arena = malloc(allocation_sz);
 		mem = (uint8_t *)arena + arena_cache_aligned_sz;
+		printf("arena: %p, mem %p\n", arena, mem);
 	} else {
 		arena = malloc(sizeof(arena_u));
 		mem = malloc(cap);

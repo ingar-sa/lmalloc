@@ -59,7 +59,7 @@ void arena_u_init(arena_u *a, bool contiguous, size_t alignment, size_t cap,
  * @param contiguous If true, allocate arena and its memory in one contiguous block
  * @return Pointer to the newly created arena, or NULL on failure
  */
-arena_u *arena_u_create(size_t cap, bool contiguous);
+arena_u *arena_u_create(size_t cap, bool contiguous, size_t alignment);
 
 /**
  * @brief Destroy a memory arena and free all associated memory
@@ -128,5 +128,9 @@ void *arena_u_pos(arena_u *a);
  * @return Pointer to the new position, or NULL if the position is invalid
  */
 void *arena_u_seek(arena_u *a, size_t pos);
+
+#define arena_u_array(a, type, count) arena_u_alloc(a, sizeof(type) * count)
+
+#define arena_u_struct(a, type) arena_u_array(a, type, 1)
 
 #endif /* ARENA_U_H */
