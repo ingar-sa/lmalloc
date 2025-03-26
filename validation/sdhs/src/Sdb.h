@@ -1572,4 +1572,4 @@ Sdb__FreeTrace__(void *Pointer, int Line, const char *Func, sdb__log_module__ *M
 
 // NOLINTEND(misc-definitions-in-headers)
 
-#endif // SDB_H_IMPLEMENTATION
+#endif // SDB_H_IMPLEMENTATION                        sdb__log_module__ *Module);
