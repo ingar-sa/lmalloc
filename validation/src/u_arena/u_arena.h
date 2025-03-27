@@ -3,8 +3,8 @@
  * @brief Arena allocator implementation
  */
 
-#ifndef u_arena_H
-#define u_arena_H
+#ifndef U_ARENA_H
+#define U_ARENA_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -85,6 +85,34 @@ void *u_arena_alloc(u_arena *a, size_t size);
  * @return Pointer to the allocated memory (zeroed), or NULL if insufficient space
  */
 void *u_arena_alloc0(u_arena *a, size_t size);
+
+/**
+ * @brief Allocate memory from the arena without bounds checking
+ * 
+ * @param a Pointer to the arena
+ * @param size Number of bytes to allocate
+ * @return Pointer to the allocated memory (zeroed), or NULL if insufficient space
+ */
+void *u_arena_alloc_no_bounds_check(u_arena *a, size_t size);
+
+/**
+ * @brief Allocate memory from the arena without aligning
+ * 
+ * @param a Pointer to the arena
+ * @param size Number of bytes to allocate
+ * @return Pointer to the allocated memory (zeroed), or NULL if insufficient space
+ */
+void *u_arena_alloc_no_align(u_arena *a, size_t size);
+
+/**
+ * @brief Allocate memory from the arena, but does no bounds checking or alignment 
+ * (in the name of speed. Gotta go fast)
+ * 
+ * @param a Pointer to the arena
+ * @param size Number of bytes to allocate
+ * @return Pointer to the allocated memory (zeroed), or NULL if insufficient space
+ */
+void *u_arena_alloc_fast(u_arena *a, size_t size);
 
 /**
  * @brief Reset the arena (free all allocations)

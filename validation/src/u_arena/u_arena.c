@@ -1,7 +1,7 @@
-#include <src/eit.h>
+#include <src/lm.h>
 
-EIT_LOG_GLOBAL_DECLARE();
-EIT_LOG_REGISTER(arena);
+LM_LOG_GLOBAL_DECLARE();
+LM_LOG_REGISTER(arena);
 
 #include "u_arena.h"
 
@@ -13,8 +13,8 @@ EIT_LOG_REGISTER(arena);
 void u_arena_init(u_arena *a, bool contiguous, size_t alignment, size_t cap,
 		  uint8_t *mem)
 {
-	EitAssert(EitIsPowerOfTwo(alignment),
-		  "Provided alignment is not a power of two");
+	LmAssert(LmIsPowerOfTwo(alignment) && alignment <= 4096,
+		 "Provided alignment is not a power of two");
 
 	a->contiguous = contiguous;
 	a->alignment = alignment;
@@ -22,7 +22,7 @@ void u_arena_init(u_arena *a, bool contiguous, size_t alignment, size_t cap,
 	a->cap = cap;
 	a->mem = mem;
 
-	EitLogDebug("arena: %p, mem %p", (void *)a, (void *)mem);
+	LmLogDebug("arena: %p, mem %p", (void *)a, (void *)mem);
 }
 
 u_arena *u_arena_create(size_t cap, bool contiguous, size_t alignment)
@@ -31,16 +31,16 @@ u_arena *u_arena_create(size_t cap, bool contiguous, size_t alignment)
 	uint8_t *mem;
 
 	if (contiguous) {
-		// TODO(ingar): query cache line size
 		// Ensures the arena and its data don't share a cache line.
+		size_t l1_cache_line_size = lm_get_l1_cache_line_size();
+		LmLogDebug("L1 cache line size: %zd", l1_cache_line_size);
 		size_t arena_cache_aligned_sz =
 			sizeof(u_arena) +
-			EitPaddingToAlign(sizeof(u_arena), 64);
+			LmPaddingToAlign(sizeof(u_arena), l1_cache_line_size);
 		size_t allocation_sz = arena_cache_aligned_sz + cap;
 
 		arena = malloc(allocation_sz);
 		mem = (uint8_t *)arena + arena_cache_aligned_sz;
-		EitLogDebug("arena: %p, mem %p", (void *)arena, (void *)mem);
 	} else {
 		arena = malloc(sizeof(u_arena));
 		mem = malloc(cap);
@@ -60,7 +60,7 @@ void u_arena_destroy(u_arena **ap)
 			if (a->mem)
 				free(a->mem);
 			else
-				EitLogWarning("Arena pointer was NULL");
+				LmLogWarning("Arena memory pointer was NULL");
 
 			free(a);
 		}
@@ -69,37 +69,56 @@ void u_arena_destroy(u_arena **ap)
 	}
 }
 
-/**
- * Arena allocation
- */
 void *u_arena_alloc(u_arena *a, size_t size)
 {
-	size_t aligned_sz = size + EitPaddingToAlign(size, a->alignment);
+	void *ptr = NULL;
+	size_t aligned_sz = size + LmPaddingToAlign(size, a->alignment);
 	if (a->cur + aligned_sz <= a->cap) {
-		void *allocation = a->mem + a->cur;
+		ptr = a->mem + a->cur;
 		a->cur += aligned_sz;
-		return allocation;
 	}
 
-	return NULL;
+	return ptr;
 }
 
-/**
-* Arena allocation with memory always cleared to zero.
-*/
 void *u_arena_alloc0(u_arena *a, size_t size)
 {
-	size_t aligned_sz = size + EitPaddingToAlign(size, a->alignment);
+	void *ptr = NULL;
+	size_t aligned_sz = size + LmPaddingToAlign(size, a->alignment);
 	if (a->cur + aligned_sz <= a->cap) {
-		void *allocation = a->mem + a->cur;
+		ptr = a->mem + a->cur;
 		a->cur += aligned_sz;
-
-		// TODO(ingar): Might need to use memset_s to guarantee clearing with optimizations
-		memset(allocation, 0, aligned_sz);
-		return allocation;
+		lm_memset_s(ptr, 0, aligned_sz);
 	}
 
-	return NULL;
+	return ptr;
+}
+
+// TODO: (isa): Might be superfluous
+void *u_arena_alloc_no_bounds_check(u_arena *a, size_t size)
+{
+	size_t aligned_sz = size + LmPaddingToAlign(size, a->alignment);
+	void *ptr = a->mem + a->cur;
+	a->cur += aligned_sz;
+	return ptr;
+}
+
+void *u_arena_alloc_no_align(u_arena *a, size_t size)
+{
+	void *ptr = NULL;
+	if (a->cur + size <= a->cap) {
+		ptr = a->mem + a->cur;
+		a->cur += size;
+	}
+
+	return ptr;
+}
+
+void *u_arena_alloc_fast(u_arena *a, size_t size)
+{
+	void *ptr = a->mem + a->cur;
+	a->cur += size;
+	return ptr;
 }
 
 void u_arena_free(u_arena *a)
@@ -117,10 +136,11 @@ void u_arena_pop(u_arena *a, size_t size)
 
 void u_arena_set_alignment(u_arena *a, size_t alignment)
 {
-	if (EitIsPowerOfTwo(alignment))
+	if (LmIsPowerOfTwo(alignment) && alignment <= 4096)
 		a->alignment = alignment;
 	else
-		EitLogWarning("Specified alignment is not a power of two");
+		LmLogWarning(
+			"Specified alignment is not a power of two or is > 4096");
 }
 
 void *u_arena_pos(u_arena *a)

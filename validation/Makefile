@@ -6,15 +6,15 @@ LIBS =  -lpthread
 LINTER = clang-tidy
 LINTER_FLAGS = -quiet
 
-EIT_LOG_LEVEL ?= 4
-EIT_REL_LOG_LEVEL ?= 2
+LM_LOG_LEVEL ?= 4
+LM_REL_LOG_LEVEL ?= 2
 
-EIT_FLAGS = -DEIT_MEM_TRACE=1 -DEIT_LOG_GLOBAL=1 -DEIT_LOG_LEVEL=$(EIT_LOG_LEVEL) -DEIT_ASSERT=1
-RELEASE_EIT_FLAGS = -DEIT_MEM_TRACE=0 -DEIT_PRINTF_DEBUG_ENABLE=0 -DEIT_LOG_LEVEL=$(EIT_REL_LOG_LEVEL)-DEIT_ASSERT=0 
+LM_FLAGS = -DLM_MEM_TRACE=1 -DLM_LOG_GLOBAL=1 -DLM_LOG_LEVEL=$(LM_LOG_LEVEL) -DLM_ASSERT=1
+RELEASE_LM_FLAGS = -DLM_MEM_TRACE=0 -DLM_PRINTF_DEBUG_ENABLE=0 -DLM_LOG_LEVEL=$(LM_REL_LOG_LEVEL)-DLM_ASSERT=0 
 
-DEBUG_FLAGS = -g -O0 -Wextra -pedantic  -Wno-unused-function -Wno-cpp -DDEBUG
-RELWDB_FLAGS = -g -O2 -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG 
-RELEASE_FLAGS = -O3 -march=native -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG
+DEBUG_FLAGS = -std=gnu11 -g -O0 -Wextra -pedantic  -Wno-unused-function -Wno-cpp -DDEBUG
+RELWDB_FLAGS = -std=gnu11 -g -O2 -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG 
+RELEASE_FLAGS = -std=gnu11 -O3 -march=native -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG
 
 PROGRAM_NAME = validation
 
@@ -22,13 +22,13 @@ PROGRAM_NAME = validation
 
 all: debug
 
-debug: CFLAGS = $(DEBUG_FLAGS) $(EIT_FLAGS)
+debug: CFLAGS = $(DEBUG_FLAGS) $(LM_FLAGS)
 debug: build_suite
 
-relwdb: CFLAGS = $(RELWDB_FLAGS) $(EIT_FLAGS)
+relwdb: CFLAGS = $(RELWDB_FLAGS) $(LM_FLAGS)
 relwdb: build_suite
 
-release: CFLAGS = $(RELEASE_FLAGS) $(RELEASE_EIT_FLAGS)
+release: CFLAGS = $(RELEASE_FLAGS) $(RELEASE_LM_FLAGS)
 release: build_suite
 
 run:
