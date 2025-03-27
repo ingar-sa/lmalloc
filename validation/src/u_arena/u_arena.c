@@ -3,6 +3,8 @@
 LM_LOG_GLOBAL_DECLARE();
 LM_LOG_REGISTER(arena);
 
+#include <src/metrics/timing.h>
+
 #include "u_arena.h"
 
 #include <stdbool.h>
