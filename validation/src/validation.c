@@ -2,13 +2,12 @@
 #include <src/eit.h>
 #undef EIT_H_IMPLEMENTATION
 
+EIT_LOG_GLOBAL_REGISTER();
 EIT_LOG_REGISTER(validation);
 
 #include <src/u_arena/u_arena.h>
 
 #include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <assert.h>
 
 void u_arena_test(void)

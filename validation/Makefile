@@ -6,17 +6,19 @@ LIBS =  -lpthread
 LINTER = clang-tidy
 LINTER_FLAGS = -quiet
 
-EIT_LOG_LEVEL ?= -DEIT_LOG_LEVEL=3
-EIT_REL_LOG_LEVEL ?= -DEIT_LOG_LEVEL=2
+EIT_LOG_LEVEL ?= 4
+EIT_REL_LOG_LEVEL ?= 2
 
-EIT_FLAGS = -DEIT_MEM_TRACE=1 -DEIT_PRINTF_DEBUG_ENABLE=1 -DEIT_ASSERT=1 $(EIT_LOG_LEVEL)
-RELEASE_EIT_FLAGS = -DEIT_MEM_TRACE=0 -DEIT_PRINTF_DEBUG_ENABLE=0 -DEIT_ASSERT=0 $(EIT_REL_LOG_LEVEL)
+EIT_FLAGS = -DEIT_MEM_TRACE=1 -DEIT_LOG_GLOBAL=1 -DEIT_LOG_LEVEL=$(EIT_LOG_LEVEL) -DEIT_ASSERT=1
+RELEASE_EIT_FLAGS = -DEIT_MEM_TRACE=0 -DEIT_PRINTF_DEBUG_ENABLE=0 -DEIT_LOG_LEVEL=$(EIT_REL_LOG_LEVEL)-DEIT_ASSERT=0 
 
 DEBUG_FLAGS = -g -O0 -Wextra -pedantic  -Wno-unused-function -Wno-cpp -DDEBUG
 RELWDB_FLAGS = -g -O2 -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG 
 RELEASE_FLAGS = -O3 -march=native -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG
 
-.PHONY: all debug relwdb release docs lint static_analysis format compile_commands.json clean
+PROGRAM_NAME = validation
+
+.PHONY: all debug relwdb release run docs lint static_analysis format compile_commands.json clean
 
 all: debug
 
@@ -28,6 +30,9 @@ relwdb: build_suite
 
 release: CFLAGS = $(RELEASE_FLAGS) $(RELEASE_EIT_FLAGS)
 release: build_suite
+
+run:
+	./build/$(PROGRAM_NAME)
 
 docs:
 	@echo "Generating documentation..."
@@ -57,7 +62,7 @@ compile_commands.json:
 build_suite:
 	@mkdir -p build
 	@printf "\033[0;32m\nBuilding validation suite\n\033[0m"
-	$(CC) $(CFLAGS) $(INCLUDES) $(SRC) -o build/validation $(LIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) $(SRC) -o build/$(PROGRAM_NAME) $(LIBS)
 	@printf "\033[0;32mFinished building validation suite\n\033[0m"
 
 clean:

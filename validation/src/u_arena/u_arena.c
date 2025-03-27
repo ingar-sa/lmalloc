@@ -1,5 +1,6 @@
 #include <src/eit.h>
 
+EIT_LOG_GLOBAL_DECLARE();
 EIT_LOG_REGISTER(arena);
 
 #include "u_arena.h"

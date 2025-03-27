@@ -7,11 +7,8 @@
 // part by uncommenting #define EIT_H_IMPLEMENTATION (and remember to comment it out again
 // afterwards,
 #include <assert.h>
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <float.h>
-#include <math.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -31,7 +28,7 @@
 //              DEFINES               //
 ////////////////////////////////////////
 
-// NOTE(ingar): Prevents the formatter from indenting everything inside the "C" block
+// NOTE: (ingar) Prevents the formatter from indenting everything inside the "C" block
 #if defined(__cplusplus)
 #define EIT_BEGIN_EXTERN_C extern "C" {
 #define EIT_END_EXTERN_C }
@@ -103,9 +100,15 @@ static_assert(EIT_LOG_BUF_SIZE >= 128,
 #endif
 
 #if EIT_LOG_LEVEL >= 4 && EIT_PRINTF_DEBUG_ENABLE == 1
-#define SdbPrintfDebug(...) printf(__VA_ARGS__);
+#define EitPrintfDebug(...) printf("DBG: " __VA_ARGS__);
 #else
-#define SdbPrintfDebug(...)
+#define EitPrintfDebug(...)
+#endif
+
+#if EIT_LOG_LEVEL >= EIT_LOG_LEVEL_WRN && EIT_PRINTF_WARN_ENABLE == 1
+#define EitPrintfWarn(...) printf("WRN: " __VA_ARGS__);
+#else
+#define EitPrintfWarn(...)
 #endif
 
 typedef struct sdb__log_module__ {
@@ -121,7 +124,7 @@ int eit__write_log__(sdb__log_module__ *module, const char *log_level,
 
 #define EIT__LOG_LEVEL_CHECK__(level) (EIT_LOG_LEVEL >= EIT_LOG_LEVEL_##level)
 
-#define EIT_LOGGING_NOT_USED                          \
+#define EIT_LOGGING_NOT_USED()                        \
 	static sdb__log_module__ *eit__log_instance__ \
 		__attribute__((used)) = NULL
 
@@ -143,6 +146,19 @@ int eit__write_log__(sdb__log_module__ *module, const char *log_level,
 	static sdb__log_module__ *eit__log_instance__ __attribute__((used)) = \
 		&EIT_CONCAT3(eit__log_module_, name, __)
 
+#define EIT_LOG_GLOBAL_REGISTER()                                              \
+	static char eit__log_module_global_buf__[EIT_LOG_BUF_SIZE];            \
+	sdb__log_module__ eit__log_module_global__                             \
+		__attribute__((used)) = { .name = "global",                    \
+					  .buf_size = EIT_LOG_BUF_SIZE,        \
+					  .buf = eit__log_module_global_buf__, \
+					  .lock = PTHREAD_MUTEX_INITIALIZER }; \
+	sdb__log_module__ *eit__log_instance_global__                          \
+		__attribute__((used)) = &eit__log_module_global__
+
+#define EIT_LOG_GLOBAL_DECLARE() \
+	extern sdb__log_module__ *eit__log_instance_global__
+
 #define EIT__LOG__(log_level, fmt, ...)                                        \
 	do {                                                                   \
 		if (EIT__LOG_LEVEL_CHECK__(log_level)) {                       \
@@ -153,10 +169,26 @@ int eit__write_log__(sdb__log_module__ *module, const char *log_level,
 		}                                                              \
 	} while (0)
 
+#define EIT__LOG_GLOBAL__(log_level, fmt, ...)                                 \
+	do {                                                                   \
+		if (EIT__LOG_LEVEL_CHECK__(log_level)) {                       \
+			int log_ret = eit__write_log__(                        \
+				eit__log_instance_global__,                    \
+				EIT_STRINGIFY(log_level), fmt, ##__VA_ARGS__); \
+			assert(log_ret >= 0);                                  \
+		}                                                              \
+	} while (0)
+
 #define EitLogDebug(...) EIT__LOG__(DBG, ##__VA_ARGS__)
 #define EitLogInfo(...) EIT__LOG__(INF, ##__VA_ARGS__)
 #define EitLogWarning(...) EIT__LOG__(WRN, ##__VA_ARGS__)
 #define EitLogError(...) EIT__LOG__(ERR, ##__VA_ARGS__)
+
+EIT_LOG_GLOBAL_DECLARE(); // Enables use of logging functionality inside this header file
+#define EitLogDebugG(...) EIT__LOG_GLOBAL__(DBG, ##__VA_ARGS__)
+#define EitLogInfoG(...) EIT__LOG_GLOBAL__(INF, ##__VA_ARGS__)
+#define EitLogWarningG(...) EIT__LOG_GLOBAL__(WRN, ##__VA_ARGS__)
+#define EitLogErrorG(...) EIT__LOG_GLOBAL__(ERR, ##__VA_ARGS__)
 
 #if EIT_ASSERT == 1
 #define EitAssert(condition, fmt, ...)                                       \
@@ -211,10 +243,24 @@ void eit_free_file_data(eit_file_data **file_data);
 int eit_write_bytes_to_file(const uint8_t *buf, size_t size,
 			    const char *filename);
 
+////////////////////////////////////////
+//              SYSTEM                //
+////////////////////////////////////////
+
+size_t get_l1_cache_line_size(void);
+
+////////////////////////////////////////
+//           END OF INCLUDE           //
+////////////////////////////////////////
+
 #if defined(__cplusplus)
 EIT_END_EXTERN_C
 #endif
 #endif // EIT_H_INCLUDE
+
+////////////////////////////////////////
+//     BEGINNING OF IMPLEMENTATION    //
+////////////////////////////////////////
 
 // WARN: Only one file in a program should define SDB_H_IMPLEMENTATION, otherwise you will get
 // redefintion errors
@@ -373,12 +419,12 @@ eit_file_data *eit_load_file_into_mem(const char *filename)
 {
 	FILE *file = fopen(filename, "rb");
 	if (!file) {
-		fprintf(stderr, "Failed to open file: %s\n", strerror(errno));
+		EitLogErrorG("Failed to open file: %s", strerror(errno));
 		return NULL;
 	}
 
 	if (fseek(file, 0L, SEEK_END) != 0) {
-		fprintf(stderr, "Failed to seek in file %s\n", filename);
+		EitLogErrorG("Failed to seek in file %s", filename);
 		fclose(file);
 		return NULL;
 	}
@@ -390,8 +436,8 @@ eit_file_data *eit_load_file_into_mem(const char *filename)
 	size_t file_data_size = sizeof(eit_file_data) + file_size + 1;
 	file_data = calloc(1, file_data_size);
 	if (!file_data) {
-		fprintf(stderr,
-			"Failed to allocate memory for file data for file %s\n",
+		EitLogErrorG(
+			"Failed to allocate memory for file data for file %s",
 			filename);
 		fclose(file);
 		return NULL;
@@ -402,12 +448,11 @@ eit_file_data *eit_load_file_into_mem(const char *filename)
 
 	size_t bytes_read = fread(file_data->data, 1, file_size, file);
 	if (bytes_read != file_size) {
-		fprintf(stderr, "Failed to read data from file %s: %s\n",
-			filename, strerror(errno));
+		EitLogErrorG("Failed to read data from file %s: %s", filename,
+			     strerror(errno));
 
 		fclose(file);
 		free(file_data);
-
 		return NULL;
 	}
 
@@ -421,7 +466,8 @@ void eit_free_file_data(eit_file_data **file_data)
 		free(*file_data);
 		*file_data = NULL;
 	} else {
-		printf("WRN: Pointer to file data pointer or file data pointer was NULL\n");
+		EitLogWarningG(
+			" Pointer to file data pointer or file data pointer was NULL");
 	}
 }
 
@@ -430,13 +476,13 @@ int eit_write_bytes_to_file(const uint8_t *buf, size_t size,
 {
 	FILE *file = fopen(filename, "wb");
 	if (!file) {
-		fprintf(stderr, "Unable to open file %s\n", filename);
+		EitLogErrorG("Unable to open file %s", filename);
 		return errno;
 	}
 
 	if (!(fwrite(buf, size, 1, file) == 1)) {
-		fprintf(stderr, "Failed to write buffer to file %s: %s",
-			filename, strerror(errno));
+		EitLogErrorG("Failed to write buffer to file %s: %s", filename,
+			     strerror(errno));
 		return errno;
 	}
 
@@ -444,6 +490,106 @@ int eit_write_bytes_to_file(const uint8_t *buf, size_t size,
 	return 0;
 }
 
+////////////////////////////////////////
+//              SYSTEM                //
+////////////////////////////////////////
+
+// NOTE: Original written by claude
+size_t get_l1_cache_line_size(void)
+{
+	FILE *cpuinfo = fopen("/proc/cpuinfo", "r");
+	if (cpuinfo == NULL) {
+		perror("Failed to open /proc/cpuinfo");
+		return 0;
+	}
+
+	char line[256];
+	size_t line_size = 0;
+
+	// First try to find cache_alignment in /proc/cpuinfo
+	while (fgets(line, sizeof(line), cpuinfo)) {
+		if (strstr(line, "cache_alignment") != NULL) {
+			char *value = strchr(line, ':');
+			if (value) {
+				line_size =
+					(size_t)strtoul(value + 1, NULL, 10);
+				break;
+			}
+		}
+	}
+	fclose(cpuinfo);
+
+	// If not found in /proc/cpuinfo, try a fallback method
+	if (line_size == 0) {
+		EitLogDebugG(
+			"Could not determine L1 cache line size from /proc/cpuinfo. Trying sysconf");
+
+		// Use sysconf or try to read from sysfs
+		FILE *cache_line = fopen(
+			"/sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size",
+			"r");
+		if (cache_line) {
+			if (fscanf(cache_line, "%zu", &line_size) != 1) {
+				line_size = 0;
+			}
+			fclose(cache_line);
+		}
+		if (line_size == 0) {
+			EitLogDebugG(
+				"Could not determine L1 cache line size from sysconf. Trying asm");
+		} else {
+			EitLogDebugG("L1 cache line size (from sysconf) is %zd",
+				     line_size);
+		}
+	} else {
+		EitLogDebugG("L1 cache line size (from /proc/cpuinfo) is %zd",
+			     line_size);
+	}
+
+	// Third fallback - most x86 processors have 64-byte cache lines
+	if (line_size == 0) {
+		// Try using a direct x86 CPUID instruction
+#if defined(__x86_64__) || defined(__i386__)
+		unsigned int eax, ebx, ecx, edx;
+
+		// Try CPUID leaf 1 first (older method)
+		__asm__ __volatile__("cpuid"
+				     : "=a"(eax), "=b"(ebx), "=c"(ecx),
+				       "=d"(edx)
+				     : "a"(1));
+
+		// CLFLUSH line size is in bits 15-8 of EBX, in units of 8 bytes
+		line_size = ((ebx >> 8) & 0xff) * 8;
+
+		// If that didn't work, try CPUID leaf 4 (newer method)
+		if (line_size == 0) {
+			__asm__ __volatile__("cpuid"
+					     : "=a"(eax), "=b"(ebx), "=c"(ecx),
+					       "=d"(edx)
+					     : "a"(4), "c"(0));
+
+			if ((eax & 0x1f) != 0) {
+				// Cache line size is in bits 0-11 of EBX, plus 1
+				line_size = (ebx & 0xfff) + 1;
+			}
+		}
+#endif
+
+		// Last resort - assume a common default
+		if (line_size == 0) {
+			EitLogWarningG(
+				"Could not determine cache line size. Using default of 64");
+			line_size =
+				64; // Most common L1 cache line size on modern CPUs
+
+		} else {
+			EitLogDebugG("L1 cache line size (from asm) is %zd",
+				     line_size);
+		}
+	}
+
+	return line_size;
+}
 // NOLINTEND(misc-definitions-in-headers)
 
 #endif // EIT_H_IMPLEMENTATION
