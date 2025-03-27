@@ -13,6 +13,7 @@ long long lm_get_time_stamp(clockid_t type)
 	return stamp;
 }
 
+// NOTE: (isa): Claude filled out the switch statement
 void lm_print_timing(long long start, long long end, const char *description,
 		     enum time_stamp_fmt stamp_fmt)
 {
@@ -60,6 +61,7 @@ void lm_print_timing(long long start, long long end, const char *description,
 	}
 }
 
+// NOTE: (isa): Claude filled out the switch statement
 void lm_log_timing(long long start, long long end, const char *description,
 		   enum time_stamp_fmt stamp_fmt, enum lm_log_level log_level,
 		   lm_log_module *log_module)
@@ -111,5 +113,57 @@ void lm_log_timing(long long start, long long end, const char *description,
 	default:
 		LmLogManual(log_level, log_module, "Unknown format");
 		break;
+	}
+}
+
+// NOTE: (isa): Original written by claude
+int lm_compare_timing(long long t1, long long t2, struct timing_comp *tc)
+{
+	if (t1 == t2) {
+		printf("Both timestamps are identical (0%% difference, 1.00x)\n");
+		tc->percentage = 0.0;
+		tc->multiplier = 1.0;
+		return 0;
+	}
+
+	if (t1 < t2) {
+		tc->percentage = ((double)(t2 - t1) / t2) * 100.0;
+		tc->multiplier = (double)t2 / t1;
+		return 1;
+	} else {
+		tc->percentage = ((double)(t1 - t2) / t2) * 100.0;
+		tc->multiplier = (double)t1 / t2;
+		return -1;
+	}
+}
+
+void lm_print_timing_comp(struct timing_comp tc, int res)
+{
+	if (res == 0) {
+		printf("Both timestamps are identical (0%% difference, 1.00x)\n");
+	} else if (res > 0) {
+		printf("t1 is faster than t2 by %.2f%% (%.2fx faster)\n",
+		       tc.percentage, tc.multiplier);
+	} else {
+		printf("t1 is slower than t2 by %.2f%% (%.2fx slower)\n",
+		       tc.percentage, tc.multiplier);
+	}
+}
+
+void lm_log_timing_comp(struct timing_comp tc, int res,
+			enum lm_log_level log_level, lm_log_module *log_module)
+{
+	if (res == 0) {
+		LmLogManual(
+			log_level, log_module,
+			"Both timestamps are identical (0%% difference, 1.00x)\n");
+	} else if (res > 0) {
+		LmLogManual(log_level, log_module,
+			    "t1 is faster than t2 by %.2f%% (%.2fx faster)\n",
+			    tc.percentage, tc.multiplier);
+	} else {
+		LmLogManual(log_level, log_module,
+			    "t1 is slower than t2 by %.2f%% (%.2fx slower)\n",
+			    tc.percentage, tc.multiplier);
 	}
 }
