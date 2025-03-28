@@ -10,6 +10,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define U_ARENA_CONTIGUOUS true
+#define U_ARENA_NON_CONTIGUOUS false
+
 /**
  * @struct u_arena
  * @brief Memory arena structure for efficient memory allocation

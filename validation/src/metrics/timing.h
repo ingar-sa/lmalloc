@@ -64,12 +64,20 @@ static const char *lm_clock_type_str(clockid_t type)
 
 long long lm_get_time_stamp(clockid_t type);
 
-void lm_print_timing(long long start, long long end, const char *description,
+void lm_print_timing(long long timing, const char *description,
 		     enum time_stamp_fmt stamp_fmt);
 
-void lm_log_timing(long long start, long long end, const char *description,
+void lm_log_timing(long long timing, const char *description,
 		   enum time_stamp_fmt stamp_fmt, enum lm_log_level log_level,
 		   lm_log_module *log_module);
+
+void lm_print_timing_avg(long long timing, long long count,
+			 const char *description,
+			 enum time_stamp_fmt stamp_fmt);
+
+void lm_log_timing_avg(long long timing, long long count,
+		       const char *description, enum time_stamp_fmt stamp_fmt,
+		       enum lm_log_level log_level, lm_log_module *log_module);
 
 int lm_compare_timing(long long t1, long long t2, struct timing_comp *tc);
 

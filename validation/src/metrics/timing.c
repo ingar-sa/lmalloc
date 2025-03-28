@@ -13,107 +13,117 @@ long long lm_get_time_stamp(clockid_t type)
 	return stamp;
 }
 
-// NOTE: (isa): Claude filled out the switch statement
-void lm_print_timing(long long start, long long end, const char *description,
-		     enum time_stamp_fmt stamp_fmt)
+// NOTE: (isa): "Filled out" by Claude
+void lm_format_timing(long long timing, enum time_stamp_fmt stamp_fmt,
+		      char buf[64])
 {
-	long long diff = end - start;
 	switch (stamp_fmt) {
 	case S_NS:
-		printf("%s: %lld.%09lld s\n", description, LmNsToS(diff),
-		       diff % 1000000000LL);
+		snprintf(buf, 64, "%lld.%09lld s", LmNsToS(timing),
+			 timing % 1000000000LL);
 		break;
 	case S_US:
-		printf("%s: %lld.%06lld s\n", description, LmNsToS(diff),
-		       (diff % 1000000000LL) / 1000LL);
+		snprintf(buf, 64, "%lld.%06lld s", LmNsToS(timing),
+			 (timing % 1000000000LL) / 1000LL);
 		break;
 	case S_MS:
-		printf("%s: %lld.%03lld s\n", description, LmNsToS(diff),
-		       (diff % 1000000000LL) / 1000000LL);
+		snprintf(buf, 64, "%lld.%03lld s", LmNsToS(timing),
+			 (timing % 1000000000LL) / 1000000LL);
 		break;
 	case US_TRUNK:
-		printf("%s: %lld us\n", description, diff / 1000LL);
+		snprintf(buf, 64, "%lld us", timing / 1000LL);
 		break;
 	case MS_TRUNK:
-		printf("%s: %lld ms\n", description, diff / 1000000LL);
+		snprintf(buf, 64, "%lld ms", timing / 1000000LL);
 		break;
 	case S_TRUNK:
-		printf("%s: %lld s\n", description, diff / 1000000000LL);
+		snprintf(buf, 64, "%lld s", timing / 1000000000LL);
 		break;
 	case NS:
-		printf("%s: %lld ns\n", description, diff);
+		snprintf(buf, 64, "%lld ns", timing);
 		break;
 	case US:
-		printf("%s: %lld.%03lld us\n", description, diff / 1000LL,
-		       diff % 1000LL);
+		snprintf(buf, 64, "%lld.%03lld us", timing / 1000LL,
+			 timing % 1000LL);
 		break;
 	case MS:
-		printf("%s: %lld.%06lld ms\n", description, diff / 1000000LL,
-		       diff % 1000000LL);
+		snprintf(buf, 64, "%lld.%06lld ms", timing / 1000000LL,
+			 timing % 1000000LL);
 		break;
 	case S:
-		printf("%s: %lld.%09lld s\n", description, LmNsToS(diff),
-		       diff % 1000000000LL);
+		snprintf(buf, 64, "%lld.%09lld s", LmNsToS(timing),
+			 timing % 1000000000LL);
 		break;
 	default:
-		printf("Unknown format\n");
+		snprintf(buf, 64, "Unknown format");
 		break;
 	}
 }
 
-// NOTE: (isa): Claude filled out the switch statement
-void lm_log_timing(long long start, long long end, const char *description,
+void lm_print_timing(long long timing, const char *description,
+		     enum time_stamp_fmt stamp_fmt)
+{
+	char timing_str[64];
+	lm_format_timing(timing, stamp_fmt, timing_str);
+	printf("%s: %s\n", description, timing_str);
+}
+
+// TODO: (isa): The compiler probably can't optimize away the call to this function
+// since the log_level isn't available at compile time. We should probably make a
+// macro wrapper for the function call
+void lm_log_timing(long long timing, const char *description,
 		   enum time_stamp_fmt stamp_fmt, enum lm_log_level log_level,
 		   lm_log_module *log_module)
 {
-	long long diff = end - start;
-	switch (stamp_fmt) {
-	case S_NS:
-		LmLogManual(log_level, log_module, "(%s): %lld.%09lld s",
-			    description, LmNsToS(diff), diff % 1000000000LL);
-		break;
-	case S_US:
-		LmLogManual(log_level, log_module, "%s: %lld.%06lld s",
-			    description, LmNsToS(diff),
-			    (diff % 1000000000LL) / 1000LL);
-		break;
-	case S_MS:
-		LmLogManual(log_level, log_module, "%s: %lld.%03lld s",
-			    description, LmNsToS(diff),
-			    (diff % 1000000000LL) / 1000000LL);
-		break;
-	case US_TRUNK:
-		LmLogManual(log_level, log_module, "%s: %lld us", description,
-			    diff / 1000LL);
-		break;
-	case MS_TRUNK:
-		LmLogManual(log_level, log_module, "%s: %lld ms", description,
-			    diff / 1000000LL);
-		break;
-	case S_TRUNK:
-		LmLogManual(log_level, log_module, "%s: %lld s", description,
-			    diff / 1000000000LL);
-		break;
-	case NS:
-		LmLogManual(log_level, log_module, "%s: %lld ns", description,
-			    diff);
-		break;
-	case US:
-		LmLogManual(log_level, log_module, "%s: %lld.%03lld us",
-			    description, diff / 1000LL, diff % 1000LL);
-		break;
-	case MS:
-		LmLogManual(log_level, log_module, "%s: %lld.%06lld ms",
-			    description, diff / 1000000LL, diff % 1000000LL);
-		break;
-	case S:
-		LmLogManual(log_level, log_module, "%s: %lld.%09lld s",
-			    description, LmNsToS(diff), diff % 1000000000LL);
-		break;
-	default:
-		LmLogManual(log_level, log_module, "Unknown format");
-		break;
+	char timing_str[64];
+	lm_format_timing(timing, stamp_fmt, timing_str);
+	LmLogManual(log_level, log_module, "%s: %s", description, timing_str);
+}
+
+void lm_print_timing_avg(long long timing, long long count,
+			 const char *description, enum time_stamp_fmt stamp_fmt)
+{
+	char timing_str[64];
+	long long div = timing / count;
+	long long mod = timing % count;
+	lm_format_timing(div, stamp_fmt, timing_str);
+	printf("%s: %s (remainder %lld ns)\n", description, timing_str, mod);
+}
+
+// NOTE: (isa): Claude rewrote to this version
+void lm_log_timing_avg(long long timing, long long count,
+		       const char *description, enum time_stamp_fmt stamp_fmt,
+		       enum lm_log_level log_level, lm_log_module *log_module)
+{
+	char timing_str[64];
+
+	/* Calculate the exact average as a double to maintain precision */
+	double avg = (double)timing / count;
+
+	/* For tiny values, switch to a more appropriate format */
+	enum time_stamp_fmt adjusted_fmt = stamp_fmt;
+
+	/* If the average is less than 1 microsecond and format is not NS already,
+       automatically switch to nanosecond format */
+	if (avg < 1000.0 && stamp_fmt != NS) {
+		adjusted_fmt = NS;
 	}
+	/* If the average is less than 1 millisecond but >= 1 microsecond,
+       and format is not NS or US, switch to microsecond format */
+	else if (avg < 1000000.0 && stamp_fmt != NS && stamp_fmt != US) {
+		adjusted_fmt = US;
+	}
+
+	/* Convert the double back to long long for formatting */
+	long long avg_ll = (long long)avg;
+
+	/* Format the calculated average */
+	lm_format_timing(avg_ll, adjusted_fmt, timing_str);
+
+	/* Log the result */
+	LmLogManual(log_level, log_module,
+		    "%s: %s (total: %lld ns, count: %lld)", description,
+		    timing_str, timing, count);
 }
 
 // NOTE: (isa): Original written by claude
@@ -150,6 +160,7 @@ void lm_print_timing_comp(struct timing_comp tc, int res)
 	}
 }
 
+// TODO: (isa): Same as with the time logging: make a wrapper macro
 void lm_log_timing_comp(struct timing_comp tc, int res,
 			enum lm_log_level log_level, lm_log_module *log_module)
 {

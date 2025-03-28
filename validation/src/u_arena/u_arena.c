@@ -1,7 +1,7 @@
 #include <src/lm.h>
 
 LM_LOG_GLOBAL_DECLARE();
-LM_LOG_REGISTER(arena);
+LM_LOG_REGISTER(u_arena);
 
 #include <src/metrics/timing.h>
 
@@ -35,7 +35,6 @@ u_arena *u_arena_create(size_t cap, bool contiguous, size_t alignment)
 	if (contiguous) {
 		// Ensures the arena and its data don't share a cache line.
 		size_t l1_cache_line_size = lm_get_l1_cache_line_size();
-		LmLogDebug("L1 cache line size: %zd", l1_cache_line_size);
 		size_t arena_cache_aligned_sz =
 			sizeof(u_arena) +
 			LmPaddingToAlign(sizeof(u_arena), l1_cache_line_size);

@@ -8,88 +8,245 @@ LM_LOG_REGISTER(validation);
 #include <src/metrics/timing.h>
 #include <src/u_arena/u_arena.h>
 
+#include <src/munit/munit.h>
+
+#include <stdlib.h>
 #include <stddef.h>
 
-void u_arena_test(void)
-{
-	LmLogDebug("Arena with non-contiguous memory test");
-	LmLogDebug("Size of u_arena: %zd", sizeof(u_arena));
+struct arena_test_params {
+	size_t cap;
+	size_t alignment;
+	int n_small_allocs;
+	int n_large_allocs;
+};
 
-	long long start = lm_get_time_stamp(PROC_CPUTIME);
-	u_arena *a = u_arena_create(4096, false, 16);
-	long long end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing(start, end, "arena creation", US, DBG,
+/*
+ * Time creation
+ * Test allocation alignment
+ * Time free
+ * Time small allocations (average)
+ * Time large allocations (average)
+*/
+static MunitResult u_arena_test(const MunitParameter params[], void *data)
+{
+	(void)params;
+	struct arena_test_params *test_params = data;
+
+	long long create_start = lm_get_time_stamp(PROC_CPUTIME);
+	u_arena *a = u_arena_create(test_params->cap, U_ARENA_NON_CONTIGUOUS,
+				    test_params->alignment);
+	long long create_end = lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing(create_end - create_start, "Arena creation", US, DBG,
 		      LM_LOG_MODULE_LOCAL);
 
 	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
 	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
 
-	start = lm_get_time_stamp(PROC_CPUTIME);
-	int *array = u_arena_array(a, int, 10);
-	end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing(start, end, "int array allocation: ", US, DBG,
-		      LM_LOG_MODULE_LOCAL);
+	/* Allocation size less than alignment */
+	//size_t alloc_sz = test_params->alignment - 1;
+	size_t alloc_sz = munit_rand_int_range(8, 15);
+	long long small_alloc_lt_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
 
-	ptrdiff_t array_size = LmPtrDiff(u_arena_pos(a), array);
-	bool array_is_aligned = LmIsAligned(array_size, a->alignment);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
+	}
+	u_arena_free(a);
 
-	LmLogDebug(
-		"sizeof type: %zd, a: %p, a->mem: %p, array: %p, pos: %p, array size: %zd, aligned: %s",
-		sizeof(*array), (void *)a, (void *)a->mem, (void *)array,
-		(void *)u_arena_pos(a), array_size,
-		LmBoolToString(array_is_aligned));
+	long long small_alloc_lt_aligned_sz_end =
+		lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_lt_aligned_sz_end -
+				  small_alloc_lt_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation < aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
+
+	/* Allocation size same as alignment */
+	alloc_sz = a->alignment;
+	long long small_alloc_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
+	}
+	u_arena_free(a);
+	long long small_alloc_aligned_sz_end = lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_aligned_sz_end -
+				  small_alloc_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
+
+	/* Allocation size greater than alignment */
+	alloc_sz = a->alignment + 1;
+	long long small_alloc_gt_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
+	}
+	u_arena_free(a);
+	long long small_alloc_gt_aligned_sz_end =
+		lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_gt_aligned_sz_end -
+				  small_alloc_gt_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation > aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
+
+	return MUNIT_OK;
 }
 
-void u_arena_contiguous_test(void)
+static MunitResult u_arena_contiguous_test(const MunitParameter params[],
+					   void *data)
 {
-	LmLogDebug("Arena with contiguous memory test");
+	(void)params;
+	struct arena_test_params *test_params = data;
 
-	size_t l1_cache_line_size = lm_get_l1_cache_line_size();
-
-	long long start = lm_get_time_stamp(PROC_CPUTIME);
-	u_arena *a =
-		u_arena_create(LmMebiByte(1) - l1_cache_line_size, true, 16);
-	long long end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing(start, end, "arena creation", US, DBG,
+	long long create_start = lm_get_time_stamp(PROC_CPUTIME);
+	u_arena *a = u_arena_create(test_params->cap, U_ARENA_CONTIGUOUS,
+				    test_params->alignment);
+	long long create_end = lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing(create_end - create_start, "Arena creation", US, DBG,
 		      LM_LOG_MODULE_LOCAL);
 
 	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
 	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
 
-//#define N_BYTES (734 * sizeof(int) + 1)
-#define N_BYTES (LmKibiByte(125) + 425)
+	/* Allocation size less than alignment */
+	size_t alloc_sz = test_params->alignment - 1;
+	//size_t alloc_sz = munit_rand_int_range(8, 15);
+	long long small_alloc_lt_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
 
-	start = lm_get_time_stamp(PROC_CPUTIME);
-	uint8_t *array = u_arena_alloc_no_align(a, N_BYTES);
-	end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing(start, end, "int array arena", US, DBG,
-		      LM_LOG_MODULE_LOCAL);
-	long long arena_time = end - start;
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
+	}
+	u_arena_free(a);
 
-	start = lm_get_time_stamp(PROC_CPUTIME);
-	uint8_t *array2 = malloc(N_BYTES);
-	end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing(start, end, "int array malloc", US, DBG,
-		      LM_LOG_MODULE_LOCAL);
-	long long malloc_time = end - start;
+	long long small_alloc_lt_aligned_sz_end =
+		lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_lt_aligned_sz_end -
+				  small_alloc_lt_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation < aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
 
-	struct timing_comp tc;
-	int res = lm_compare_timing(malloc_time, arena_time, &tc);
-	lm_log_timing_comp(tc, res, DBG, LM_LOG_MODULE_LOCAL);
+	/* Allocation size same as alignment */
+	alloc_sz = a->alignment;
+	long long small_alloc_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
+	}
+	u_arena_free(a);
+	long long small_alloc_aligned_sz_end = lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_aligned_sz_end -
+				  small_alloc_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
 
-	ptrdiff_t array_size = LmPtrDiff(u_arena_pos(a), array);
-	bool array_is_aligned = LmIsAligned(array_size, a->alignment);
+	/* Allocation size greater than alignment */
+	alloc_sz = a->alignment + 1;
+	long long small_alloc_gt_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
+	}
+	u_arena_free(a);
+	long long small_alloc_gt_aligned_sz_end =
+		lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_gt_aligned_sz_end -
+				  small_alloc_gt_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation > aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
 
-	LmLogDebug(
-		"sizeof type: %zd, a: %p, a->mem: %p, array: %p, pos: %p, array size: %zd, aligned: %s",
-		sizeof(*array), (void *)a, (void *)a->mem, (void *)array,
-		(void *)u_arena_pos(a), array_size,
-		LmBoolToString(array_is_aligned));
+	return MUNIT_OK;
 }
 
-int main(void)
+static MunitResult malloc_test(const MunitParameter params[], void *data)
 {
-	//u_arena_test();
-	u_arena_contiguous_test();
-	return 0;
+	(void)params;
+	struct arena_test_params *test_params = data;
+	uint8_t *allocation;
+
+	/* Allocation size less than alignment */
+	size_t alloc_sz = test_params->alignment - 1;
+	//size_t alloc_sz = munit_rand_int_range(8, 15);
+	long long small_alloc_lt_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		allocation = malloc(alloc_sz);
+	}
+	long long small_alloc_lt_aligned_sz_end =
+		lm_get_time_stamp(PROC_CPUTIME);
+
+	lm_log_timing_avg(small_alloc_lt_aligned_sz_end -
+				  small_alloc_lt_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation < aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
+
+	/* Allocation size same as alignment */
+	alloc_sz = test_params->alignment;
+	long long small_alloc_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		allocation = malloc(alloc_sz);
+	}
+	long long small_alloc_aligned_sz_end = lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_aligned_sz_end -
+				  small_alloc_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
+
+	/* Allocation size greater than alignment */
+	alloc_sz = test_params->alignment + 1;
+	long long small_alloc_gt_aligned_sz_start =
+		lm_get_time_stamp(PROC_CPUTIME);
+	for (int i = 0; i < test_params->n_small_allocs; ++i) {
+		allocation = malloc(alloc_sz);
+	}
+	long long small_alloc_gt_aligned_sz_end =
+		lm_get_time_stamp(PROC_CPUTIME);
+	lm_log_timing_avg(small_alloc_gt_aligned_sz_end -
+				  small_alloc_gt_aligned_sz_start,
+			  test_params->n_small_allocs,
+			  "Small allocation > aligned size average: ", US, DBG,
+			  LM_LOG_MODULE_LOCAL);
+
+	return MUNIT_OK;
+}
+static MunitTest tests[] = {
+	{ (char *)"u_arena non-contiguous", u_arena_test, NULL, NULL,
+	  MUNIT_TEST_OPTION_NONE, NULL },
+	{ (char *)"u_arena contiguous", u_arena_contiguous_test, NULL, NULL,
+	  MUNIT_TEST_OPTION_NONE, NULL },
+	{ (char *)"malloc", malloc_test, NULL, NULL, MUNIT_TEST_OPTION_NONE,
+	  NULL },
+	{ "", NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
+};
+
+static const MunitSuite test_suite = { (char *)"", tests, NULL, 1,
+				       MUNIT_SUITE_OPTION_NONE };
+
+int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
+{
+	//const int n = 20;
+	//long long sum = 0;
+	//for (int i = 0; i < n; ++i) {
+	//	long long foo = lm_get_time_stamp(PROC_CPUTIME);
+	//	long long bar = lm_get_time_stamp(PROC_CPUTIME);
+	//	//sum += bar - foo;
+	//	lm_log_timing(bar - foo, "Timing time", NS, DBG,
+	//		      LM_LOG_MODULE_LOCAL);
+	//}
+	//lm_log_timing_avg(sum, n, "Timing overhead", NS, DBG,
+	//		  LM_LOG_MODULE_LOCAL);
+
+	struct arena_test_params test_params = { LmKibiByte(512), 16, 10000,
+						 1000 };
+	int success = munit_suite_main(&test_suite, &test_params, argc, argv);
+	return EXIT_SUCCESS;
 }
