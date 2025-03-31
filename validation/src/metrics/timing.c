@@ -84,10 +84,20 @@ void lm_print_timing_avg(long long timing, long long count,
 			 const char *description, enum time_stamp_fmt stamp_fmt)
 {
 	char timing_str[64];
-	long long div = timing / count;
-	long long mod = timing % count;
-	lm_format_timing(div, stamp_fmt, timing_str);
-	printf("%s: %s (remainder %lld ns)\n", description, timing_str, mod);
+	double avg = (double)timing / count;
+	enum time_stamp_fmt adjusted_fmt = stamp_fmt;
+
+	if (avg < 1000.0 && stamp_fmt != NS) {
+		adjusted_fmt = NS;
+	} else if (avg < 1000000.0 && stamp_fmt != NS && stamp_fmt != US) {
+		adjusted_fmt = US;
+	}
+
+	long long avg_ll = (long long)avg;
+	lm_format_timing(avg_ll, adjusted_fmt, timing_str);
+
+	printf("%s: %s (total: %lld ns, count: %lld)", description, timing_str,
+	       timing, count);
 }
 
 // NOTE: (isa): Claude rewrote to this version
