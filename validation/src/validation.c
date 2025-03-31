@@ -20,13 +20,6 @@ struct arena_test_params {
 	int n_large_allocs;
 };
 
-/*
- * Time creation
- * Test allocation alignment
- * Time free
- * Time small allocations (average)
- * Time large allocations (average)
-*/
 static MunitResult u_arena_test(const MunitParameter params[], void *data)
 {
 	(void)params;

@@ -96,31 +96,18 @@ void lm_log_timing_avg(long long timing, long long count,
 		       enum lm_log_level log_level, lm_log_module *log_module)
 {
 	char timing_str[64];
-
-	/* Calculate the exact average as a double to maintain precision */
 	double avg = (double)timing / count;
-
-	/* For tiny values, switch to a more appropriate format */
 	enum time_stamp_fmt adjusted_fmt = stamp_fmt;
 
-	/* If the average is less than 1 microsecond and format is not NS already,
-       automatically switch to nanosecond format */
 	if (avg < 1000.0 && stamp_fmt != NS) {
 		adjusted_fmt = NS;
-	}
-	/* If the average is less than 1 millisecond but >= 1 microsecond,
-       and format is not NS or US, switch to microsecond format */
-	else if (avg < 1000000.0 && stamp_fmt != NS && stamp_fmt != US) {
+	} else if (avg < 1000000.0 && stamp_fmt != NS && stamp_fmt != US) {
 		adjusted_fmt = US;
 	}
 
-	/* Convert the double back to long long for formatting */
 	long long avg_ll = (long long)avg;
-
-	/* Format the calculated average */
 	lm_format_timing(avg_ll, adjusted_fmt, timing_str);
 
-	/* Log the result */
 	LmLogManual(log_level, log_module,
 		    "%s: %s (total: %lld ns, count: %lld)", description,
 		    timing_str, timing, count);
