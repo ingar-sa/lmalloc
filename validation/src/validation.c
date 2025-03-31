@@ -32,64 +32,57 @@ static MunitResult u_arena_test(const MunitParameter params[], void *data)
 	(void)params;
 	struct arena_test_params *test_params = data;
 
-	long long create_start = lm_get_time_stamp(PROC_CPUTIME);
+	LM_START_TIMING(create, PROC_CPUTIME);
 	u_arena *a = u_arena_create(test_params->cap, U_ARENA_NON_CONTIGUOUS,
 				    test_params->alignment);
-	long long create_end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing(create_end - create_start, "Arena creation", US, DBG,
-		      LM_LOG_MODULE_LOCAL);
+	LM_END_TIMING(create, PROC_CPUTIME);
+	LM_LOG_TIMING(create, "Arena creation", US, DBG, LM_LOG_MODULE_LOCAL);
 
 	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
-	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
+	LmLogDebug("Distance from arena to its memory%zd", a_to_a_mem_diff);
 
 	/* Allocation size less than alignment */
-	//size_t alloc_sz = test_params->alignment - 1;
-	size_t alloc_sz = munit_rand_int_range(8, 15);
-	long long small_alloc_lt_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+	size_t alloc_sz = test_params->alignment - 1;
 
+	LM_START_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
 	}
 	u_arena_free(a);
+	LM_END_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
 
-	long long small_alloc_lt_aligned_sz_end =
-		lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_lt_aligned_sz_end -
-				  small_alloc_lt_aligned_sz_start,
+	LM_LOG_TIMING_AVG(small_alloc_lt_aligned_sz,
 			  test_params->n_small_allocs,
-			  "Small allocation < aligned size average: ", US, DBG,
+			  "Small allocation < aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
 	/* Allocation size same as alignment */
 	alloc_sz = a->alignment;
-	long long small_alloc_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+
+	LM_START_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
 	}
 	u_arena_free(a);
-	long long small_alloc_aligned_sz_end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_aligned_sz_end -
-				  small_alloc_aligned_sz_start,
-			  test_params->n_small_allocs,
-			  "Small allocation aligned size average: ", US, DBG,
+	LM_END_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
+
+	LM_LOG_TIMING_AVG(small_alloc_aligned_sz, test_params->n_small_allocs,
+			  "Small allocation aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
 	/* Allocation size greater than alignment */
 	alloc_sz = a->alignment + 1;
-	long long small_alloc_gt_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+
+	LM_START_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
 	}
 	u_arena_free(a);
-	long long small_alloc_gt_aligned_sz_end =
-		lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_gt_aligned_sz_end -
-				  small_alloc_gt_aligned_sz_start,
+	LM_END_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
+
+	LM_LOG_TIMING_AVG(small_alloc_gt_aligned_sz,
 			  test_params->n_small_allocs,
-			  "Small allocation > aligned size average: ", US, DBG,
+			  "Small allocation > aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
 	return MUNIT_OK;
@@ -101,64 +94,57 @@ static MunitResult u_arena_contiguous_test(const MunitParameter params[],
 	(void)params;
 	struct arena_test_params *test_params = data;
 
-	long long create_start = lm_get_time_stamp(PROC_CPUTIME);
+	LM_START_TIMING(create, PROC_CPUTIME);
 	u_arena *a = u_arena_create(test_params->cap, U_ARENA_CONTIGUOUS,
 				    test_params->alignment);
-	long long create_end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing(create_end - create_start, "Arena creation", US, DBG,
-		      LM_LOG_MODULE_LOCAL);
+	LM_END_TIMING(create, PROC_CPUTIME);
+	LM_LOG_TIMING(create, "Arena creation", US, DBG, LM_LOG_MODULE_LOCAL);
 
 	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
-	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
+	LmLogDebug("Distance from arena to its memory%zd", a_to_a_mem_diff);
 
 	/* Allocation size less than alignment */
 	size_t alloc_sz = test_params->alignment - 1;
-	//size_t alloc_sz = munit_rand_int_range(8, 15);
-	long long small_alloc_lt_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
 
+	LM_START_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
 	}
 	u_arena_free(a);
+	LM_END_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
 
-	long long small_alloc_lt_aligned_sz_end =
-		lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_lt_aligned_sz_end -
-				  small_alloc_lt_aligned_sz_start,
+	LM_LOG_TIMING_AVG(small_alloc_lt_aligned_sz,
 			  test_params->n_small_allocs,
-			  "Small allocation < aligned size average: ", US, DBG,
+			  "Small allocation < aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
 	/* Allocation size same as alignment */
 	alloc_sz = a->alignment;
-	long long small_alloc_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+
+	LM_START_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
 	}
 	u_arena_free(a);
-	long long small_alloc_aligned_sz_end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_aligned_sz_end -
-				  small_alloc_aligned_sz_start,
-			  test_params->n_small_allocs,
-			  "Small allocation aligned size average: ", US, DBG,
+	LM_END_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
+
+	LM_LOG_TIMING_AVG(small_alloc_aligned_sz, test_params->n_small_allocs,
+			  "Small allocation aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
 	/* Allocation size greater than alignment */
 	alloc_sz = a->alignment + 1;
-	long long small_alloc_gt_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+
+	LM_START_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
 	}
 	u_arena_free(a);
-	long long small_alloc_gt_aligned_sz_end =
-		lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_gt_aligned_sz_end -
-				  small_alloc_gt_aligned_sz_start,
+	LM_END_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
+
+	LM_LOG_TIMING_AVG(small_alloc_gt_aligned_sz,
 			  test_params->n_small_allocs,
-			  "Small allocation > aligned size average: ", US, DBG,
+			  "Small allocation > aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
 	return MUNIT_OK;
@@ -170,50 +156,42 @@ static MunitResult malloc_test(const MunitParameter params[], void *data)
 	struct arena_test_params *test_params = data;
 	uint8_t *allocation;
 
-	/* Allocation size less than alignment */
+	/* Allocation size less than (arena) alignment */
 	size_t alloc_sz = test_params->alignment - 1;
-	//size_t alloc_sz = munit_rand_int_range(8, 15);
-	long long small_alloc_lt_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+	LM_START_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		allocation = malloc(alloc_sz);
 	}
-	long long small_alloc_lt_aligned_sz_end =
-		lm_get_time_stamp(PROC_CPUTIME);
+	LM_END_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
 
-	lm_log_timing_avg(small_alloc_lt_aligned_sz_end -
-				  small_alloc_lt_aligned_sz_start,
+	LM_LOG_TIMING_AVG(small_alloc_lt_aligned_sz,
 			  test_params->n_small_allocs,
-			  "Small allocation < aligned size average: ", US, DBG,
+			  "Small allocation < aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
-	/* Allocation size same as alignment */
+	/* Allocation size same as (arena) alignment */
 	alloc_sz = test_params->alignment;
-	long long small_alloc_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+	LM_START_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		allocation = malloc(alloc_sz);
 	}
-	long long small_alloc_aligned_sz_end = lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_aligned_sz_end -
-				  small_alloc_aligned_sz_start,
-			  test_params->n_small_allocs,
-			  "Small allocation aligned size average: ", US, DBG,
+	LM_END_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
+
+	LM_LOG_TIMING_AVG(small_alloc_aligned_sz, test_params->n_small_allocs,
+			  "Small allocation aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
-	/* Allocation size greater than alignment */
+	/* Allocation size greater than (arena) alignment */
 	alloc_sz = test_params->alignment + 1;
-	long long small_alloc_gt_aligned_sz_start =
-		lm_get_time_stamp(PROC_CPUTIME);
+	LM_START_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
 	for (int i = 0; i < test_params->n_small_allocs; ++i) {
 		allocation = malloc(alloc_sz);
 	}
-	long long small_alloc_gt_aligned_sz_end =
-		lm_get_time_stamp(PROC_CPUTIME);
-	lm_log_timing_avg(small_alloc_gt_aligned_sz_end -
-				  small_alloc_gt_aligned_sz_start,
+	LM_END_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
+
+	LM_LOG_TIMING_AVG(small_alloc_gt_aligned_sz,
 			  test_params->n_small_allocs,
-			  "Small allocation > aligned size average: ", US, DBG,
+			  "Small allocation > aligned size average", US, DBG,
 			  LM_LOG_MODULE_LOCAL);
 
 	return MUNIT_OK;
@@ -245,7 +223,7 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 	//lm_log_timing_avg(sum, n, "Timing overhead", NS, DBG,
 	//		  LM_LOG_MODULE_LOCAL);
 
-	struct arena_test_params test_params = { LmKibiByte(512), 16, 10000,
+	struct arena_test_params test_params = { LmKibiByte(512), 16, 100000,
 						 1000 };
 	int success = munit_suite_main(&test_suite, &test_params, argc, argv);
 	return EXIT_SUCCESS;
