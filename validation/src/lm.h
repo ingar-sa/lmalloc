@@ -140,7 +140,7 @@ int lm__set_log_file_by_name__(const char *filename, const char *mode,
 			       lm__log_module__ *module);
 #define LmSetLogFileByNameLocal(filename, mode) \
 	lm__set_log_file_by_name__(filename, mode, LM_LOG_MODULE_LOCAL)
-#define LmSetLogFileByNameGlobal(filename) \
+#define LmSetLogFileByNameGlobal(filename, mode) \
 	lm__set_log_file_by_name__(filename, mode, LM_LOG_MODULE_GLOBAL)
 
 void lm__set_log_file__(FILE *file, lm__log_module__ *module);
@@ -162,11 +162,11 @@ void lm__disable_log_to_term__(lm__log_module__ *module);
 
 void lm__enable_log_raw__(lm__log_module__ *module);
 #define LmEnableLogRawLocal() lm__enable_log_raw__(LM_LOG_MODULE_LOCAL)
-#define LmEnableLogRawGlobal() lm__enable_log_raw__(LM_LOG_MODULE_LOCAL)
+#define LmEnableLogRawGlobal() lm__enable_log_raw__(LM_LOG_MODULE_GLOBAL)
 
 void lm__disable_log_raw__(lm__log_module__ *module);
 #define LmDisableLogRawLocal() lm__disable_log_raw__(LM_LOG_MODULE_LOCAL)
-#define LmDisableLogRawGlobal() lm__disable_log_raw__(LM_LOG_MODULE_LOCAL)
+#define LmDisableLogRawGlobal() lm__disable_log_raw__(LM_LOG_MODULE_GLOBAL)
 
 #define LM__LOG_LEVEL_CHECK__(level) (LM_LOG_LEVEL >= LM_LOG_LEVEL_##level)
 

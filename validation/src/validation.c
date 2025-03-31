@@ -32,6 +32,8 @@ static MunitResult u_arena_test(const MunitParameter params[], void *data)
 	(void)params;
 	struct arena_test_params *test_params = data;
 
+	LmLogDebug("non-contiguous arena test");
+
 	LM_START_TIMING(create, PROC_CPUTIME);
 	u_arena *a = u_arena_create(test_params->cap, U_ARENA_NON_CONTIGUOUS,
 				    test_params->alignment);
@@ -94,6 +96,8 @@ static MunitResult u_arena_contiguous_test(const MunitParameter params[],
 	(void)params;
 	struct arena_test_params *test_params = data;
 
+	LmLogDebug("contiguous arena test");
+
 	LM_START_TIMING(create, PROC_CPUTIME);
 	u_arena *a = u_arena_create(test_params->cap, U_ARENA_CONTIGUOUS,
 				    test_params->alignment);
@@ -155,6 +159,8 @@ static MunitResult malloc_test(const MunitParameter params[], void *data)
 	(void)params;
 	struct arena_test_params *test_params = data;
 	uint8_t *allocation;
+
+	LmLogDebug("malloc test");
 
 	/* Allocation size less than (arena) alignment */
 	size_t alloc_sz = test_params->alignment - 1;
@@ -222,15 +228,16 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 	//}
 	//lm_log_timing_avg(sum, n, "Timing overhead", NS, DBG,
 	//		  LM_LOG_MODULE_LOCAL);
-	int ret = LmSetLogFileByNameLocal("./logs/timing.txt", "w");
-	LmEnableLogRawLocal();
 
-	if (ret != 0) {
-		LmLogError("Failed to set log file");
-		return EXIT_FAILURE;
-	}
+	FILE *log_file = lm_open_file_by_name("./logs/timing.txt", "w");
+	LmSetLogFileLocal(log_file);
+	LmSetLogFileGlobal(log_file);
+	LmEnableLogRawLocal();
+	LmEnableLogRawGlobal();
+
 	struct arena_test_params test_params = { LmKibiByte(512), 16, 100000,
 						 1000 };
 	int success = munit_suite_main(&test_suite, &test_params, argc, argv);
+
 	return EXIT_SUCCESS;
 }
