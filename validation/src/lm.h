@@ -120,9 +120,13 @@ enum lm_log_level {
 
 typedef struct lm__log_module__ {
 	const char *name;
+	pthread_mutex_t lock;
+	bool write_to_term; // True by default
+	bool write_to_file; // False by default
+	bool write_raw;
+	FILE *file;
 	size_t buf_size;
 	char *buf;
-	pthread_mutex_t lock;
 } lm__log_module__;
 
 typedef struct lm__log_module__ lm_log_module;
@@ -132,22 +136,58 @@ typedef struct lm__log_module__ lm_log_module;
 int lm__write_log__(lm__log_module__ *module, const char *log_level,
 		    const char *fmt, ...) __attribute__((format(printf, 3, 4)));
 
+int lm__set_log_file_by_name__(const char *filename, const char *mode,
+			       lm__log_module__ *module);
+#define LmSetLogFileByNameLocal(filename, mode) \
+	lm__set_log_file_by_name__(filename, mode, LM_LOG_MODULE_LOCAL)
+#define LmSetLogFileByNameGlobal(filename) \
+	lm__set_log_file_by_name__(filename, mode, LM_LOG_MODULE_GLOBAL)
+
+void lm__set_log_file__(FILE *file, lm__log_module__ *module);
+#define LmSetLogFileLocal(file) lm__set_log_file__(file, LM_LOG_MODULE_LOCAL)
+#define LmSetLogFileGlobal(file) lm__set_log_file__(file, LM_LOG_MODULE_GLOBAL)
+
+void lm__remove_log_file__(lm__log_module__ *module);
+#define LmRemoveLogFileLocal() lm__remove_log_file__(LM_LOG_MODULE_LOCAL)
+#define LmRemoveLogFileGlobal() lm__remove_log_file__(LM_LOG_MODULE_GLOBAL)
+
+void lm__enable_log_to_term__(lm__log_module__ *module);
+#define LmEnableLogToTermLocal() lm__enable_log_to_term__(LM_LOG_MODULE_LOCAL)
+#define LmEnableLogToTermGlobal() lm__enable_log_to_term__(LM_LOG_MODULE_GLOBAL)
+
+void lm__disable_log_to_term__(lm__log_module__ *module);
+#define LmDisableLogToTermLocal() lm__disable_log_to_term__(LM_LOG_MODULE_LOCAL)
+#define LmDisableLogToTermGlobal() \
+	lm__disable_log_to_term__(LM_LOG_MODULE_GLOBAL)
+
+void lm__enable_log_raw__(lm__log_module__ *module);
+#define LmEnableLogRawLocal() lm__enable_log_raw__(LM_LOG_MODULE_LOCAL)
+#define LmEnableLogRawGlobal() lm__enable_log_raw__(LM_LOG_MODULE_LOCAL)
+
+void lm__disable_log_raw__(lm__log_module__ *module);
+#define LmDisableLogRawLocal() lm__disable_log_raw__(LM_LOG_MODULE_LOCAL)
+#define LmDisableLogRawGlobal() lm__disable_log_raw__(LM_LOG_MODULE_LOCAL)
+
 #define LM__LOG_LEVEL_CHECK__(level) (LM_LOG_LEVEL >= LM_LOG_LEVEL_##level)
 
 #define LM_LOGGING_NOT_USED() \
 	static lm__log_module__ *lm__log_instance__ __attribute__((used)) = NULL
 
-#define LM_LOG_REGISTER(module_name)                                        \
-	static char LM_CONCAT3(lm__log_module_, module_name,                \
-			       buf__)[LM_LOG_BUF_SIZE];                     \
-	lm__log_module__ LM_CONCAT3(lm__log_module_, module_name,           \
-				    __) __attribute__((used)) = {           \
-		.name = LM_STRINGIFY(module_name),                          \
-		.buf_size = LM_LOG_BUF_SIZE,                                \
-		.buf = LM_CONCAT3(lm__log_module_, module_name, buf__),     \
-		.lock = PTHREAD_MUTEX_INITIALIZER                           \
-	};                                                                  \
-	static lm__log_module__ *lm__log_instance__ __attribute__((used)) = \
+#define LM_LOG_REGISTER(module_name)                                           \
+	static char LM_CONCAT3(lm__log_module_, module_name,                   \
+			       buf__)[LM_LOG_BUF_SIZE];                        \
+	lm__log_module__ LM_CONCAT3(lm__log_module_, module_name, __)          \
+		__attribute__((used)) = {                                      \
+			.name = LM_STRINGIFY(module_name),                     \
+			.lock = PTHREAD_MUTEX_INITIALIZER,                     \
+			.write_to_term = true,                                 \
+			.write_to_file = false,                                \
+			.write_raw = false,                                    \
+			.file = NULL,                                          \
+			.buf_size = LM_LOG_BUF_SIZE,                           \
+			.buf = LM_CONCAT3(lm__log_module_, module_name, buf__) \
+		};                                                             \
+	static lm__log_module__ *lm__log_instance__ __attribute__((used)) =    \
 		&LM_CONCAT3(lm__log_module_, module_name, __)
 
 #define LM_LOG_DECLARE(name)                                           \
@@ -155,14 +195,18 @@ int lm__write_log__(lm__log_module__ *module, const char *log_level,
 	static lm__log_module__ *lm__log_instance__                    \
 		__attribute__((used)) = &LM_CONCAT3(lm__log_module_, name, __)
 
-#define LM_LOG_GLOBAL_REGISTER()                                               \
-	static char lm__log_module_global_buf__[LM_LOG_BUF_SIZE];              \
-	lm__log_module__ lm__log_module_global__                               \
-		__attribute__((used)) = { .name = "global",                    \
-					  .buf_size = LM_LOG_BUF_SIZE,         \
-					  .buf = lm__log_module_global_buf__,  \
-					  .lock = PTHREAD_MUTEX_INITIALIZER }; \
-	lm__log_module__ *lm__log_instance_global__                            \
+#define LM_LOG_GLOBAL_REGISTER()                                  \
+	static char lm__log_module_global_buf__[LM_LOG_BUF_SIZE]; \
+	lm__log_module__ lm__log_module_global__ __attribute__((  \
+		used)) = { .name = "global",                      \
+			   .lock = PTHREAD_MUTEX_INITIALIZER,     \
+			   .write_to_term = true,                 \
+			   .write_to_file = false,                \
+			   .write_raw = false,                    \
+			   .file = NULL,                          \
+			   .buf_size = LM_LOG_BUF_SIZE,           \
+			   .buf = lm__log_module_global_buf__ };  \
+	lm__log_module__ *lm__log_instance_global__               \
 		__attribute__((used)) = &lm__log_module_global__
 
 #define LM_LOG_GLOBAL_DECLARE() \
@@ -277,10 +321,15 @@ typedef struct lm_file_data {
 	uint8_t *data;
 } lm_file_data;
 
-lm_file_data *lm_load_file_into_mem(const char *filename);
+lm_file_data *lm_load_file_into_memory(const char *filename);
 void lm_free_file_data(lm_file_data **file_data);
-int lm_write_bytes_to_file(const uint8_t *buf, size_t size,
-			   const char *filename);
+
+FILE *lm_open_file_by_name(const char *filename, const char *mode);
+int lm_close_file(FILE *file);
+
+int lm_write_bytes_to_file(const uint8_t *buf, size_t size, FILE *file);
+int lm_write_bytes_to_file_by_name(const uint8_t *buf, size_t size,
+				   const char *filename);
 
 ////////////////////////////////////////
 //              SYSTEM                //
@@ -328,43 +377,47 @@ int lm__write_log__(lm__log_module__ *module, const char *log_level,
 
 	pthread_mutex_lock(&module->lock);
 
-	time_t posix_time;
-	struct tm time_info;
-
-	if ((time_t)(-1) == time(&posix_time)) {
-		return -errno;
-	}
-
-	if (NULL == localtime_r(&posix_time, &time_info)) {
-		return -errno;
-	}
-
 	size_t chars_written = 0;
 	size_t buf_remaining = module->buf_size;
+	int fmt_ret = 0;
 
-	int fmt_ret = strftime(module->buf, buf_remaining, "%T: ", &time_info);
-	if (0 == fmt_ret) {
-		// NOTE(ingar): Since the buffer size is at least 128, this should never happen
-		assert(fmt_ret);
-		return -ENOMEM;
+	if (!module->write_raw) {
+		time_t posix_time;
+		struct tm time_info;
+
+		if ((time_t)(-1) == time(&posix_time)) {
+			return -errno;
+		}
+
+		if (NULL == localtime_r(&posix_time, &time_info)) {
+			return -errno;
+		}
+
+		int fmt_ret = strftime(module->buf, buf_remaining,
+				       "%T: ", &time_info);
+		if (0 == fmt_ret) {
+			// NOTE(ingar): Since the buffer size is at least 128, this should never happen
+			assert(fmt_ret);
+			return -ENOMEM;
+		}
+
+		chars_written = fmt_ret;
+		buf_remaining -= fmt_ret;
+
+		fmt_ret = snprintf(module->buf + chars_written, buf_remaining,
+				   "%s: %s: ", module->name, log_level);
+		if (fmt_ret < 0) {
+			return -errno;
+		} else if ((size_t)fmt_ret >= buf_remaining) {
+			// NOTE(ingar): If the log module name is so long that it does not fit in 128 bytes - the
+			// time stamp, it should be changed
+			assert(fmt_ret);
+			return -ENOMEM;
+		}
+
+		chars_written += fmt_ret;
+		buf_remaining -= fmt_ret;
 	}
-
-	chars_written = fmt_ret;
-	buf_remaining -= fmt_ret;
-
-	fmt_ret = snprintf(module->buf + chars_written, buf_remaining,
-			   "%s: %s: ", module->name, log_level);
-	if (fmt_ret < 0) {
-		return -errno;
-	} else if ((size_t)fmt_ret >= buf_remaining) {
-		// NOTE(ingar): If the log module name is so long that it does not fit in 128 bytes - the
-		// time stamp, it should be changed
-		assert(fmt_ret);
-		return -ENOMEM;
-	}
-
-	chars_written += fmt_ret;
-	buf_remaining -= fmt_ret;
 
 	va_list va_args;
 	va_start(va_args, fmt);
@@ -389,20 +442,88 @@ int lm__write_log__(lm__log_module__ *module, const char *log_level,
 	chars_written += fmt_ret;
 	module->buf[chars_written++] = '\n';
 
-	int out_fd;
-	if ('E' == log_level[0]) {
-		out_fd = STDERR_FILENO;
-	} else {
-		out_fd = STDOUT_FILENO;
+	if (module->write_to_term) {
+		int out_fd;
+		if ('E' == log_level[0]) {
+			out_fd = STDERR_FILENO;
+		} else {
+			out_fd = STDOUT_FILENO;
+		}
+
+		if ((ssize_t)(-1) ==
+		    write(out_fd, module->buf, chars_written)) {
+			return -errno;
+		}
 	}
 
-	if ((ssize_t)(-1) == write(out_fd, module->buf, chars_written)) {
-		return -errno;
+	if (module->write_to_file) {
+		if ((size_t)1 !=
+		    fwrite(module->buf, chars_written, 1, module->file)) {
+			return -ferror(module->file);
+		}
 	}
 
 	pthread_mutex_unlock(&module->lock);
 
 	return 0;
+}
+
+void lm__set_log_file__(FILE *file, lm__log_module__ *module)
+{
+	pthread_mutex_lock(&module->lock);
+	module->write_to_file = true;
+	module->file = file;
+	pthread_mutex_unlock(&module->lock);
+}
+
+int lm__set_log_file_by_name__(const char *filename, const char *mode,
+			       lm__log_module__ *module)
+{
+	FILE *file = fopen(filename, mode);
+	if (!file) {
+		LmLogErrorG("Failed to open log file %s in mode %s: %s",
+			    filename, mode, strerror(errno));
+		return -1;
+	}
+
+	lm__set_log_file__(file, module);
+	return 0;
+}
+
+void lm__remove_log_file__(lm__log_module__ *module)
+{
+	pthread_mutex_lock(&module->lock);
+	module->write_to_file = false;
+	module->file = NULL;
+	pthread_mutex_unlock(&module->lock);
+}
+
+void lm__enable_log_to_term__(lm__log_module__ *module)
+{
+	pthread_mutex_lock(&module->lock);
+	module->write_to_term = true;
+	pthread_mutex_unlock(&module->lock);
+}
+
+void lm__disable_log_to_term__(lm__log_module__ *module)
+{
+	pthread_mutex_lock(&module->lock);
+	module->write_to_term = false;
+	pthread_mutex_lock(&module->lock);
+}
+
+void lm__enable_log_raw__(lm__log_module__ *module)
+{
+	pthread_mutex_lock(&module->lock);
+	module->write_raw = true;
+	pthread_mutex_unlock(&module->lock);
+}
+
+void lm__disable_log_raw__(lm__log_module__ *module)
+{
+	pthread_mutex_lock(&module->lock);
+	module->write_raw = false;
+	pthread_mutex_unlock(&module->lock);
 }
 
 ////////////////////////////////////////
@@ -464,7 +585,7 @@ void lm__free_trace__(void *ptr, int line, const char *func,
 	}
 }
 
-lm_file_data *lm_load_file_into_mem(const char *filename)
+lm_file_data *lm_load_file_into_memory(const char *filename)
 {
 	FILE *file = fopen(filename, "rb");
 	if (!file) {
@@ -495,11 +616,9 @@ lm_file_data *lm_load_file_into_mem(const char *filename)
 	file_data->size = file_size;
 	file_data->data = (uint8_t *)file_data + sizeof(lm_file_data);
 
-	size_t bytes_read = fread(file_data->data, 1, file_size, file);
-	if (bytes_read != file_size) {
+	if (fread(file_data->data, file_size, 1, file) != 1) {
 		LmLogErrorG("Failed to read data from file %s: %s", filename,
 			    strerror(errno));
-
 		fclose(file);
 		free(file_data);
 		return NULL;
@@ -520,8 +639,41 @@ void lm_free_file_data(lm_file_data **file_data)
 	}
 }
 
-int lm_write_bytes_to_file(const uint8_t *buf, size_t size,
-			   const char *filename)
+FILE *lm_open_file_by_name(const char *filename, const char *mode)
+{
+	FILE *file = fopen(filename, mode);
+	if (!file) {
+		LmLogErrorG("Failed to open file %s in mode %s: %s", filename,
+			    mode, strerror(errno));
+		return NULL;
+	}
+
+	return file;
+}
+
+int lm_close_file(FILE *file)
+{
+	if (EOF == fclose(file)) {
+		LmLogErrorG("Failed to close file %p", (void *)file);
+		return -EOF;
+	}
+
+	return 0;
+}
+
+int lm_write_bytes_to_file(const uint8_t *buf, size_t size, FILE *file)
+{
+	if (!(fwrite(buf, size, 1, file) == (size_t)1)) {
+		LmLogErrorG("Failed to write buffer to file %p: %s",
+			    (void *)file, strerror(errno));
+		return -errno;
+	}
+
+	return 0;
+}
+
+int lm_write_bytes_to_file_by_name(const uint8_t *buf, size_t size,
+				   const char *filename)
 {
 	FILE *file = fopen(filename, "wb");
 	if (!file) {
@@ -529,7 +681,7 @@ int lm_write_bytes_to_file(const uint8_t *buf, size_t size,
 		return errno;
 	}
 
-	if (!(fwrite(buf, size, 1, file) == 1)) {
+	if (!(fwrite(buf, size, 1, file) == (size_t)1)) {
 		LmLogErrorG("Failed to write buffer to file %s: %s", filename,
 			    strerror(errno));
 		return errno;

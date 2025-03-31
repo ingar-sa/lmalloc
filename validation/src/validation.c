@@ -39,7 +39,7 @@ static MunitResult u_arena_test(const MunitParameter params[], void *data)
 	LM_LOG_TIMING(create, "Arena creation", US, DBG, LM_LOG_MODULE_LOCAL);
 
 	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
-	LmLogDebug("Distance from arena to its memory%zd", a_to_a_mem_diff);
+	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
 
 	/* Allocation size less than alignment */
 	size_t alloc_sz = test_params->alignment - 1;
@@ -101,7 +101,7 @@ static MunitResult u_arena_contiguous_test(const MunitParameter params[],
 	LM_LOG_TIMING(create, "Arena creation", US, DBG, LM_LOG_MODULE_LOCAL);
 
 	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
-	LmLogDebug("Distance from arena to its memory%zd", a_to_a_mem_diff);
+	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
 
 	/* Allocation size less than alignment */
 	size_t alloc_sz = test_params->alignment - 1;
@@ -222,7 +222,13 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 	//}
 	//lm_log_timing_avg(sum, n, "Timing overhead", NS, DBG,
 	//		  LM_LOG_MODULE_LOCAL);
+	int ret = LmSetLogFileByNameLocal("./logs/timing.txt", "w");
+	LmEnableLogRawLocal();
 
+	if (ret != 0) {
+		LmLogError("Failed to set log file");
+		return EXIT_FAILURE;
+	}
 	struct arena_test_params test_params = { LmKibiByte(512), 16, 100000,
 						 1000 };
 	int success = munit_suite_main(&test_suite, &test_params, argc, argv);
