@@ -7,6 +7,7 @@
 // part by uncommenting #define LM_H_IMPLEMENTATION (and remember to comment it out again
 // afterwards,
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -81,6 +82,8 @@ typedef unsigned int uint;
 #define LmBoolToString(bool) ((bool) ? "true" : "false")
 
 #define LmPtrDiff(a, b) (ptrdiff_t)((uintptr_t)a - (uintptr_t)b)
+
+size_t lm_mem_sz_from_string(const char *string);
 
 ////////////////////////////////////////
 //              LOGGING               //
@@ -396,7 +399,7 @@ LM_END_EXTERN_C
 //     BEGINNING OF IMPLEMENTATION    //
 ////////////////////////////////////////
 
-// WARN: Only one file in a program should define SDB_H_IMPLEMENTATION, otherwise you will get
+// WARN: Only one file in a program should define LM_H_IMPLEMENTATION, otherwise you will get
 // redefintion errors
 //#define LM_H_IMPLEMENTATION // Uncomment/comment to enable/disable syntax highlighting
 #ifdef LM_H_IMPLEMENTATION
@@ -409,6 +412,77 @@ LM_LOG_GLOBAL_DECLARE(); // Enables use of logging functionality inside this hea
 #undef free
 #endif
 
+////////////////////////////////////////
+//               MISC                 //
+////////////////////////////////////////
+
+// NOTE: (isa): Written by Claude
+size_t lm_mem_sz_from_string(const char *string)
+{
+	if (!string || !*string) {
+		return 0;
+	}
+
+	char *end_ptr;
+	size_t value = strtoull(string, &end_ptr, 10);
+
+	if (end_ptr == string) {
+		return 0; // No number found
+	}
+
+	while (isspace(*end_ptr)) {
+		end_ptr++;
+	}
+
+	if (!*end_ptr) {
+		return value;
+	}
+
+	size_t multiplier = 0;
+	switch (*end_ptr) {
+	case 'T':
+		multiplier = 1000ULL * 1000ULL * 1000ULL * 1000ULL;
+		break;
+	case 't':
+		multiplier = 1024ULL * 1024ULL * 1024ULL * 1024ULL;
+		break;
+	case 'G':
+		multiplier = 1000ULL * 1000ULL * 1000ULL;
+		break;
+	case 'g':
+		multiplier = 1024ULL * 1024ULL * 1024ULL;
+		break;
+	case 'M':
+		multiplier = 1000ULL * 1000ULL;
+		break;
+	case 'm':
+		multiplier = 1024ULL * 1024ULL;
+		break;
+	case 'K':
+		multiplier = 1000ULL;
+		break;
+	case 'k':
+		multiplier = 1024ULL;
+		break;
+	case 'B':
+		// Check if this is just 'B' or part of a larger unit
+		if (end_ptr[1] != '\0') {
+			return 0;
+		} else {
+			multiplier = 1;
+		}
+		break;
+	default:
+		return 0;
+	}
+
+	// If we have a unit letter, verify it's followed by 'B' (except for plain 'B')
+	if (*end_ptr != 'B' && (end_ptr[1] != 'B' || end_ptr[2] != '\0')) {
+		return 0;
+	}
+
+	return value * multiplier;
+}
 ////////////////////////////////////////
 //              LOGGING               //
 ////////////////////////////////////////
