@@ -12,6 +12,8 @@
 
 #define U_ARENA_CONTIGUOUS true
 #define U_ARENA_NON_CONTIGUOUS false
+#define U_ARENA_MALLOCD true
+#define U_ARENA_NOT_MALLOCD false
 
 typedef struct u_arena {
 	bool contiguous;

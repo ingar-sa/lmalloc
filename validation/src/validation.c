@@ -6,203 +6,151 @@ LM_LOG_GLOBAL_REGISTER();
 LM_LOG_REGISTER(validation);
 
 #include <src/metrics/timing.h>
-#include <src/u_arena/u_arena.h>
+#include <src/tests/allocator_tests.h>
+#include <src/allocators/u_arena.h>
 
 #include <src/munit/munit.h>
 
 #include <stdlib.h>
 #include <stddef.h>
 
-struct arena_test_params {
-	size_t cap;
-	size_t alignment;
-	int n_small_allocs;
-	int n_large_allocs;
-};
+#define ARENA_SZ LmKibiByte(512)
 
-static MunitResult u_arena_test(const MunitParameter params[], void *data)
+static MunitResult u_arena_mallocd_cont_test(const MunitParameter params[],
+					     void *data)
 {
 	(void)params;
-	struct arena_test_params *test_params = data;
-
-	LmLogDebug("non-contiguous arena test");
-
-	LM_START_TIMING(create, PROC_CPUTIME);
-	u_arena *a = u_arena_create(test_params->cap, U_ARENA_NON_CONTIGUOUS,
-				    test_params->alignment);
-	LM_END_TIMING(create, PROC_CPUTIME);
-	LM_LOG_TIMING(create, "Arena creation", US, DBG, LM_LOG_MODULE_LOCAL);
-
-	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
-	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
-
-	/* Allocation size less than alignment */
-	size_t alloc_sz = test_params->alignment - 1;
-
-	LM_START_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
-	}
-	u_arena_free(a);
-	LM_END_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_lt_aligned_sz,
-			  test_params->n_small_allocs,
-			  "Small allocation < aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	/* Allocation size same as alignment */
-	alloc_sz = a->alignment;
-
-	LM_START_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
-	}
-	u_arena_free(a);
-	LM_END_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_aligned_sz, test_params->n_small_allocs,
-			  "Small allocation aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	/* Allocation size greater than alignment */
-	alloc_sz = a->alignment + 1;
-
-	LM_START_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
-	}
-	u_arena_free(a);
-	LM_END_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_gt_aligned_sz,
-			  test_params->n_small_allocs,
-			  "Small allocation > aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	return MUNIT_OK;
+	(void)data;
+	struct u_arena_test_params test_params = { ARENA_SZ, 16,
+						   U_ARENA_CONTIGUOUS,
+						   U_ARENA_MALLOCD };
+	if (u_arena_tests(test_params) == 0)
+		return MUNIT_OK;
+	else
+		return MUNIT_FAIL;
 }
 
-static MunitResult u_arena_contiguous_test(const MunitParameter params[],
-					   void *data)
+static MunitResult u_arena_mallocd_non_cont_test(const MunitParameter params[],
+						 void *data)
 {
 	(void)params;
-	struct arena_test_params *test_params = data;
+	(void)data;
+	struct u_arena_test_params test_params = { ARENA_SZ, 16,
+						   U_ARENA_NON_CONTIGUOUS,
+						   U_ARENA_MALLOCD };
+	if (u_arena_tests(test_params) == 0)
+		return MUNIT_OK;
+	else
+		return MUNIT_FAIL;
+}
+static MunitResult u_arena_not_mallocd_cont_test(const MunitParameter params[],
+						 void *data)
+{
+	(void)params;
+	(void)data;
+	struct u_arena_test_params test_params = { ARENA_SZ, 16,
+						   U_ARENA_CONTIGUOUS,
+						   U_ARENA_NOT_MALLOCD };
+	if (u_arena_tests(test_params) == 0)
+		return MUNIT_OK;
+	else
+		return MUNIT_FAIL;
+}
 
-	LmLogDebug("contiguous arena test");
-
-	LM_START_TIMING(create, PROC_CPUTIME);
-	u_arena *a = u_arena_create(test_params->cap, U_ARENA_CONTIGUOUS,
-				    test_params->alignment);
-	LM_END_TIMING(create, PROC_CPUTIME);
-	LM_LOG_TIMING(create, "Arena creation", US, DBG, LM_LOG_MODULE_LOCAL);
-
-	ptrdiff_t a_to_a_mem_diff = LmPtrDiff(a->mem, a);
-	LmLogDebug("Distance from arena to its memory: %zd", a_to_a_mem_diff);
-
-	/* Allocation size less than alignment */
-	size_t alloc_sz = test_params->alignment - 1;
-
-	LM_START_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
-	}
-	u_arena_free(a);
-	LM_END_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_lt_aligned_sz,
-			  test_params->n_small_allocs,
-			  "Small allocation < aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	/* Allocation size same as alignment */
-	alloc_sz = a->alignment;
-
-	LM_START_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
-	}
-	u_arena_free(a);
-	LM_END_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_aligned_sz, test_params->n_small_allocs,
-			  "Small allocation aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	/* Allocation size greater than alignment */
-	alloc_sz = a->alignment + 1;
-
-	LM_START_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		uint8_t *allocation = u_arena_alloc(a, alloc_sz);
-	}
-	u_arena_free(a);
-	LM_END_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_gt_aligned_sz,
-			  test_params->n_small_allocs,
-			  "Small allocation > aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	return MUNIT_OK;
+static MunitResult
+u_arena_not_mallocd_non_cont_test(const MunitParameter params[], void *data)
+{
+	(void)params;
+	(void)data;
+	struct u_arena_test_params test_params = { ARENA_SZ, 16,
+						   U_ARENA_NON_CONTIGUOUS,
+						   U_ARENA_NOT_MALLOCD };
+	if (u_arena_tests(test_params) == 0)
+		return MUNIT_OK;
+	else
+		return MUNIT_FAIL;
 }
 
 static MunitResult malloc_test(const MunitParameter params[], void *data)
 {
 	(void)params;
-	struct arena_test_params *test_params = data;
-	uint8_t *allocation;
-
-	LmLogDebug("malloc test");
-
-	/* Allocation size less than (arena) alignment */
-	size_t alloc_sz = test_params->alignment - 1;
-	LM_START_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		allocation = malloc(alloc_sz);
-	}
-	LM_END_TIMING(small_alloc_lt_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_lt_aligned_sz,
-			  test_params->n_small_allocs,
-			  "Small allocation < aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	/* Allocation size same as (arena) alignment */
-	alloc_sz = test_params->alignment;
-	LM_START_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		allocation = malloc(alloc_sz);
-	}
-	LM_END_TIMING(small_alloc_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_aligned_sz, test_params->n_small_allocs,
-			  "Small allocation aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	/* Allocation size greater than (arena) alignment */
-	alloc_sz = test_params->alignment + 1;
-	LM_START_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
-	for (int i = 0; i < test_params->n_small_allocs; ++i) {
-		allocation = malloc(alloc_sz);
-	}
-	LM_END_TIMING(small_alloc_gt_aligned_sz, PROC_CPUTIME);
-
-	LM_LOG_TIMING_AVG(small_alloc_gt_aligned_sz,
-			  test_params->n_small_allocs,
-			  "Small allocation > aligned size average", US, DBG,
-			  LM_LOG_MODULE_LOCAL);
-
-	return MUNIT_OK;
+	(void)data;
+	if (malloc_tests() == 0)
+		return MUNIT_OK;
+	else
+		return MUNIT_FAIL;
 }
-static MunitTest tests[] = {
-	{ (char *)"u_arena non-contiguous", u_arena_test, NULL, NULL,
-	  MUNIT_TEST_OPTION_NONE, NULL },
-	{ (char *)"u_arena contiguous", u_arena_contiguous_test, NULL, NULL,
-	  MUNIT_TEST_OPTION_NONE, NULL },
-	{ (char *)"malloc", malloc_test, NULL, NULL, MUNIT_TEST_OPTION_NONE,
+
+// NOTE: (isa): Defines created by Claude
+#define U_ARENA_MALLOCD_CONT_TEST_ENABLED 1
+#define U_ARENA_MALLOCD_NON_CONT_TEST_ENABLED 1
+#define U_ARENA_NOT_MALLOCD_CONT_TEST_ENABLED 1
+#define U_ARENA_NOT_MALLOCD_NON_CONT_TEST_ENABLED 1
+#define MALLOC_TEST_ENABLED 1
+
+/* Test definitions */
+#if U_ARENA_MALLOCD_CONT_TEST_ENABLED
+#define U_ARENA_MALLOCD_CONT_TEST               \
+	{ (char *)"u_arena mallocd contiguous", \
+	  u_arena_mallocd_cont_test,            \
+	  NULL,                                 \
+	  NULL,                                 \
+	  MUNIT_TEST_OPTION_NONE,               \
 	  NULL },
-	{ "", NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
+#else
+#define U_ARENA_MALLOCD_CONT_TEST
+#endif
+
+#if U_ARENA_NOT_MALLOCD_NON_CONT_TEST_ENABLED
+#define U_ARENA_MALLOCD_NON_CONT_TEST               \
+	{ (char *)"u_arena mallocd non-contiguous", \
+	  u_arena_mallocd_non_cont_test,            \
+	  NULL,                                     \
+	  NULL,                                     \
+	  MUNIT_TEST_OPTION_NONE,                   \
+	  NULL },
+#else
+#define U_ARENA_MALLOCD_NON_CONT_TEST
+#endif
+
+#if U_ARENA_NOT_MALLOCD_CONT_TEST_ENABLED
+#define U_ARENA_NOT_MALLOCD_CONT_TEST               \
+	{ (char *)"u_arena not mallocd contiguous", \
+	  u_arena_not_mallocd_cont_test,            \
+	  NULL,                                     \
+	  NULL,                                     \
+	  MUNIT_TEST_OPTION_NONE,                   \
+	  NULL },
+#else
+#define U_ARENA_NOT_MALLOCD_CONT_TEST
+#endif
+
+#if U_ARENA_NOT_MALLOCD_NON_CONT_TEST_ENABLED
+#define U_ARENA_NOT_MALLOCD_NON_CONT_TEST                \
+	{ (char *)"um_arena not mallocd non-contiguous", \
+	  u_arena_not_mallocd_non_cont_test,             \
+	  NULL,                                          \
+	  NULL,                                          \
+	  MUNIT_TEST_OPTION_NONE,                        \
+	  NULL },
+#else
+#define U_ARENA_NOT_MALLOCD_NON_CONT_TEST
+#endif
+
+#if MALLOC_TEST_ENABLED
+#define MALLOC_TEST                                        \
+	{ (char *)"malloc",	  malloc_test, NULL, NULL, \
+	  MUNIT_TEST_OPTION_NONE, NULL },
+#else
+#define MALLOC_TEST
+#endif
+
+#define FINAL_NULL_ENTRY { 0 }
+
+static MunitTest tests[] = {
+	U_ARENA_MALLOCD_CONT_TEST U_ARENA_MALLOCD_NON_CONT_TEST
+		U_ARENA_NOT_MALLOCD_CONT_TEST U_ARENA_NOT_MALLOCD_NON_CONT_TEST
+			MALLOC_TEST FINAL_NULL_ENTRY
 };
 
 static const MunitSuite test_suite = { (char *)"", tests, NULL, 1,
@@ -210,27 +158,10 @@ static const MunitSuite test_suite = { (char *)"", tests, NULL, 1,
 
 int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
-	//const int n = 20;
-	//long long sum = 0;
-	//for (int i = 0; i < n; ++i) {
-	//	long long foo = lm_get_time_stamp(PROC_CPUTIME);
-	//	long long bar = lm_get_time_stamp(PROC_CPUTIME);
-	//	//sum += bar - foo;
-	//	lm_log_timing(bar - foo, "Timing time", NS, DBG,
-	//		      LM_LOG_MODULE_LOCAL);
-	//}
-	//lm_log_timing_avg(sum, n, "Timing overhead", NS, DBG,
-	//		  LM_LOG_MODULE_LOCAL);
+	(void)argv;
 
-	FILE *log_file = lm_open_file_by_name("./logs/timing.txt", "w");
-	LmSetLogFileLocal(log_file);
-	LmSetLogFileGlobal(log_file);
-	LmEnableLogRawLocal();
-	LmEnableLogRawGlobal();
-
-	struct arena_test_params test_params = { LmKibiByte(512), 16, 100000,
-						 1000 };
-	int success = munit_suite_main(&test_suite, &test_params, argc, argv);
+	LmLogInfoGR("\n\n-----New run of allocator tests-----");
+	int success = munit_suite_main(&test_suite, NULL, argc, argv);
 
 	return EXIT_SUCCESS;
 }
