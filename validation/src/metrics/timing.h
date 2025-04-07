@@ -67,6 +67,13 @@ static const char *lm_clock_type_str(clockid_t type)
 
 #define LM_END_TIMING(name, type) long long name##_end = lm_get_time_stamp(type)
 
+#define LM_TIME_LOOP(name, clock, var_t, var, start, end, comp, incr, op) \
+	LM_START_TIMING(name, clock);                                     \
+	for (var_t var = start; var comp end; incr var) {                 \
+		op                                                        \
+	}                                                                 \
+	LM_END_TIMING(name, clock);
+
 long long lm_get_time_stamp(clockid_t type);
 
 void lm_print_timing(long long timing, const char *description,
