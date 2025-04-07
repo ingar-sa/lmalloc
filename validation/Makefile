@@ -6,13 +6,15 @@ LIBS =  -lpthread
 LINTER = clang-tidy
 LINTER_FLAGS = -quiet
 
-LM_LOG_LEVEL ?= 4
-LM_REL_LOG_LEVEL ?= 2
+DEBUG_OPT_LEVEL ?= 0
+LOG_LEVEL ?= 4
+REL_LOG_LEVEL ?= 2
+MEM_TRACE ?= 1
 
-LM_FLAGS = -DLM_MEM_TRACE=1 -DLM_LOG_GLOBAL=1 -DLM_LOG_LEVEL=$(LM_LOG_LEVEL) -DLM_ASSERT=1
-RELEASE_LM_FLAGS = -DLM_MEM_TRACE=0 -DLM_PRINTF_DEBUG_ENABLE=0 -DLM_LOG_LEVEL=$(LM_REL_LOG_LEVEL)-DLM_ASSERT=0 
+LM_FLAGS = -DLM_MEM_TRACE=$(MEM_TRACE) -DLM_LOG_GLOBAL=1 -DLM_LOG_LEVEL=$(LOG_LEVEL) -DLM_ASSERT=1
+RELEASE_LM_FLAGS = -DLM_MEM_TRACE=0 -DLM_PRINTF_DEBUG_ENABLE=0 -DLM_LOG_LEVEL=$(REL_LOG_LEVEL)-DLM_ASSERT=0 
 
-DEBUG_FLAGS = -std=gnu11 -g -O0 -Wextra -pedantic  -Wno-unused-function -Wno-cpp -DDEBUG
+DEBUG_FLAGS = -std=gnu11 -g -O$(DEBUG_OPT_LEVEL) -Wextra -pedantic  -Wno-unused-function -Wno-cpp -DDEBUG
 RELWDB_FLAGS = -std=gnu11 -g -O2 -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG 
 RELEASE_FLAGS = -std=gnu11 -O3 -march=native -Wextra -pedantic -Wno-unused-function -Wno-cpp -DNDEBUG
 
