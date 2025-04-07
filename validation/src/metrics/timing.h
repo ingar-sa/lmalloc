@@ -73,12 +73,13 @@ void lm_print_timing(long long timing, const char *description,
 		     enum time_stamp_fmt stamp_fmt);
 
 void lm_log_timing(long long timing, const char *description,
-		   enum time_stamp_fmt stamp_fmt, enum lm_log_level log_level,
-		   lm_log_module *log_module);
+		   enum time_stamp_fmt stamp_fmt, bool log_raw,
+		   enum lm_log_level log_level, lm_log_module *log_module);
 
-#define LM_LOG_TIMING(name, description, stamp_fmt, log_level, log_module) \
+#define LM_LOG_TIMING(name, description, stamp_fmt, log_raw, log_level,    \
+		      log_module)                                          \
 	lm_log_timing((name##_end - name##_start), description, stamp_fmt, \
-		      log_level, log_module)
+		      log_raw, log_level, log_module)
 
 void lm_print_timing_avg(long long timing, long long count,
 			 const char *description,
@@ -86,17 +87,18 @@ void lm_print_timing_avg(long long timing, long long count,
 
 void lm_log_timing_avg(long long timing, long long count,
 		       const char *description, enum time_stamp_fmt stamp_fmt,
-		       enum lm_log_level log_level, lm_log_module *log_module);
+		       bool log_raw, enum lm_log_level log_level,
+		       lm_log_module *log_module);
 
-#define LM_LOG_TIMING_AVG(name, count, description, stamp_fmt, log_level,  \
-			  log_module)                                      \
+#define LM_LOG_TIMING_AVG(name, count, description, stamp_fmt, log_raw,    \
+			  log_level, log_module)                           \
 	lm_log_timing_avg((name##_end - name##_start), count, description, \
-			  stamp_fmt, log_level, log_module)
+			  stamp_fmt, log_raw, log_level, log_module)
 
 int lm_compare_timing(long long t1, long long t2, struct timing_comp *tc);
 
 void lm_print_timing_comp(struct timing_comp tc, int res);
 
-void lm_log_timing_comp(struct timing_comp tc, int res,
+void lm_log_timing_comp(struct timing_comp tc, int res, bool log_raw,
 			enum lm_log_level log_level, lm_log_module *log_module);
 #endif

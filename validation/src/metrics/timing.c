@@ -72,12 +72,13 @@ void lm_print_timing(long long timing, const char *description,
 // since the log_level isn't available at compile time. We should probably make a
 // macro wrapper for the function call
 void lm_log_timing(long long timing, const char *description,
-		   enum time_stamp_fmt stamp_fmt, enum lm_log_level log_level,
-		   lm_log_module *log_module)
+		   enum time_stamp_fmt stamp_fmt, bool log_raw,
+		   enum lm_log_level log_level, lm_log_module *log_module)
 {
 	char timing_str[64];
 	lm_format_timing(timing, stamp_fmt, timing_str);
-	LmLogManual(log_level, log_module, "%s: %s", description, timing_str);
+	LmLogManual(log_module, log_raw, log_level, "%s: %s", description,
+		    timing_str);
 }
 
 void lm_print_timing_avg(long long timing, long long count,
@@ -103,7 +104,8 @@ void lm_print_timing_avg(long long timing, long long count,
 // NOTE: (isa): Claude rewrote to this version
 void lm_log_timing_avg(long long timing, long long count,
 		       const char *description, enum time_stamp_fmt stamp_fmt,
-		       enum lm_log_level log_level, lm_log_module *log_module)
+		       bool log_raw, enum lm_log_level log_level,
+		       lm_log_module *log_module)
 {
 	char timing_str[64];
 	double avg = (double)timing / count;
@@ -118,7 +120,7 @@ void lm_log_timing_avg(long long timing, long long count,
 	long long avg_ll = (long long)avg;
 	lm_format_timing(avg_ll, adjusted_fmt, timing_str);
 
-	LmLogManual(log_level, log_module,
+	LmLogManual(log_module, log_raw, log_level,
 		    "%s: %s (total: %lld ns, count: %lld)", description,
 		    timing_str, timing, count);
 }
@@ -158,19 +160,19 @@ void lm_print_timing_comp(struct timing_comp tc, int res)
 }
 
 // TODO: (isa): Same as with the time logging: make a wrapper macro
-void lm_log_timing_comp(struct timing_comp tc, int res,
+void lm_log_timing_comp(struct timing_comp tc, int res, bool log_raw,
 			enum lm_log_level log_level, lm_log_module *log_module)
 {
 	if (res == 0) {
 		LmLogManual(
-			log_level, log_module,
+			log_module, log_raw, log_level,
 			"Both timestamps are identical (0%% difference, 1.00x)\n");
 	} else if (res > 0) {
-		LmLogManual(log_level, log_module,
+		LmLogManual(log_module, log_raw, log_level,
 			    "t1 is faster than t2 by %.2f%% (%.2fx faster)\n",
 			    tc.percentage, tc.multiplier);
 	} else {
-		LmLogManual(log_level, log_module,
+		LmLogManual(log_module, log_raw, log_level,
 			    "t1 is slower than t2 by %.2f%% (%.2fx slower)\n",
 			    tc.percentage, tc.multiplier);
 	}

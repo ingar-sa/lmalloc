@@ -95,6 +95,8 @@ static_assert(LM_LOG_BUF_SIZE >= 128,
 #define LM_LOG_LEVEL_INF (3U)
 #define LM_LOG_LEVEL_DBG (4U)
 
+#define LM_LOG_RAW true
+#define LM_LOG_FMT false // TODO: (isa): This name is kinda bad. Change
 enum lm_log_level {
 	ERR = LM_LOG_LEVEL_ERR,
 	WRN = LM_LOG_LEVEL_WRN,
@@ -123,7 +125,6 @@ typedef struct lm__log_module__ {
 	pthread_mutex_t lock;
 	bool write_to_term; // True by default
 	bool write_to_file; // False by default
-	bool write_raw;
 	FILE *file;
 	size_t buf_size;
 	char *buf;
@@ -133,8 +134,9 @@ typedef struct lm__log_module__ lm_log_module;
 #define LM_LOG_MODULE_LOCAL lm__log_instance__
 #define LM_LOG_MODULE_GLOBAL lm__log_instance_global__
 
-int lm__write_log__(lm__log_module__ *module, const char *log_level,
-		    const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+int lm__write_log__(lm__log_module__ *module, bool log_raw,
+		    const char *log_level, const char *fmt, ...)
+	__attribute__((format(printf, 4, 5)));
 
 int lm__set_log_file_by_name__(const char *filename, const char *mode,
 			       lm__log_module__ *module);
@@ -160,14 +162,6 @@ void lm__disable_log_to_term__(lm__log_module__ *module);
 #define LmDisableLogToTermGlobal() \
 	lm__disable_log_to_term__(LM_LOG_MODULE_GLOBAL)
 
-void lm__enable_log_raw__(lm__log_module__ *module);
-#define LmEnableLogRawLocal() lm__enable_log_raw__(LM_LOG_MODULE_LOCAL)
-#define LmEnableLogRawGlobal() lm__enable_log_raw__(LM_LOG_MODULE_GLOBAL)
-
-void lm__disable_log_raw__(lm__log_module__ *module);
-#define LmDisableLogRawLocal() lm__disable_log_raw__(LM_LOG_MODULE_LOCAL)
-#define LmDisableLogRawGlobal() lm__disable_log_raw__(LM_LOG_MODULE_GLOBAL)
-
 #define LM__LOG_LEVEL_CHECK__(level) (LM_LOG_LEVEL >= LM_LOG_LEVEL_##level)
 
 #define LM_LOGGING_NOT_USED() \
@@ -182,7 +176,6 @@ void lm__disable_log_raw__(lm__log_module__ *module);
 			.lock = PTHREAD_MUTEX_INITIALIZER,                     \
 			.write_to_term = true,                                 \
 			.write_to_file = false,                                \
-			.write_raw = false,                                    \
 			.file = NULL,                                          \
 			.buf_size = LM_LOG_BUF_SIZE,                           \
 			.buf = LM_CONCAT3(lm__log_module_, module_name, buf__) \
@@ -202,7 +195,6 @@ void lm__disable_log_raw__(lm__log_module__ *module);
 			   .lock = PTHREAD_MUTEX_INITIALIZER,     \
 			   .write_to_term = true,                 \
 			   .write_to_file = false,                \
-			   .write_raw = false,                    \
 			   .file = NULL,                          \
 			   .buf_size = LM_LOG_BUF_SIZE,           \
 			   .buf = lm__log_module_global_buf__ };  \
@@ -212,72 +204,87 @@ void lm__disable_log_raw__(lm__log_module__ *module);
 #define LM_LOG_GLOBAL_DECLARE() \
 	extern lm__log_module__ *lm__log_instance_global__
 
-#define LM__LOG__(log_level, fmt, ...)                                         \
+#define LM__LOG__(log_raw, log_level, fmt, ...)                                \
 	do {                                                                   \
 		if (LM__LOG_LEVEL_CHECK__(log_level)) {                        \
 			int log_ret = lm__write_log__(lm__log_instance__,      \
+						      log_raw,                 \
 						      LM_STRINGIFY(log_level), \
 						      fmt, ##__VA_ARGS__);     \
 			assert(log_ret >= 0);                                  \
 		}                                                              \
 	} while (0)
 
-#define LM__LOG_GLOBAL__(log_level, fmt, ...)                                 \
+#define LM__LOG_GLOBAL__(log_raw, log_level, fmt, ...)                        \
 	do {                                                                  \
 		if (LM__LOG_LEVEL_CHECK__(log_level)) {                       \
 			int log_ret = lm__write_log__(                        \
-				lm__log_instance_global__,                    \
+				lm__log_instance_global__, log_raw,           \
 				LM_STRINGIFY(log_level), fmt, ##__VA_ARGS__); \
 			assert(log_ret >= 0);                                 \
 		}                                                             \
 	} while (0)
 
-#define LM__LOG_MANUAL__(log_level, module, fmt, ...)                         \
-	do {                                                                  \
-		if (log_level >= LM_LOG_LEVEL) {                              \
-			int log_ret;                                          \
-			switch (log_level) {                                  \
-			case ERR:                                             \
-				log_ret = lm__write_log__(module, "ERR", fmt, \
-							  ##__VA_ARGS__);     \
-				break;                                        \
-			case WRN:                                             \
-				log_ret = lm__write_log__(module, "WRN", fmt, \
-							  ##__VA_ARGS__);     \
-				break;                                        \
-			case INF:                                             \
-				log_ret = lm__write_log__(module, "INF", fmt, \
-							  ##__VA_ARGS__);     \
-				break;                                        \
-			case DBG:                                             \
-				log_ret = lm__write_log__(module, "DBG", fmt, \
-							  ##__VA_ARGS__);     \
-				break;                                        \
-			}                                                     \
-		}                                                             \
+#define LM__LOG_MANUAL__(module, log_raw, log_level, fmt, ...)             \
+	do {                                                               \
+		if (log_level >= LM_LOG_LEVEL) {                           \
+			int log_ret;                                       \
+			switch (log_level) {                               \
+			case ERR:                                          \
+				log_ret = lm__write_log__(module, log_raw, \
+							  "ERR", fmt,      \
+							  ##__VA_ARGS__);  \
+				break;                                     \
+			case WRN:                                          \
+				log_ret = lm__write_log__(module, log_raw, \
+							  "WRN", fmt,      \
+							  ##__VA_ARGS__);  \
+				break;                                     \
+			case INF:                                          \
+				log_ret = lm__write_log__(module, log_raw, \
+							  "INF", fmt,      \
+							  ##__VA_ARGS__);  \
+				break;                                     \
+			case DBG:                                          \
+				log_ret = lm__write_log__(module, log_raw, \
+							  "DBG", fmt,      \
+							  ##__VA_ARGS__);  \
+				break;                                     \
+			}                                                  \
+		}                                                          \
 	} while (0)
 
-#define LmLogDebug(...) LM__LOG__(DBG, ##__VA_ARGS__)
-#define LmLogInfo(...) LM__LOG__(INF, ##__VA_ARGS__)
-#define LmLogWarning(...) LM__LOG__(WRN, ##__VA_ARGS__)
-#define LmLogError(...) LM__LOG__(ERR, ##__VA_ARGS__)
+#define LmLogDebug(...) LM__LOG__(false, DBG, ##__VA_ARGS__)
+#define LmLogInfo(...) LM__LOG__(false, INF, ##__VA_ARGS__)
+#define LmLogWarning(...) LM__LOG__(false, WRN, ##__VA_ARGS__)
+#define LmLogError(...) LM__LOG__(false, ERR, ##__VA_ARGS__)
 
-#define LmLogDebugG(...) LM__LOG_GLOBAL__(DBG, ##__VA_ARGS__)
-#define LmLogInfoG(...) LM__LOG_GLOBAL__(INF, ##__VA_ARGS__)
-#define LmLogWarningG(...) LM__LOG_GLOBAL__(WRN, ##__VA_ARGS__)
-#define LmLogErrorG(...) LM__LOG_GLOBAL__(ERR, ##__VA_ARGS__)
+#define LmLogDebugG(...) LM__LOG_GLOBAL__(false, DBG, ##__VA_ARGS__)
+#define LmLogInfoG(...) LM__LOG_GLOBAL__(false, INF, ##__VA_ARGS__)
+#define LmLogWarningG(...) LM__LOG_GLOBAL__(false, WRN, ##__VA_ARGS__)
+#define LmLogErrorG(...) LM__LOG_GLOBAL__(false, ERR, ##__VA_ARGS__)
+
+#define LmLogDebugR(...) LM__LOG__(true, DBG, ##__VA_ARGS__)
+#define LmLogInfoR(...) LM__LOG__(true, INF, ##__VA_ARGS__)
+#define LmLogWarningR(...) LM__LOG__(true, WRN, ##__VA_ARGS__)
+#define LmLogErrorR(...) LM__LOG__(true, ERR, ##__VA_ARGS__)
+
+#define LmLogDebugGR(...) LM__LOG_GLOBAL__(true, DBG, ##__VA_ARGS__)
+#define LmLogInfoGR(...) LM__LOG_GLOBAL__(true, INF, ##__VA_ARGS__)
+#define LmLogWarningGR(...) LM__LOG_GLOBAL__(true, WRN, ##__VA_ARGS__)
+#define LmLogErrorGR(...) LM__LOG_GLOBAL__(true, ERR, ##__VA_ARGS__)
 
 #define LmLogManual(...) LM__LOG_MANUAL__(__VA_ARGS__)
 
 #if LM_ASSERT == 1
-#define LmAssert(condition, fmt, ...)                                       \
-	do {                                                                \
-		if (!(condition)) {                                         \
-			lm__write_log__(lm__log_instance__, "DBG",          \
-					"ASSERT (%s,%d): : " fmt, __func__, \
-					__LINE__, ##__VA_ARGS__);           \
-			assert(condition);                                  \
-		}                                                           \
+#define LmAssert(condition, fmt, ...)                                          \
+	do {                                                                   \
+		if (!(condition)) {                                            \
+			lm__write_log__(lm__log_instance__, LM_LOG_FMT, "ERR", \
+					"ASSERT (%s,%d): : " fmt, __func__,    \
+					__LINE__, ##__VA_ARGS__);              \
+			assert(condition);                                     \
+		}                                                              \
 	} while (0)
 #else
 #define LmAssert(...)
@@ -368,8 +375,8 @@ LM_LOG_GLOBAL_DECLARE(); // Enables use of logging functionality inside this hea
 ////////////////////////////////////////
 /* Based on the logging frontend I wrote for oec */
 
-int lm__write_log__(lm__log_module__ *module, const char *log_level,
-		    const char *fmt, ...)
+int lm__write_log__(lm__log_module__ *module, bool log_raw,
+		    const char *log_level, const char *fmt, ...)
 {
 	if (module == NULL) {
 		return 0; // NOTE(ingar): If the log module is NULL, then we assume logging isn't used
@@ -377,42 +384,49 @@ int lm__write_log__(lm__log_module__ *module, const char *log_level,
 
 	pthread_mutex_lock(&module->lock);
 
+	int retval = 0;
+
 	size_t chars_written = 0;
 	size_t buf_remaining = module->buf_size;
 	int fmt_ret = 0;
 
-	if (!module->write_raw) {
+	if (!log_raw) {
 		time_t posix_time;
 		struct tm time_info;
 
 		if ((time_t)(-1) == time(&posix_time)) {
-			return -errno;
+			retval = -errno;
+			goto out;
 		}
 
 		if (NULL == localtime_r(&posix_time, &time_info)) {
-			return -errno;
+			retval = -errno;
+			goto out;
 		}
 
 		int fmt_ret = strftime(module->buf, buf_remaining,
-				       "%T: ", &time_info);
+				       "%T::", &time_info);
 		if (0 == fmt_ret) {
 			// NOTE(ingar): Since the buffer size is at least 128, this should never happen
 			assert(fmt_ret);
-			return -ENOMEM;
+			retval = -ENOMEM;
+			goto out;
 		}
 
 		chars_written = fmt_ret;
 		buf_remaining -= fmt_ret;
 
 		fmt_ret = snprintf(module->buf + chars_written, buf_remaining,
-				   "%s: %s: ", module->name, log_level);
+				   "%s::%s: ", module->name, log_level);
 		if (fmt_ret < 0) {
-			return -errno;
+			retval = -errno;
+			goto out;
 		} else if ((size_t)fmt_ret >= buf_remaining) {
 			// NOTE(ingar): If the log module name is so long that it does not fit in 128 bytes - the
 			// time stamp, it should be changed
 			assert(fmt_ret);
-			return -ENOMEM;
+			retval = -ENOMEM;
+			goto out;
 		}
 
 		chars_written += fmt_ret;
@@ -426,16 +440,19 @@ int lm__write_log__(lm__log_module__ *module, const char *log_level,
 	va_end(va_args);
 
 	if (fmt_ret < 0) {
-		return -errno;
+		retval = -errno;
+		goto out;
 	} else if ((size_t)fmt_ret >= buf_remaining) {
 		(void)memset(module->buf + chars_written, 0, buf_remaining);
 		fmt_ret = snprintf(module->buf + chars_written, buf_remaining,
 				   "%s", "Message dropped; too big");
 		if (fmt_ret < 0) {
-			return -errno;
+			retval = -errno;
+			goto out;
 		} else if ((size_t)fmt_ret >= buf_remaining) {
 			assert(fmt_ret);
-			return -ENOMEM;
+			retval = -ENOMEM;
+			goto out;
 		}
 	}
 
@@ -452,20 +469,22 @@ int lm__write_log__(lm__log_module__ *module, const char *log_level,
 
 		if ((ssize_t)(-1) ==
 		    write(out_fd, module->buf, chars_written)) {
-			return -errno;
+			retval = -errno;
+			goto out;
 		}
 	}
 
 	if (module->write_to_file) {
 		if ((size_t)1 !=
 		    fwrite(module->buf, chars_written, 1, module->file)) {
-			return -ferror(module->file);
+			retval = -ferror(module->file);
+			goto out;
 		}
 	}
 
+out:
 	pthread_mutex_unlock(&module->lock);
-
-	return 0;
+	return retval;
 }
 
 void lm__set_log_file__(FILE *file, lm__log_module__ *module)
@@ -510,20 +529,6 @@ void lm__disable_log_to_term__(lm__log_module__ *module)
 	pthread_mutex_lock(&module->lock);
 	module->write_to_term = false;
 	pthread_mutex_lock(&module->lock);
-}
-
-void lm__enable_log_raw__(lm__log_module__ *module)
-{
-	pthread_mutex_lock(&module->lock);
-	module->write_raw = true;
-	pthread_mutex_unlock(&module->lock);
-}
-
-void lm__disable_log_raw__(lm__log_module__ *module)
-{
-	pthread_mutex_lock(&module->lock);
-	module->write_raw = false;
-	pthread_mutex_unlock(&module->lock);
 }
 
 ////////////////////////////////////////
