@@ -41,6 +41,11 @@
 LM_BEGIN_EXTERN_C
 #endif
 
+typedef unsigned int uint;
+
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 #define LM_EXPAND(x) x
 #define LM__STRINGIFY__(x) #x
 #define LM_STRINGIFY(x) LM__STRINGIFY__(x)
@@ -97,6 +102,7 @@ static_assert(LM_LOG_BUF_SIZE >= 128,
 
 #define LM_LOG_RAW true
 #define LM_LOG_FMT false // TODO: (isa): This name is kinda bad. Change
+
 enum lm_log_level {
 	ERR = LM_LOG_LEVEL_ERR,
 	WRN = LM_LOG_LEVEL_WRN,
@@ -295,6 +301,39 @@ void lm__disable_log_to_term__(lm__log_module__ *module);
 ////////////////////////////////////////
 
 void *lm_memset_s(void *s, int c, size_t n);
+
+////////////////////////////////////////
+//              STRINGS               //
+////////////////////////////////////////
+
+typedef char *LmString;
+typedef struct {
+	size_t len;
+	size_t cap;
+} LmStringHeader;
+
+#define LM_STRING_HEADER(str) ((LmStringHeader *)(str) - 1)
+
+size_t lm_string_len(LmString string);
+size_t lm_string_cap(LmString string);
+size_t lm_string_space_avail(LmString string);
+size_t lm_string_alloc_sz(LmString string);
+
+LmString lm_string_make_space(LmString string, size_t add_len);
+LmString lm_string_make(const char *string);
+void lm_string_free(LmString string);
+
+LmString lm_string_dup(const LmString string);
+void lm_string_clear(LmString string);
+LmString lm_string_set(LmString string, const char *c_string);
+void lm_string_backspace(LmString string, size_t n);
+
+LmString lm_string_append(LmString string, LmString other);
+LmString lm_string_append_c(LmString string, const char *other);
+LmString lm_string_append_fmt(LmString string, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)));
+
+bool lm_strings_are_equal(LmString lhs, LmString rhs);
 
 ////////////////////////////////////////
 //            MEM TRACE               //
@@ -545,6 +584,181 @@ void *lm_memset_s(void *dest, int ch, size_t count)
 	return memset_v(dest, ch, count);
 }
 
+////////////////////////////////////////
+//              STRINGS               //
+////////////////////////////////////////
+
+size_t lm_string_len(LmString string)
+{
+	return LM_STRING_HEADER(string)->len;
+}
+size_t lm_string_cap(LmString string);
+
+size_t lm_string_cap(LmString string)
+{
+	return LM_STRING_HEADER(string)->cap;
+}
+
+size_t lm_string_space_avail(LmString string)
+{
+	LmStringHeader *header = LM_STRING_HEADER(string);
+	return header->cap - header->len;
+}
+
+size_t lm_string_alloc_sz(LmString string)
+{
+	size_t sz = sizeof(LmStringHeader) + lm_string_cap(string);
+	return sz;
+}
+
+void lm__string_set_len__(LmString string, size_t len)
+{
+	LM_STRING_HEADER(string)->len = len;
+}
+
+void lm__string_set_cap__(LmString string, size_t cap)
+{
+	LM_STRING_HEADER(string)->cap = cap;
+}
+
+LmString lm__string_make__(const void *init_string, size_t len)
+{
+	size_t header_sz = sizeof(LmStringHeader);
+	void *ptr = calloc(1, header_sz + len + 1);
+	if (ptr == NULL) {
+		return NULL;
+	}
+	if (init_string == NULL) {
+		memset(ptr, 0, header_sz + len + 1);
+	}
+
+	LmString string;
+	LmStringHeader *header;
+
+	string = (char *)ptr + header_sz;
+	header = LM_STRING_HEADER(string);
+
+	header->len = len;
+	header->cap = len;
+	if (len > 0 && (init_string != NULL)) {
+		memcpy(string, init_string, len);
+		string[len] = '\0';
+	}
+
+	return string;
+}
+
+LmString lm_string_make(const char *string)
+{
+	size_t Len = (string != NULL) ? strlen(string) : 0;
+	return lm__string_make__(string, Len);
+}
+
+void lm_string_free(LmString string)
+{
+	if (string != NULL) {
+		LmStringHeader *h = LM_STRING_HEADER(string);
+		free(h);
+	}
+}
+
+LmString lm_string_dup(const LmString string)
+{
+	return lm__string_make__(string, lm_string_len(string));
+}
+
+void lm_string_clear(LmString string)
+{
+	lm__string_set_len__(string, 0);
+	string[0] = '\0';
+}
+
+void lm_string_backspace(LmString string, size_t n)
+{
+	size_t new_len = lm_string_len(string) - n;
+	lm__string_set_len__(string, new_len);
+	string[new_len] = '\0';
+}
+
+LmString lm_string_make_space(LmString string, size_t add_len)
+{
+	size_t available = lm_string_space_avail(string);
+	if (available < add_len) {
+		LmStringHeader *header = LM_STRING_HEADER(string);
+		size_t new_sz = sizeof(LmStringHeader) + header->cap + add_len;
+
+		LmStringHeader *new_string = realloc(header, new_sz);
+		if (new_string == NULL)
+			return NULL;
+
+		size_t new_cap = new_string->cap + add_len;
+		string =
+			(LmString)((char *)new_string + sizeof(LmStringHeader));
+		lm__string_set_cap__(string, new_cap);
+	}
+	return string;
+}
+
+LmString lm__string_append__(LmString string, const void *other,
+			     size_t other_len)
+{
+	string = lm_string_make_space(string, other_len);
+	if (string == NULL)
+		return NULL;
+
+	size_t cur_len = lm_string_len(string);
+	memcpy(string + cur_len, other, other_len);
+	lm__string_set_len__(string, cur_len + other_len);
+	string[cur_len + other_len] = '\0';
+	return string;
+}
+
+LmString lm_string_append(LmString String, LmString Other)
+{
+	return lm__string_append__(String, Other, lm_string_len(Other));
+}
+
+LmString lm_string_append_c(LmString string, const char *other)
+{
+	return lm__string_append__(string, other, strlen(other));
+}
+
+LmString lm_string_append_fmt(LmString string, const char *fmt, ...)
+{
+	char buf[1024] = { 0 };
+	va_list va;
+	va_start(va, fmt);
+	size_t fmt_len = vsnprintf(buf, LmArrayLen(buf) - 1, fmt, va);
+	va_end(va);
+	return lm__string_append__(string, buf, fmt_len);
+}
+
+LmString lm_string_set(LmString string, const char *c_string)
+{
+	size_t len = strlen(c_string);
+	string = lm_string_make_space(string, len);
+	if (string == NULL) {
+		return NULL;
+	}
+
+	memcpy(string, c_string, len);
+	string[len] = '\0';
+	lm__string_set_len__(string, len);
+
+	return string;
+}
+
+bool lm_strings_are_equal(LmString lhs, LmString rhs)
+{
+	size_t l_string_len = lm_string_len(lhs);
+	size_t r_string_len = lm_string_len(rhs);
+
+	if (l_string_len != r_string_len) {
+		return false;
+	} else {
+		return memcmp(lhs, rhs, l_string_len);
+	}
+}
 ////////////////////////////////////////
 //            MEM TRACE               //
 ////////////////////////////////////////
