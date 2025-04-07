@@ -1,0 +1,53 @@
+{
+    "suites": [
+        {
+            "prefix": "main",
+            "enabled": true,
+            "sub_suites": "NONE",
+            "iterations": 1,
+            "options": "NONE",
+            "tests": [
+                {
+                    "name": "u_arena mallocd contiguous",
+                    "enabled": true,
+                    "test_fn": "u_arena_mallocd_cont_test",
+                    "setup_fn": "NULL",
+                    "teardown_fn": "NULL",
+                    "options": "NONE"
+                },
+                {
+                    "name": "u_arena mallocd non-contiguous",
+                    "enabled": true,
+                    "test_fn": "u_arena_mallocd_non_cont_test",
+                    "setup_fn": "NULL",
+                    "teardown_fn": "NULL",
+                    "options": "NONE"
+                },
+                {
+                    "name": "u_arena not mallocd contiguous",
+                    "enabled": true,
+                    "test_fn": "u_arena_not_mallocd_cont_test",
+                    "setup_fn": "NULL",
+                    "teardown_fn": "NULL",
+                    "options": "NONE"
+                },
+                {
+                    "name": "um_arena not mallocd non-contiguous",
+                    "enabled": true,
+                    "test_fn": "u_arena_not_mallocd_non_cont_test",
+                    "setup_fn": "NULL",
+                    "teardown_fn": "NULL",
+                    "options": "NONE"
+                },
+                {
+                    "name": "malloc",
+                    "enabled": true,
+                    "test_fn": "malloc_test",
+                    "setup_fn": "NULL",
+                    "teardown_fn": "NULL",
+                    "options": "NONE"
+                }
+            ]
+        }
+    ]
+}
