@@ -11,21 +11,44 @@ LM_LOG_REGISTER(munit_tests);
 
 #define ARENA_SZ LmKibiByte(512)
 
+#define BOOL_STRING(bool) (bool ? "true" : "false")
+
 MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 {
 	(void)mu_params;
 	struct u_arena_test_params *params = data;
-	if (u_arena_tests(data) == 0)
+	LmLogDebug("Params: %zd, %zd, %s, %s", params->arena_sz,
+		   params->alignment, BOOL_STRING(params->mallocd),
+		   BOOL_STRING(params->contiguous));
+	if (u_arena_tests(params) == 0)
 		return MUNIT_OK;
 	else
 		return MUNIT_FAIL;
 }
 
-void *u_arena_test_setup(const MunitParameter *mu_params, void *data)
+void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
+			 void *test_ctx)
 {
 	(void)mu_params;
-	struct u_arena_test_params *test_params;
-	cJSON *params_json = data;
+	(void)data;
+
+	cJSON *ctx_json = test_ctx;
+	cJSON *arena_sz_json = cJSON_GetObjectItem(ctx_json, "arena_sz");
+	cJSON *alignment_json = cJSON_GetObjectItem(ctx_json, "alignment");
+	cJSON *mallocd_json = cJSON_GetObjectItem(ctx_json, "mallocd");
+	cJSON *contiguous_json = cJSON_GetObjectItem(ctx_json, "contiguous");
+	if (!arena_sz_json || !alignment_json || !mallocd_json ||
+	    !contiguous_json) {
+		LmLogError("Malformed test context JSON");
+		return NULL;
+	}
+	struct u_arena_test_params *test_params =
+		malloc(sizeof(struct u_arena_test_params));
+	test_params->arena_sz =
+		lm_mem_sz_from_string(cJSON_GetStringValue(arena_sz_json));
+	test_params->alignment = cJSON_GetNumberValue(alignment_json);
+	test_params->mallocd = cJSON_IsTrue(mallocd_json);
+	test_params->contiguous = cJSON_IsTrue(contiguous_json);
 
 	return test_params;
 }
@@ -41,9 +64,9 @@ MunitResult malloc_test(const MunitParameter params[], void *data)
 }
 
 struct test_definition {
-	munit_test_fn test_fn;
-	munit_setup_fn setup_fn;
-	munit_teardown_fn teardown_fn;
+	MunitTestFunc test_fn;
+	MunitTestSetup setup_fn;
+	MunitTestTearDown teardown_fn;
 	const char *test_name;
 };
 
@@ -82,12 +105,11 @@ struct test_definition *get_test_definition(cJSON *test_name_json)
 	char *test_name = cJSON_GetStringValue(test_name_json);
 	struct test_definition test_def = test_definitions[0];
 
-	for (int i = 1; test_def.test_fn != NULL; ++i) {
+	for (int i = 0; test_def.test_fn != NULL;
+	     test_def = test_definitions[++i]) {
 		// TODO: (isa): Is strcmp fine here?
 		if (strcmp(test_def.test_name, test_name) == 0)
 			return &test_definitions[i];
-		else
-			test_def = test_definitions[i];
 	}
 
 	LmLogWarning(
@@ -131,21 +153,22 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 				cJSON_GetObjectItem(test_json, "name");
 			cJSON *options_json =
 				cJSON_GetObjectItem(test_json, "options");
-			if (!name_json || !options_json) {
+			cJSON *ctx_json = cJSON_GetObjectItem(test_json, "ctx");
+			if (!name_json || !options_json || !ctx_json) {
 				LmLogError("Malformed suite test JSON");
 				free(tests);
 				return NULL;
 			}
 
+			MunitTest *test = &tests[test_json_idx++];
 			struct test_definition *test_definition =
 				get_test_definition(name_json);
-			MunitTest *test = &tests[test_json_idx++];
-			test->name =
-				lm_string_make(cJSON_GetStringValue(name_json));
+			test->name = lm_string_make(test_definition->test_name);
 			test->test = test_definition->test_fn;
 			test->setup = test_definition->setup_fn;
 			test->tear_down = test_definition->teardown_fn;
 			test->options = get_test_options_STUB(options_json);
+			test->ctx = ctx_json;
 			// TODO: (isa): Determine if test->parameters should be set here
 		}
 	}
@@ -155,8 +178,6 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 
 MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 {
-	MunitSuite *suite;
-
 	cJSON *suite_enabled_json =
 		cJSON_GetObjectItem(suite_conf_json, "enabled");
 	if (!suite_enabled_json) {
@@ -181,7 +202,7 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 		return NULL;
 	}
 
-	suite = malloc(sizeof(MunitSuite));
+	MunitSuite *suite = malloc(sizeof(MunitSuite));
 	suite->prefix = lm_string_make(cJSON_GetStringValue(suite_prefix_json));
 	suite->suites = get_sub_suites_STUB(sub_suites_json);
 	suite->iterations = cJSON_GetNumberValue(iterations_json);
