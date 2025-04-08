@@ -22,6 +22,8 @@ LM_LOG_REGISTER(validation);
 
 int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
+	int success = EXIT_SUCCESS;
+
 	if (!RUN_IN_DEBUGGER) {
 		lm_file_data *test_config_file =
 			lm_load_file_into_memory("./configs/validation.json");
@@ -30,16 +32,15 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 		cJSON *main_suite_json =
 			cJSON_GetObjectItem(test_config_json, "main_suite");
 
-		int success = EXIT_SUCCESS;
 		MunitSuite *main_suite = create_munit_suite(main_suite_json);
 		if (main_suite)
 			success =
 				munit_suite_main(main_suite, NULL, argc, argv);
 		else
-			LmLogInfo("Test suite disabled. Bye!");
-
-		return success;
+			LmLogInfo("Test suite disabled!");
 	} else {
 		malloc_tests_debugger();
 	}
+
+	return success;
 }
