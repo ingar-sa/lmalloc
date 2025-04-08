@@ -8,44 +8,60 @@
             "options": "NONE",
             "tests": [
                 {
-                    "name": "u_arena mallocd contiguous",
+                    "name": "u_arena_mallocd_cont_test",
                     "enabled": true,
-                    "test_fn": "u_arena_mallocd_cont_test",
-                    "setup_fn": "NULL",
-                    "teardown_fn": "NULL",
-                    "options": "NONE"
+                    "options": "NONE",
+                    "params": 
+                    {
+                        "arena_sz": "512kB",
+                        "alignment": 16,
+                        "mallocd": true,
+                        "contiguous": true
+                    }
                 },
                 {
-                    "name": "u_arena mallocd non-contiguous",
+                    "name": "u_arena_mallocd_non_cont_test",
                     "enabled": true,
-                    "test_fn": "u_arena_mallocd_non_cont_test",
-                    "setup_fn": "NULL",
-                    "teardown_fn": "NULL",
-                    "options": "NONE"
+                    "options": "NONE",
+                    "params": 
+                    {
+                        "arena_sz": "512kB",
+                        "alignment": 16,
+                        "mallocd": true,
+                        "contiguous": false 
+                    }
                 },
                 {
-                    "name": "u_arena not mallocd contiguous",
+                    "name": "u_arena_not_mallocd_cont_test",
                     "enabled": true,
-                    "test_fn": "u_arena_not_mallocd_cont_test",
-                    "setup_fn": "NULL",
-                    "teardown_fn": "NULL",
-                    "options": "NONE"
+                    "options": "NONE",
+                    "params": 
+                    {
+                        "arena_sz": "512kB",
+                        "alignment": 16,
+                        "mallocd": false,
+                        "contiguous": true
+                    }
                 },
                 {
-                    "name": "um_arena not mallocd non-contiguous",
+                    "name": "u_arena_not_mallocd_non_cont_test",
                     "enabled": true,
-                    "test_fn": "u_arena_not_mallocd_non_cont_test",
-                    "setup_fn": "NULL",
-                    "teardown_fn": "NULL",
-                    "options": "NONE"
+                    "options": "NONE",
+                    "params": 
+                    {
+                        "arena_sz": "512kB",
+                        "alignment": 16,
+                        "mallocd": false,
+                        "contiguous": false
+                    }
                 },
                 {
-                    "name": "malloc",
+                    "name": "malloc_test",
                     "enabled": true,
-                    "test_fn": "malloc_test",
-                    "setup_fn": "NULL",
-                    "teardown_fn": "NULL",
-                    "options": "NONE"
+                    "options": "NONE",
+                    "params":
+                    {
+                    }
                 }
             ]
         }

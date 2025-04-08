@@ -98,17 +98,17 @@ static void bulk_allocations(void)
 {
 }
 
-int u_arena_tests(struct u_arena_test_params params)
+int u_arena_tests(struct u_arena_test_params *params)
 {
-	LmString filename = lm_string_make("./logs/u_arena_tests_");
-	filename = lm_string_append_fmt(filename, "%s_%s.txt",
-					(params.mallocd ? "m" : "nm"),
-					(params.contiguous ? "c" : "nc"));
+	LmString filename = lm_string_make("->/logs/u_arena_tests_");
+	filename = lm_string_append_fmt(filename, "%s_%s->txt",
+					(params->mallocd ? "m" : "nm"),
+					(params->contiguous ? "c" : "nc"));
 	pid_t pid;
 	int status;
 	if ((pid = fork()) == 0) {
-		UArena *a = u_arena_create(params.arena_sz, params.contiguous,
-					   params.mallocd, params.alignment);
+		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
+					   params->mallocd, params->alignment);
 
 		small_alloc(a, filename);
 	} else {
@@ -116,13 +116,33 @@ int u_arena_tests(struct u_arena_test_params params)
 	}
 
 	if ((pid = fork()) == 0) {
-		UArena *a = u_arena_create(params.arena_sz, params.contiguous,
-					   params.mallocd, params.alignment);
+		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
+					   params->mallocd, params->alignment);
 
 		small_zalloc(a, filename);
 	} else {
 		waitpid(pid, &status, 0);
 	}
+
+	return 0;
+}
+
+int u_arena_tests_debugger(struct u_arena_test_params params)
+{
+	LmString filename = lm_string_make("./logs/u_arena_tests_");
+	filename = lm_string_append_fmt(filename, "%s_%s.txt",
+					(params.mallocd ? "m" : "nm"),
+					(params.contiguous ? "c" : "nc"));
+
+	UArena *a = u_arena_create(params.arena_sz, params.contiguous,
+				   params.mallocd, params.alignment);
+
+	u_arena_destroy(&a);
+
+	a = u_arena_create(params.arena_sz, params.contiguous, params.mallocd,
+			   params.alignment);
+
+	small_zalloc(a, filename);
 
 	return 0;
 }

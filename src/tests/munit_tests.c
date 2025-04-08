@@ -11,59 +11,23 @@ LM_LOG_REGISTER(munit_tests);
 
 #define ARENA_SZ LmKibiByte(512)
 
-MunitResult u_arena_mallocd_cont_test(const MunitParameter params[], void *data)
+MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 {
-	(void)params;
-	(void)data;
-	struct u_arena_test_params test_params = { ARENA_SZ, 16,
-						   U_ARENA_CONTIGUOUS,
-						   U_ARENA_MALLOCD };
-	if (u_arena_tests(test_params) == 0)
+	(void)mu_params;
+	struct u_arena_test_params *params = data;
+	if (u_arena_tests(data) == 0)
 		return MUNIT_OK;
 	else
 		return MUNIT_FAIL;
 }
 
-MunitResult u_arena_mallocd_non_cont_test(const MunitParameter params[],
-					  void *data)
+void *u_arena_test_setup(const MunitParameter *mu_params, void *data)
 {
-	(void)params;
-	(void)data;
-	struct u_arena_test_params test_params = { ARENA_SZ, 16,
-						   U_ARENA_NON_CONTIGUOUS,
-						   U_ARENA_MALLOCD };
-	if (u_arena_tests(test_params) == 0)
-		return MUNIT_OK;
-	else
-		return MUNIT_FAIL;
-}
+	(void)mu_params;
+	struct u_arena_test_params *test_params;
+	cJSON *params_json = data;
 
-MunitResult u_arena_not_mallocd_cont_test(const MunitParameter params[],
-					  void *data)
-{
-	(void)params;
-	(void)data;
-	struct u_arena_test_params test_params = { ARENA_SZ, 16,
-						   U_ARENA_CONTIGUOUS,
-						   U_ARENA_NOT_MALLOCD };
-	if (u_arena_tests(test_params) == 0)
-		return MUNIT_OK;
-	else
-		return MUNIT_FAIL;
-}
-
-MunitResult u_arena_not_mallocd_non_cont_test(const MunitParameter params[],
-					      void *data)
-{
-	(void)params;
-	(void)data;
-	struct u_arena_test_params test_params = { ARENA_SZ, 16,
-						   U_ARENA_NON_CONTIGUOUS,
-						   U_ARENA_NOT_MALLOCD };
-	if (u_arena_tests(test_params) == 0)
-		return MUNIT_OK;
-	else
-		return MUNIT_FAIL;
+	return test_params;
 }
 
 MunitResult malloc_test(const MunitParameter params[], void *data)
@@ -76,79 +40,58 @@ MunitResult malloc_test(const MunitParameter params[], void *data)
 		return MUNIT_FAIL;
 }
 
-struct setup_fn_name_map {
-	munit_setup_fn setup_fn;
-	const char *setup_fn_name;
-};
-
-struct teardown_fn_name_map {
-	munit_teardown_fn teardown_fn;
-	const char *teardown_fn_name;
-};
-
-struct test_fn_name_map {
+struct test_definition {
 	munit_test_fn test_fn;
-	const char *test_fn_name;
+	munit_setup_fn setup_fn;
+	munit_teardown_fn teardown_fn;
+	const char *test_name;
 };
 
-// TODO: (isa): Make arrays for setup and teardown functions if applicable
-static struct test_fn_name_map test_name_maps[] = {
-	{ u_arena_mallocd_cont_test, LM_STRINGIFY(u_arena_mallocd_cont_test) },
-	{ u_arena_mallocd_non_cont_test,
-	  LM_STRINGIFY(u_arena_mallocd_non_cont_test) },
-	{ u_arena_not_mallocd_cont_test,
-	  LM_STRINGIFY(u_arena_not_mallocd_cont_test) },
-	{ u_arena_not_mallocd_non_cont_test,
-	  LM_STRINGIFY(u_arena_not_mallocd_non_cont_test) },
+static struct test_definition test_definitions[] = {
+	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_mallocd_cont_test" },
+	{ u_arena_test, u_arena_test_setup, NULL,
+	  "u_arena_mallocd_non_cont_test" },
+	{ u_arena_test, u_arena_test_setup, NULL,
+	  "u_arena_not_mallocd_cont_test" },
+	{ u_arena_test, u_arena_test_setup, NULL,
+	  "u_arena_not_mallocd_non_cont_test" },
+	{ malloc_test, NULL, NULL, "malloc_test" },
 	{ 0 }
 };
 
-MunitSuite *get_sub_suites(cJSON *sub_suites_json)
+MunitSuite *get_sub_suites_STUB(cJSON *sub_suites_json)
 {
-	// TODO: (isa): Just a stub for now
 	(void)sub_suites_json;
 	return NULL;
 }
 
-MunitSuiteOptions get_suite_options(cJSON *suite_options_json)
+MunitSuiteOptions get_suite_options_STUB(cJSON *suite_options_json)
 {
-	// TODO: (isa): Just a stub for now
 	(void)suite_options_json;
 	return MUNIT_SUITE_OPTION_NONE;
 }
 
-munit_setup_fn get_test_setup_fn(cJSON *setup_json)
+MunitTestOptions get_test_options_STUB(cJSON *test_options_json)
 {
-	// TODO: (isa): Just a stub for now
-	(void)setup_json;
-	return NULL;
-}
-
-munit_teardown_fn get_test_teardown_fn(cJSON *teardown_json)
-{
-	// TODO: (isa): Just a stub for now
-	(void)teardown_json;
-	return NULL;
-}
-
-MunitTestOptions get_test_options(cJSON *test_options_json)
-{
-	// TODO: (isa): Just a stub for now
 	(void)test_options_json;
 	return MUNIT_TEST_OPTION_NONE;
 }
 
-munit_test_fn get_test_fn(cJSON *test_fn_json)
+struct test_definition *get_test_definition(cJSON *test_name_json)
 {
-	char *test_fn_name = cJSON_GetStringValue(test_fn_json);
-	struct test_fn_name_map test_name_map = test_name_maps[0];
-	for (int i = 1; test_name_map.test_fn != NULL; ++i) {
-		if (strcmp(test_name_map.test_fn_name, test_fn_name) == 0)
-			return test_name_map.test_fn;
+	char *test_name = cJSON_GetStringValue(test_name_json);
+	struct test_definition test_def = test_definitions[0];
+
+	for (int i = 1; test_def.test_fn != NULL; ++i) {
+		// TODO: (isa): Is strcmp fine here?
+		if (strcmp(test_def.test_name, test_name) == 0)
+			return &test_definitions[i];
 		else
-			test_name_map = test_name_maps[i];
+			test_def = test_definitions[i];
 	}
 
+	LmLogWarning(
+		"No definition found with this name! Is it spelled incorecctly, either in the config or in the code?");
 	return NULL;
 }
 
@@ -184,35 +127,25 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 		cJSON *test_enabled_json =
 			cJSON_GetObjectItem(test_json, "enabled");
 		if (cJSON_IsTrue(test_enabled_json)) {
-			cJSON *test_name_json =
+			cJSON *name_json =
 				cJSON_GetObjectItem(test_json, "name");
-			cJSON *test_fn_json =
-				cJSON_GetObjectItem(test_json, "test_fn");
-			cJSON *setup_fn_json =
-				cJSON_GetObjectItem(test_json, "setup_fn");
-			cJSON *teardown_fn_json =
-				cJSON_GetObjectItem(test_json, "teardown_fn");
 			cJSON *options_json =
 				cJSON_GetObjectItem(test_json, "options");
-			if (!test_name_json || !test_fn_json ||
-			    !setup_fn_json || !teardown_fn_json ||
-			    !options_json) {
+			if (!name_json || !options_json) {
 				LmLogError("Malformed suite test JSON");
 				free(tests);
 				return NULL;
 			}
 
+			struct test_definition *test_definition =
+				get_test_definition(name_json);
 			MunitTest *test = &tests[test_json_idx++];
-			test->name = lm_string_make(
-				cJSON_GetStringValue(test_name_json));
-			test->test = get_test_fn(test_fn_json);
-			test->setup = get_test_setup_fn(setup_fn_json);
-			// NOTE: (isa): ^^^ Always returns NULL atm
-			test->tear_down =
-				get_test_teardown_fn(teardown_fn_json);
-			// NOTE: (isa): ^^^ Always returns NULL atm
-			test->options = get_test_options(options_json);
-			// NOTE: (isa): ^^^ Always returns MUNIT_TEST_OPTION_NONE atm
+			test->name =
+				lm_string_make(cJSON_GetStringValue(name_json));
+			test->test = test_definition->test_fn;
+			test->setup = test_definition->setup_fn;
+			test->tear_down = test_definition->teardown_fn;
+			test->options = get_test_options_STUB(options_json);
 			// TODO: (isa): Determine if test->parameters should be set here
 		}
 	}
@@ -250,11 +183,9 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 
 	suite = malloc(sizeof(MunitSuite));
 	suite->prefix = lm_string_make(cJSON_GetStringValue(suite_prefix_json));
-	suite->suites = get_sub_suites(sub_suites_json);
-	// NOTE: (isa): ^^^ Always returns NULL atm
+	suite->suites = get_sub_suites_STUB(sub_suites_json);
 	suite->iterations = cJSON_GetNumberValue(iterations_json);
-	suite->options = get_suite_options(suite_options_json);
-	// NOTE: (isa): ^^^ Always returns MUNIT_SUITE_OPTION_NONE atm
+	suite->options = get_suite_options_STUB(suite_options_json);
 	suite->tests = get_suite_tests(suite_tests_json);
 
 	return suite;
