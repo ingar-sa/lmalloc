@@ -1,5 +1,5 @@
 CC = gcc
-SRC = $(filter-out odin sdhs, $(shell find src -name "*.c"))
+SRC = $(filter-out sdhs poc glibc linux gcc, $(shell find src -name "*.c"))
 INCLUDES = -I.
 LIBS =  -lpthread
 
@@ -63,6 +63,7 @@ compile_commands.json:
 
 build_suite:
 	@mkdir -p build
+	@mkdir -p logs
 	@printf "\033[0;32m\nBuilding validation suite\n\033[0m"
 	$(CC) $(CFLAGS) $(INCLUDES) $(SRC) -o build/$(PROGRAM_NAME) $(LIBS)
 	@printf "\033[0;32mFinished building validation suite\n\033[0m"
