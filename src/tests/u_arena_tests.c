@@ -100,8 +100,8 @@ static void bulk_allocations(void)
 
 int u_arena_tests(struct u_arena_test_params *params)
 {
-	LmString filename = lm_string_make("->/logs/u_arena_tests_");
-	filename = lm_string_append_fmt(filename, "%s_%s->txt",
+	LmString filename = lm_string_make("./logs/u_arena_tests_");
+	filename = lm_string_append_fmt(filename, "%s_%s.txt",
 					(params->mallocd ? "m" : "nm"),
 					(params->contiguous ? "c" : "nc"));
 	pid_t pid;
