@@ -16,10 +16,12 @@ LM_LOG_REGISTER(validation);
 #include <stdlib.h>
 #include <stddef.h>
 
+#ifndef RUN_IN_DEBUGGER
+#define RUN_IN_DEBUGGER false
+#endif
+
 int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
-	static const bool RUN_IN_DEBUGGER = true;
-
 	if (!RUN_IN_DEBUGGER) {
 		lm_file_data *test_config_file =
 			lm_load_file_into_memory("./configs/validation.json");
