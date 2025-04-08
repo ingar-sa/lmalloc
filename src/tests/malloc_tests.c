@@ -8,7 +8,7 @@ LM_LOG_REGISTER(malloc_test);
 #include <stdlib.h>
 #include <sys/wait.h>
 
-static void small_calloc(LmString log_filename)
+static void small_calloc(LmString log_filename, bool running_in_debugger)
 {
 	FILE *log_file = lm_open_file_by_name(log_filename, "a");
 	LmSetLogFileLocal(log_file);
@@ -40,14 +40,16 @@ static void small_calloc(LmString log_filename)
 			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
 
 	lm_close_file(log_file);
-	exit(EXIT_SUCCESS);
+	if (!running_in_debugger)
+		exit(EXIT_SUCCESS);
 }
 
-static void small_malloc(LmString log_filename)
+static void small_malloc(LmString log_filename, bool running_in_debugger)
 {
-	FILE *log_file = lm_open_file_by_name(log_filename, "a");
+	FILE *log_file = lm_open_file_by_name(log_filename, "w");
 	LmSetLogFileLocal(log_file);
 
+	LmLogDebugR("\n------------------------------");
 	LmLogDebug("Small malloc");
 
 	const int iterations = 10000;
@@ -75,7 +77,8 @@ static void small_malloc(LmString log_filename)
 			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
 
 	lm_close_file(log_file);
-	exit(EXIT_SUCCESS);
+	if (!running_in_debugger)
+		exit(EXIT_SUCCESS);
 }
 
 int malloc_tests(void)
@@ -83,18 +86,26 @@ int malloc_tests(void)
 	LmString filename = lm_string_make("./logs/malloc_test.txt");
 	pid_t pid;
 	int status;
-
 	if ((pid = fork()) == 0) {
-		small_malloc(filename);
+		small_malloc(filename, false);
 	} else {
 		waitpid(pid, &status, 0);
 	}
 
 	if ((pid = fork()) == 0) {
-		small_calloc(filename);
+		small_calloc(filename, false);
 	} else {
 		waitpid(pid, &status, 0);
 	}
+
+	return 0;
+}
+
+int malloc_tests_debugger(void)
+{
+	LmString filename = lm_string_make("./logs/malloc_test.txt");
+	small_malloc(filename, true);
+	small_calloc(filename, true);
 
 	return 0;
 }

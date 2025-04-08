@@ -18,18 +18,26 @@ LM_LOG_REGISTER(validation);
 
 int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
-	lm_file_data *test_config_file =
-		lm_load_file_into_memory("./configs/validation.json");
-	cJSON *test_config_json = cJSON_Parse((char *)test_config_file->data);
-	cJSON *suites_json = cJSON_GetObjectItem(test_config_json, "suites");
+	static const bool RUN_IN_DEBUGGER = true;
 
-	MunitSuite *test_suite = NULL;
-	cJSON *suite_json;
-	cJSON_ArrayForEach(suite_json, suites_json)
-	{
-		test_suite = create_munit_suite(suite_json);
+	if (!RUN_IN_DEBUGGER) {
+		lm_file_data *test_config_file =
+			lm_load_file_into_memory("./configs/validation.json");
+		cJSON *test_config_json =
+			cJSON_Parse((char *)test_config_file->data);
+		cJSON *suites_json =
+			cJSON_GetObjectItem(test_config_json, "suites");
+
+		MunitSuite *test_suite = NULL;
+		cJSON *suite_json;
+		cJSON_ArrayForEach(suite_json, suites_json)
+		{
+			test_suite = create_munit_suite(suite_json);
+		}
+
+		int success = munit_suite_main(test_suite, NULL, argc, argv);
+		return success;
+	} else {
+		malloc_tests_debugger();
 	}
-
-	int success = munit_suite_main(test_suite, NULL, argc, argv);
-	return success;
 }

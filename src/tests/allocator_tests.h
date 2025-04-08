@@ -258,5 +258,6 @@ struct u_arena_test_params {
 
 int u_arena_tests(struct u_arena_test_params params);
 int malloc_tests(void);
+int malloc_tests_debugger(void);
 
 #endif
