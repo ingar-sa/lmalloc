@@ -24,14 +24,15 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
 	int success = EXIT_SUCCESS;
 
-	if (!RUN_IN_DEBUGGER) {
-		lm_file_data *test_config_file =
-			lm_load_file_into_memory("./configs/validation.json");
-		cJSON *test_config_json =
-			cJSON_Parse((char *)test_config_file->data);
-		cJSON *main_suite_json =
-			cJSON_GetObjectItem(test_config_json, "main_suite");
+	lm_file_data *test_config_file =
+		lm_load_file_into_memory("./configs/validation.json");
+	cJSON *test_config_json = cJSON_Parse((char *)test_config_file->data);
+	cJSON *main_suite_json =
+		cJSON_GetObjectItem(test_config_json, "main_suite");
+	LmAssert(main_suite_json != NULL,
+		 "main_suite not present in validation.json");
 
+	if (!RUN_IN_DEBUGGER) {
 		MunitSuite *main_suite = create_munit_suite(main_suite_json);
 		if (main_suite)
 			success =

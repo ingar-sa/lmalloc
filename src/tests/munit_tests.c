@@ -17,13 +17,16 @@ MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 {
 	(void)mu_params;
 	struct u_arena_test_params *params = data;
+	LmAssert(params->alloc_iterations > 0,
+		 "Number of allocation iterations is 0");
+
 	LmLogDebug("Params: %zd, %zd, %s, %s", params->arena_sz,
 		   params->alignment, BOOL_STRING(params->mallocd),
 		   BOOL_STRING(params->contiguous));
-	if (u_arena_tests(params) == 0)
-		return MUNIT_OK;
-	else
-		return MUNIT_FAIL;
+
+	MunitResult success = (u_arena_tests(params) == 0) ? MUNIT_OK :
+							     MUNIT_FAIL;
+	return success;
 }
 
 void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
@@ -37,11 +40,12 @@ void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 	cJSON *alignment_json = cJSON_GetObjectItem(ctx_json, "alignment");
 	cJSON *mallocd_json = cJSON_GetObjectItem(ctx_json, "mallocd");
 	cJSON *contiguous_json = cJSON_GetObjectItem(ctx_json, "contiguous");
-	if (!arena_sz_json || !alignment_json || !mallocd_json ||
-	    !contiguous_json) {
-		LmLogError("Malformed test context JSON");
-		return NULL;
-	}
+	cJSON *alloc_iterations_json =
+		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
+	LmAssert(arena_sz_json && alignment_json && mallocd_json &&
+			 contiguous_json && alloc_iterations_json,
+		 "u_arena_test's context JSON is malformed");
+
 	struct u_arena_test_params *test_params =
 		malloc(sizeof(struct u_arena_test_params));
 	test_params->arena_sz =
@@ -49,18 +53,21 @@ void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 	test_params->alignment = cJSON_GetNumberValue(alignment_json);
 	test_params->mallocd = cJSON_IsTrue(mallocd_json);
 	test_params->contiguous = cJSON_IsTrue(contiguous_json);
+	test_params->alloc_iterations =
+		cJSON_GetNumberValue(alloc_iterations_json);
+	LmAssert(test_params->alloc_iterations > 0,
+		 "u_arena_test's alloc_iterations is 0");
 
 	return test_params;
 }
 
-MunitResult malloc_test(const MunitParameter params[], void *data)
+MunitResult malloc_test(const MunitParameter mu_params[], void *data)
 {
-	(void)params;
-	(void)data;
-	if (malloc_tests() == 0)
-		return MUNIT_OK;
-	else
-		return MUNIT_FAIL;
+	(void)mu_params;
+	struct malloc_test_params *params = data;
+	MunitResult result = (malloc_tests(params) == 0) ? MUNIT_OK :
+							   MUNIT_FAIL;
+	return result;
 }
 
 struct test_definition {
@@ -69,6 +76,27 @@ struct test_definition {
 	MunitTestTearDown teardown_fn;
 	const char *test_name;
 };
+void *malloc_test_setup(const MunitParameter *mu_params, void *data,
+			void *test_ctx)
+{
+	(void)mu_params;
+	(void)data;
+
+	cJSON *ctx_json = test_ctx;
+	cJSON *alloc_iterations_json =
+		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
+	LmAssert(alloc_iterations_json,
+		 "malloc_test's context JSON is malformed");
+
+	struct malloc_test_params *test_params =
+		malloc(sizeof(struct malloc_test_params));
+	test_params->alloc_iterations =
+		cJSON_GetNumberValue(alloc_iterations_json);
+	LmAssert(test_params->alloc_iterations > 0,
+		 "malloc_test's alloc_iterations is 0");
+
+	return test_params;
+}
 
 static struct test_definition test_definitions[] = {
 	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_mallocd_cont_test" },
@@ -127,10 +155,8 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 	{
 		cJSON *test_enabled_json =
 			cJSON_GetObjectItem(test_json, "enabled");
-		if (!test_enabled_json) {
-			LmLogError("Malformed suite test JSON");
-			return NULL;
-		}
+		LmAssert(test_enabled_json, "Malformed suite test JSON");
+
 		if (cJSON_IsTrue(test_enabled_json))
 			++enabled_test_count;
 	}
@@ -153,23 +179,28 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 				cJSON_GetObjectItem(test_json, "name");
 			cJSON *options_json =
 				cJSON_GetObjectItem(test_json, "options");
-			cJSON *ctx_json = cJSON_GetObjectItem(test_json, "ctx");
-			if (!name_json || !options_json || !ctx_json) {
-				LmLogError("Malformed suite test JSON");
-				free(tests);
-				return NULL;
-			}
+			LmAssert(name_json && options_json,
+				 "Malformed suite test JSON");
 
+			cJSON *ctx_json;
+			bool has_ctx = cJSON_HasObjectItem(test_json, "ctx");
+			if (has_ctx)
+				ctx_json =
+					cJSON_GetObjectItem(test_json, "ctx");
 			MunitTest *test = &tests[test_json_idx++];
 			struct test_definition *test_definition =
 				get_test_definition(name_json);
+			LmAssert(
+				!(has_ctx &&
+				  (test_definition->setup_fn == NULL)),
+				"The test %s has a context in its JSON but no setup function",
+				test_definition->test_name);
 			test->name = lm_string_make(test_definition->test_name);
 			test->test = test_definition->test_fn;
 			test->setup = test_definition->setup_fn;
 			test->tear_down = test_definition->teardown_fn;
 			test->options = get_test_options_STUB(options_json);
-			test->ctx = ctx_json;
-			// TODO: (isa): Determine if test->parameters should be set here
+			test->ctx = (has_ctx ? ctx_json : NULL);
 		}
 	}
 
@@ -180,10 +211,8 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 {
 	cJSON *suite_enabled_json =
 		cJSON_GetObjectItem(suite_conf_json, "enabled");
-	if (!suite_enabled_json) {
-		LmLogError("Malformed suite configuration JSON");
-		return NULL;
-	}
+	LmAssert(suite_enabled_json, "Malformed suite configuration JSON");
+
 	if (cJSON_IsFalse(suite_enabled_json))
 		return NULL;
 
@@ -196,11 +225,9 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 	cJSON *suite_options_json =
 		cJSON_GetObjectItem(suite_conf_json, "options");
 	cJSON *suite_tests_json = cJSON_GetObjectItem(suite_conf_json, "tests");
-	if (!suite_prefix_json || !sub_suites_json || !iterations_json ||
-	    !suite_options_json || !suite_tests_json) {
-		LmLogError("Malformed suite configuration JSON");
-		return NULL;
-	}
+	LmAssert(suite_prefix_json && sub_suites_json && iterations_json &&
+			 suite_options_json && suite_tests_json,
+		 "Malformed suite configuration JSON");
 
 	MunitSuite *suite = malloc(sizeof(MunitSuite));
 	suite->prefix = lm_string_make(cJSON_GetStringValue(suite_prefix_json));

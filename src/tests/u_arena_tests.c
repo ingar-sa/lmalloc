@@ -10,7 +10,8 @@ LM_LOG_REGISTER(u_arena_test);
 #include <stddef.h>
 #include <sys/wait.h>
 
-static void small_zalloc(UArena *a, LmString log_filename)
+static void small_zalloc(UArena *a, uint alloc_iterations,
+			 bool running_in_debugger, LmString log_filename)
 {
 	FILE *log_file = lm_open_file_by_name(log_filename, "a");
 	LmSetLogFileLocal(log_file);
@@ -18,37 +19,40 @@ static void small_zalloc(UArena *a, LmString log_filename)
 	LmLogDebugR("\n------------------------------");
 	LmLogDebug("Small zalloc");
 
-	const int iterations = 1000;
 	for (int j = 0; j < (int)LmArrayLen(small_sizes); ++j) {
 		LmLogDebugR("\nAllocating %zd bytes %d times", small_sizes[j],
-			    iterations);
+			    alloc_iterations);
 
-		LM_TIME_LOOP(individual_sizes, PROC_CPUTIME, int, ss, 0,
-			     iterations, <, ++,
+		LM_TIME_LOOP(individual_sizes, PROC_CPUTIME, uint, ss, 0,
+			     alloc_iterations, <, ++,
 			     uint8_t *ptr = u_arena_zalloc(a, small_sizes[j]);
 			     *ptr = 1;)
 
-		LM_LOG_TIMING_AVG(individual_sizes, iterations,
+		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
 				  "Timing of individual size", US, LM_LOG_RAW,
 				  DBG, LM_LOG_MODULE_LOCAL);
 		u_arena_free(a);
 	}
 
-	LmLogDebugR("\nAllocating all sizes repeatedly %d times", iterations);
-	LM_TIME_LOOP(all_sizes, PROC_CPUTIME, int, ss, 0, iterations, <, ++,
+	LmLogDebugR("\nAllocating all sizes repeatedly %d times",
+		    alloc_iterations);
+	LM_TIME_LOOP(all_sizes, PROC_CPUTIME, uint, ss, 0, alloc_iterations, <,
+		     ++,
 		     uint8_t *ptr = u_arena_zalloc(
 			     a, small_sizes[ss % LmArrayLen(small_sizes)]);
 		     *ptr = 1;)
 	// TODO: (isa): Determine if mod operation adds a lot of overhead
-	LM_LOG_TIMING_AVG(all_sizes, iterations,
+	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations,
 			  "Timing of allocating all sizes repeatedly", US,
 			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
 
 	lm_close_file(log_file);
-	exit(EXIT_SUCCESS);
+	if (!running_in_debugger)
+		exit(EXIT_SUCCESS);
 }
 
-static void small_alloc(UArena *a, LmString log_filename)
+static void small_alloc(UArena *a, uint alloc_iterations,
+			bool running_in_debugger, LmString log_filename)
 {
 	FILE *log_file = lm_open_file_by_name(log_filename, "a");
 	LmSetLogFileLocal(log_file);
@@ -56,34 +60,36 @@ static void small_alloc(UArena *a, LmString log_filename)
 	LmLogDebugR("\n------------------------------");
 	LmLogDebug("Small alloc");
 
-	const int iterations = 1000;
 	for (int j = 0; j < (int)LmArrayLen(small_sizes); ++j) {
 		LmLogDebugR("\nAllocating %zd bytes %d times", small_sizes[j],
-			    iterations);
+			    alloc_iterations);
 
-		LM_TIME_LOOP(individual_sizes, PROC_CPUTIME, int, ss, 0,
-			     iterations, <, ++,
+		LM_TIME_LOOP(individual_sizes, PROC_CPUTIME, uint, ss, 0,
+			     alloc_iterations, <, ++,
 			     uint8_t *ptr = u_arena_alloc(a, small_sizes[j]);
 			     *ptr = 1;)
 
-		LM_LOG_TIMING_AVG(individual_sizes, iterations,
+		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
 				  "Timing of individual size", US, LM_LOG_RAW,
 				  DBG, LM_LOG_MODULE_LOCAL);
 		u_arena_free(a);
 	}
 
-	LmLogDebugR("\nAllocating all sizes repeatedly %d times", iterations);
-	LM_TIME_LOOP(all_sizes, PROC_CPUTIME, int, ss, 0, iterations, <, ++,
+	LmLogDebugR("\nAllocating all sizes repeatedly %d times",
+		    alloc_iterations);
+	LM_TIME_LOOP(all_sizes, PROC_CPUTIME, uint, ss, 0, alloc_iterations, <,
+		     ++,
 		     uint8_t *ptr = u_arena_alloc(
 			     a, small_sizes[ss % LmArrayLen(small_sizes)]);
 		     *ptr = 1;)
 	// TODO: (isa): Determine if mod operation adds a lot of overhead
-	LM_LOG_TIMING_AVG(all_sizes, iterations,
+	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations,
 			  "Timing of allocating all sizes repeatedly", US,
 			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
 
 	lm_close_file(log_file);
-	exit(EXIT_SUCCESS);
+	if (!running_in_debugger)
+		exit(EXIT_SUCCESS);
 }
 
 static void _medium_allocations(void)
@@ -110,7 +116,7 @@ int u_arena_tests(struct u_arena_test_params *params)
 		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
 					   params->mallocd, params->alignment);
 
-		small_alloc(a, filename);
+		small_alloc(a, params->alloc_iterations, false, filename);
 	} else {
 		waitpid(pid, &status, 0);
 	}
@@ -119,7 +125,7 @@ int u_arena_tests(struct u_arena_test_params *params)
 		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
 					   params->mallocd, params->alignment);
 
-		small_zalloc(a, filename);
+		small_zalloc(a, params->alloc_iterations, false, filename);
 	} else {
 		waitpid(pid, &status, 0);
 	}

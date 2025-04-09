@@ -15,7 +15,8 @@
                     "arena_sz": "512kB",
                     "alignment": 16,
                     "mallocd": true,
-                    "contiguous": true
+                    "contiguous": true,
+                    "alloc_iterations": 1000
                 }
             },
             {
@@ -27,7 +28,9 @@
                     "arena_sz": "512kB",
                     "alignment": 16,
                     "mallocd": true,
-                    "contiguous": false 
+                    "contiguous": false,
+                    "alloc_iterations": 1000
+
                 }
             },
             {
@@ -39,7 +42,9 @@
                     "arena_sz": "512kB",
                     "alignment": 16,
                     "mallocd": false,
-                    "contiguous": true
+                    "contiguous": true,
+                    "alloc_iterations": 1000
+
                 }
             },
             {
@@ -51,7 +56,9 @@
                     "arena_sz": "512kB",
                     "alignment": 16,
                     "mallocd": false,
-                    "contiguous": false
+                    "contiguous": false,
+                    "alloc_iterations": 1000
+
                 }
             },
             {
@@ -60,6 +67,7 @@
                 "options": "NONE",
                 "ctx":
                 {
+                    "alloc_iterations": 1000
                 }
             }
         ]

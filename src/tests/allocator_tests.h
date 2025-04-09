@@ -254,11 +254,16 @@ struct u_arena_test_params {
 	size_t alignment;
 	bool contiguous;
 	bool mallocd;
+	uint alloc_iterations;
+};
+
+struct malloc_test_params {
+	uint alloc_iterations;
 };
 
 int u_arena_tests(struct u_arena_test_params *params);
-int malloc_tests(void);
 int malloc_tests_debugger(void);
 int u_arena_tests_debugger(struct u_arena_test_params params);
+int malloc_tests(struct malloc_test_params *param);
 
 #endif
