@@ -133,22 +133,24 @@ int u_arena_tests(struct u_arena_test_params *params)
 	return 0;
 }
 
-int u_arena_tests_debugger(struct u_arena_test_params params)
+int u_arena_tests_debug(struct u_arena_test_params *params)
 {
 	LmString filename = lm_string_make("./logs/u_arena_tests_");
 	filename = lm_string_append_fmt(filename, "%s_%s.txt",
-					(params.mallocd ? "m" : "nm"),
-					(params.contiguous ? "c" : "nc"));
+					(params->mallocd ? "m" : "nm"),
+					(params->contiguous ? "c" : "nc"));
 
-	UArena *a = u_arena_create(params.arena_sz, params.contiguous,
-				   params.mallocd, params.alignment);
+	UArena *a = u_arena_create(params->arena_sz, params->contiguous,
+				   params->mallocd, params->alignment);
+
+	small_alloc(a, params->alloc_iterations, true, filename);
 
 	u_arena_destroy(&a);
 
-	a = u_arena_create(params.arena_sz, params.contiguous, params.mallocd,
-			   params.alignment);
+	a = u_arena_create(params->arena_sz, params->contiguous,
+			   params->mallocd, params->alignment);
 
-	small_zalloc(a, filename);
+	small_zalloc(a, params->alloc_iterations, true, filename);
 
 	return 0;
 }

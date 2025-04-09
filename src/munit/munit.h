@@ -444,6 +444,9 @@ typedef void *(*MunitTestSetup)(const MunitParameter params[], void *user_data,
 				void *test_ctx);
 typedef void (*MunitTestTearDown)(void *fixture);
 
+// NOTE: (isa): Added by me. Only used in our program, not in the library.
+typedef void (*test_debug_fn)(void *test_ctx);
+
 typedef struct {
 	char *name;
 	MunitTestFunc test;
@@ -451,7 +454,9 @@ typedef struct {
 	MunitTestTearDown tear_down;
 	MunitTestOptions options;
 	MunitParameterEnum *parameters;
-	void *ctx;
+	test_debug_fn
+		debug_fn; // NOTE: (isa): Added by me. Only used by us, not in the library.
+	void *ctx; // NOTE: (isa): Added by me. Only used by us, not in the library.
 } MunitTest;
 
 typedef enum { MUNIT_SUITE_OPTION_NONE = 0 } MunitSuiteOptions;

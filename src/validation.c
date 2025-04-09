@@ -40,7 +40,22 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 		else
 			LmLogInfo("Test suite disabled!");
 	} else {
-		malloc_tests_debugger();
+		cJSON *tests_json =
+			cJSON_GetObjectItem(main_suite_json, "tests");
+		LmAssert(tests_json != NULL, "'tests' not in main_suite");
+		MunitTest *tests = get_suite_tests(tests_json);
+		for (MunitTest *test = tests; test->test != NULL; test++) {
+			void *test_ctx =
+				test->setup != NULL ?
+					test->setup(NULL, NULL, test->ctx) :
+					NULL;
+			if (test->debug_fn != NULL)
+				test->debug_fn(test_ctx);
+			else
+				LmLogDebug(
+					"Test %s has no debug function. Skipping",
+					test->name);
+		}
 	}
 
 	return success;

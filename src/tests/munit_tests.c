@@ -29,6 +29,12 @@ MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 	return success;
 }
 
+void u_arena_test_debug(void *test_ctx)
+{
+	struct u_arena_test_params *params = test_ctx;
+	u_arena_tests_debug(params);
+}
+
 void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 			 void *test_ctx)
 {
@@ -70,12 +76,12 @@ MunitResult malloc_test(const MunitParameter mu_params[], void *data)
 	return result;
 }
 
-struct test_definition {
-	MunitTestFunc test_fn;
-	MunitTestSetup setup_fn;
-	MunitTestTearDown teardown_fn;
-	const char *test_name;
-};
+void malloc_test_debug(void *test_ctx)
+{
+	struct malloc_test_params *params = test_ctx;
+	malloc_tests_debug(params);
+}
+
 void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 			void *test_ctx)
 {
@@ -99,14 +105,16 @@ void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 }
 
 static struct test_definition test_definitions[] = {
-	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_mallocd_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL,
+	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
+	  "u_arena_mallocd_cont_test" },
+	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
 	  "u_arena_mallocd_non_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL,
+	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
 	  "u_arena_not_mallocd_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL,
+	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
 	  "u_arena_not_mallocd_non_cont_test" },
-	{ malloc_test, NULL, NULL, "malloc_test" },
+	{ malloc_test, malloc_test_setup, NULL, malloc_test_debug,
+	  "malloc_test" },
 	{ 0 }
 };
 
@@ -187,18 +195,22 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 			if (has_ctx)
 				ctx_json =
 					cJSON_GetObjectItem(test_json, "ctx");
+
 			MunitTest *test = &tests[test_json_idx++];
 			struct test_definition *test_definition =
 				get_test_definition(name_json);
+
 			LmAssert(
 				!(has_ctx &&
 				  (test_definition->setup_fn == NULL)),
 				"The test %s has a context in its JSON but no setup function",
 				test_definition->test_name);
+
 			test->name = lm_string_make(test_definition->test_name);
 			test->test = test_definition->test_fn;
 			test->setup = test_definition->setup_fn;
 			test->tear_down = test_definition->teardown_fn;
+			test->debug_fn = test_definition->debug_fn;
 			test->options = get_test_options_STUB(options_json);
 			test->ctx = (has_ctx ? ctx_json : NULL);
 		}

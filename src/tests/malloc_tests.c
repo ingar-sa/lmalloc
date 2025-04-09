@@ -105,11 +105,11 @@ int malloc_tests(struct malloc_test_params *params)
 	return 0;
 }
 
-int malloc_tests_debugger(void)
+int malloc_tests_debug(struct malloc_test_params *params)
 {
 	LmString filename = lm_string_make("./logs/malloc_test.txt");
-	small_malloc(filename, true);
-	small_calloc(filename, true);
+	small_malloc(filename, params->alloc_iterations, true);
+	small_calloc(filename, params->alloc_iterations, true);
 
 	return 0;
 }
