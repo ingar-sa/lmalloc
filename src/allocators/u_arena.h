@@ -19,7 +19,6 @@ typedef struct u_arena {
 	bool contiguous;
 	bool mallocd;
 	size_t alignment;
-	size_t cacheln_sz;
 	size_t page_sz;
 	size_t cap;
 	size_t cur;
@@ -27,7 +26,7 @@ typedef struct u_arena {
 } UArena;
 
 void u_arena_init(UArena *a, bool contiguous, bool mallocd, size_t alignment,
-		  size_t cacheln_sz, size_t page_sz, size_t cap, uint8_t *mem);
+		  size_t page_sz, size_t cap, uint8_t *mem);
 
 UArena *u_arena_create(size_t cap, bool contiguous, bool mallocd,
 		       size_t alignment);

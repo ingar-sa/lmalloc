@@ -13,16 +13,16 @@ LM_LOG_REGISTER(u_arena);
 #include <stdlib.h>
 #include <string.h>
 
-static inline size_t arena_cache_aligned_sz(UArena *a)
+static size_t arena_cache_aligned_sz(void)
 {
+	size_t cacheln_sz = get_l1d_cacheln_sz();
 	size_t arena_cache_aligned_sz =
-		sizeof(UArena) +
-		LmPaddingToAlign(sizeof(UArena), a->cacheln_sz);
+		sizeof(UArena) + LmPaddingToAlign(sizeof(UArena), cacheln_sz);
 	return arena_cache_aligned_sz;
 }
 
 void u_arena_init(UArena *a, bool contiguous, bool mallocd, size_t alignment,
-		  size_t cacheln_sz, size_t page_sz, size_t cap, uint8_t *mem)
+		  size_t page_sz, size_t cap, uint8_t *mem)
 {
 	LmAssert(LmIsPowerOfTwo(alignment) && alignment <= 4096,
 		 "Provided alignment is not a power of two and/or <= 4096");
@@ -30,7 +30,6 @@ void u_arena_init(UArena *a, bool contiguous, bool mallocd, size_t alignment,
 	a->contiguous = contiguous;
 	a->mallocd = mallocd;
 	a->alignment = alignment;
-	a->cacheln_sz = cacheln_sz;
 	a->page_sz = page_sz;
 	a->cur = 0;
 	a->cap = cap;
@@ -75,8 +74,7 @@ UArena *u_arena_create(size_t cap, bool contiguous, bool mallocd,
 		}
 	}
 
-	u_arena_init(arena, contiguous, mallocd, alignment, cacheln_sz, page_sz,
-		     cap, mem);
+	u_arena_init(arena, contiguous, mallocd, alignment, page_sz, cap, mem);
 	return arena;
 }
 
@@ -97,7 +95,7 @@ void u_arena_destroy(UArena **ap)
 			}
 		} else {
 			if (a->contiguous) {
-				munmap(a, arena_cache_aligned_sz(a) + a->cap);
+				munmap(a, arena_cache_aligned_sz() + a->cap);
 			} else {
 				munmap(a->mem, a->cap);
 				free(a);
