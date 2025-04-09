@@ -20,6 +20,10 @@ LM_LOG_REGISTER(validation);
 #define RUN_IN_DEBUGGER false
 #endif
 
+// NOTE: (isa): We are pretty much not freeing any of the memory used by cJSON
+// or munit atm, but that memory can live happily for the entire lifetime of
+// the program, so it's not an issue (famous last words, I know).
+
 int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
 	int success = EXIT_SUCCESS;
@@ -43,6 +47,7 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 		cJSON *tests_json =
 			cJSON_GetObjectItem(main_suite_json, "tests");
 		LmAssert(tests_json != NULL, "'tests' not in main_suite");
+
 		MunitTest *tests = get_suite_tests(tests_json);
 		for (MunitTest *test = tests; test->test != NULL; test++) {
 			void *test_ctx =
