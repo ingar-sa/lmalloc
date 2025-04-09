@@ -255,10 +255,12 @@ struct u_arena_test_params {
 	bool contiguous;
 	bool mallocd;
 	uint alloc_iterations;
+	LmString log_filename;
 };
 
 struct malloc_test_params {
 	uint alloc_iterations;
+	LmString log_filename;
 };
 
 int u_arena_tests(struct u_arena_test_params *params);

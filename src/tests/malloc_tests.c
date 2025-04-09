@@ -8,14 +8,15 @@ LM_LOG_REGISTER(malloc_test);
 #include <stdlib.h>
 #include <sys/wait.h>
 
-static void small_calloc(LmString log_filename, uint alloc_iterations,
-			 bool running_in_debugger)
+static void calloc_test(uint alloc_iterations, bool running_in_debugger,
+			LmString log_filename, const char *file_mode)
 {
-	FILE *log_file = lm_open_file_by_name(log_filename, "a");
+	FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
 	LmSetLogFileLocal(log_file);
 	LmLogDebugR("\n------------------------------");
 	LmLogDebug("Small calloc");
 
+	// TODO: (isa): Average for all small sizes
 	for (int j = 0; j < (int)LmArrayLen(small_sizes); ++j) {
 		LmLogDebugR("\nAllocating %zd bytes %d times", small_sizes[j],
 			    alloc_iterations);
@@ -46,15 +47,16 @@ static void small_calloc(LmString log_filename, uint alloc_iterations,
 		exit(EXIT_SUCCESS);
 }
 
-static void small_malloc(LmString log_filename, uint alloc_iterations,
-			 bool running_in_debugger)
+static void malloc_test(uint alloc_iterations, bool running_in_debugger,
+			LmString log_filename, const char *file_mode)
 {
-	FILE *log_file = lm_open_file_by_name(log_filename, "w");
+	FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
 	LmSetLogFileLocal(log_file);
 
 	LmLogDebugR("\n------------------------------");
 	LmLogDebug("Small malloc");
 
+	// TODO: (isa): Average for all small sizes
 	for (int j = 0; j < (int)LmArrayLen(small_sizes); ++j) {
 		LmLogDebugR("\nAllocating %zd bytes %d times", small_sizes[j],
 			    alloc_iterations);
@@ -87,17 +89,20 @@ static void small_malloc(LmString log_filename, uint alloc_iterations,
 
 int malloc_tests(struct malloc_test_params *params)
 {
-	LmString filename = lm_string_make("./logs/malloc_test.txt");
 	pid_t pid;
 	int status;
+	const char *file_mode = "a";
+
 	if ((pid = fork()) == 0) {
-		small_malloc(filename, params->alloc_iterations, false);
+		malloc_test(params->alloc_iterations, false,
+			    params->log_filename, file_mode);
 	} else {
 		waitpid(pid, &status, 0);
 	}
 
 	if ((pid = fork()) == 0) {
-		small_calloc(filename, params->alloc_iterations, false);
+		calloc_test(params->alloc_iterations, false,
+			    params->log_filename, file_mode);
 	} else {
 		waitpid(pid, &status, 0);
 	}
@@ -107,9 +112,12 @@ int malloc_tests(struct malloc_test_params *params)
 
 int malloc_tests_debug(struct malloc_test_params *params)
 {
-	LmString filename = lm_string_make("./logs/malloc_test.txt");
-	small_malloc(filename, params->alloc_iterations, true);
-	small_calloc(filename, params->alloc_iterations, true);
+	const char *file_mode = "a";
+
+	malloc_test(params->alloc_iterations, true, params->log_filename,
+		    file_mode);
+	calloc_test(params->alloc_iterations, true, params->log_filename,
+		    file_mode);
 
 	return 0;
 }

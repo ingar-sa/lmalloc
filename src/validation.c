@@ -42,7 +42,7 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 			success =
 				munit_suite_main(main_suite, NULL, argc, argv);
 		else
-			LmLogInfo("Test suite disabled!");
+			LmLogWarning("Main suite is disabled!");
 	} else {
 		cJSON *tests_json =
 			cJSON_GetObjectItem(main_suite_json, "tests");
@@ -58,7 +58,7 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 				test->debug_fn(test_ctx);
 			else
 				LmLogDebug(
-					"Test %s has no debug function. Skipping",
+					"Test '%s' has no debug function. Skipping",
 					test->name);
 		}
 	}

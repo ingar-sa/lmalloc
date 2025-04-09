@@ -48,8 +48,11 @@ void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 	cJSON *contiguous_json = cJSON_GetObjectItem(ctx_json, "contiguous");
 	cJSON *alloc_iterations_json =
 		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
+	cJSON *log_filename_json =
+		cJSON_GetObjectItem(ctx_json, "log_filename");
 	LmAssert(arena_sz_json && alignment_json && mallocd_json &&
-			 contiguous_json && alloc_iterations_json,
+			 contiguous_json && alloc_iterations_json &&
+			 log_filename_json,
 		 "u_arena_test's context JSON is malformed");
 
 	struct u_arena_test_params *test_params =
@@ -61,6 +64,9 @@ void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 	test_params->contiguous = cJSON_IsTrue(contiguous_json);
 	test_params->alloc_iterations =
 		cJSON_GetNumberValue(alloc_iterations_json);
+	test_params->log_filename =
+		lm_string_make(cJSON_GetStringValue(log_filename_json));
+
 	LmAssert(test_params->alloc_iterations > 0,
 		 "u_arena_test's alloc_iterations is 0");
 
@@ -91,13 +97,18 @@ void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 	cJSON *ctx_json = test_ctx;
 	cJSON *alloc_iterations_json =
 		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
-	LmAssert(alloc_iterations_json,
+	cJSON *log_filename_json =
+		cJSON_GetObjectItem(ctx_json, "log_filename");
+	LmAssert(alloc_iterations_json && log_filename_json,
 		 "malloc_test's context JSON is malformed");
 
 	struct malloc_test_params *test_params =
 		malloc(sizeof(struct malloc_test_params));
 	test_params->alloc_iterations =
 		cJSON_GetNumberValue(alloc_iterations_json);
+	test_params->log_filename =
+		lm_string_make(cJSON_GetStringValue(log_filename_json));
+
 	LmAssert(test_params->alloc_iterations > 0,
 		 "malloc_test's alloc_iterations is 0");
 
@@ -203,8 +214,13 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 			LmAssert(
 				!(has_ctx &&
 				  (test_definition->setup_fn == NULL)),
-				"The test %s has a context in its JSON but no setup function to parse it",
+				"The test '%s' has a context in its JSON but no setup function to parse it",
 				test_definition->test_name);
+
+			if (test_definition->setup_fn != NULL && !has_ctx)
+				LmLogWarning(
+					"The test '%s' has a setup function but not context in its JSON. Is this correct?",
+					test_definition->test_name);
 
 			test->name = lm_string_make(test_definition->test_name);
 			test->test = test_definition->test_fn;
@@ -221,6 +237,8 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 
 MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 {
+	LmAssert(suite_conf_json, "Suite JSON is NULL");
+
 	cJSON *suite_enabled_json =
 		cJSON_GetObjectItem(suite_conf_json, "enabled");
 	LmAssert(suite_enabled_json, "No 'enabled' field in suite JSON");

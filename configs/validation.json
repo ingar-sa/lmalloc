@@ -1,6 +1,6 @@
 {
     "main_suite": {
-        "prefix": "main",
+        "prefix": "validation",
         "enabled": true,
         "sub_suites": "NONE",
         "iterations": 1,
@@ -16,7 +16,8 @@
                     "alignment": 16,
                     "mallocd": true,
                     "contiguous": true,
-                    "alloc_iterations": 1000
+                    "alloc_iterations": 1000,
+                    "log_filename": "./logs/u_arena_m_c.txt"
                 }
             },
             {
@@ -29,9 +30,9 @@
                     "alignment": 16,
                     "mallocd": true,
                     "contiguous": false,
-                    "alloc_iterations": 1000
-
-                }
+                    "alloc_iterations": 1000,
+                    "log_filename": "./logs/u_arena_m_nc.txt"
+               }
             },
             {
                 "name": "u_arena_not_mallocd_cont_test",
@@ -43,8 +44,8 @@
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": true,
-                    "alloc_iterations": 1000
-
+                    "alloc_iterations": 1000,
+                    "log_filename": "./logs/u_arena_nm_c.txt"
                 }
             },
             {
@@ -57,17 +58,18 @@
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": false,
-                    "alloc_iterations": 1000
-
+                    "alloc_iterations": 1000,
+                    "log_filename": "./logs/u_arena_nm_nc.txt"
                 }
             },
             {
                 "name": "malloc_test",
-                "enabled": true,
+                "enabled": false,
                 "options": "NONE",
                 "ctx":
                 {
-                    "alloc_iterations": 1000
+                    "alloc_iterations": 1000,
+                    "log_filename": "./logs/malloc.txt"
                 }
             }
         ]

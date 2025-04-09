@@ -107,11 +107,11 @@ void u_arena_destroy(UArena **ap)
 	}
 }
 
-void *u_arena_alloc(UArena *a, size_t size)
+inline void *u_arena_alloc(UArena *a, size_t size)
 {
 	void *ptr = NULL;
 	size_t aligned_sz = size + LmPaddingToAlign(size, a->alignment);
-	if (likely(a->cur + aligned_sz <= a->cap)) {
+	if (LM_LIKELY(a->cur + aligned_sz <= a->cap)) {
 		ptr = a->mem + a->cur;
 		a->cur += aligned_sz;
 	}
@@ -119,20 +119,23 @@ void *u_arena_alloc(UArena *a, size_t size)
 	return ptr;
 }
 
-void *u_arena_zalloc(UArena *a, size_t size)
+// TODO: (isa): Zero entire pages instead of each individual allocation.
+// This might be an optimization, but it can also be the case that the
+// formula for checking if a new page has been touched causes a lot of
+// overhead
+inline void *u_arena_zalloc(UArena *a, size_t size)
 {
 	void *ptr = NULL;
 	size_t aligned_sz = size + LmPaddingToAlign(size, a->alignment);
-	if (likely(a->cur + aligned_sz <= a->cap)) {
+	if (LM_LIKELY(a->cur + aligned_sz <= a->cap)) {
 		ptr = a->mem + a->cur;
 		a->cur += aligned_sz;
 		explicit_bzero(ptr, aligned_sz);
-		// TODO: (isa): Zero entire pages instead of each individual allocation
 	}
 	return ptr;
 }
 
-void *u_arena_falloc(UArena *a, size_t size)
+inline void *u_arena_falloc(UArena *a, size_t size)
 {
 	size_t aligned_sz = size + LmPaddingToAlign(size, a->alignment);
 	void *ptr = a->mem + a->cur;
@@ -140,13 +143,12 @@ void *u_arena_falloc(UArena *a, size_t size)
 	return ptr;
 }
 
-void *u_arena_fzalloc(UArena *a, size_t size)
+inline void *u_arena_fzalloc(UArena *a, size_t size)
 {
 	size_t aligned_sz = size + LmPaddingToAlign(size, a->alignment);
 	void *ptr = a->mem + a->cur;
-	explicit_bzero(ptr, aligned_sz);
-	// TODO: (isa): Zero entire pages instead of each individual allocation
 	a->cur += aligned_sz;
+	explicit_bzero(ptr, aligned_sz);
 	return ptr;
 }
 
@@ -155,7 +157,7 @@ void u_arena_release(UArena *a, size_t pos, size_t size)
 	LmAssert(pos < a->cur, "pos > arena pos");
 	LmAssert(pos % a->page_sz == 0, "pos is not a multiple of page size");
 	LmAssert(size % a->page_sz == 0, "size is not a multiple of page size");
-	if (unlikely(a->mallocd)) {
+	if (LM_UNLIKELY(a->mallocd)) {
 		LmLogWarning("Cannot call u_arena_release on mallocd arena");
 	} else {
 		if (madvise(a->mem + pos, size, MADV_DONTNEED) != 0)
@@ -163,15 +165,15 @@ void u_arena_release(UArena *a, size_t pos, size_t size)
 	}
 }
 
-void u_arena_free(UArena *a)
+inline void u_arena_free(UArena *a)
 {
 	a->cur = 0;
 }
 
-void u_arena_pop(UArena *a, size_t size)
+inline void u_arena_pop(UArena *a, size_t size)
 {
-	if (likely(((size % a->alignment) == 0) &&
-		   ((ssize_t)a->cur - (ssize_t)size >= 0))) {
+	if (LM_LIKELY(((size % a->alignment) == 0) &&
+		      ((ssize_t)a->cur - (ssize_t)size >= 0))) {
 		a->cur -= size;
 	}
 }
@@ -185,15 +187,15 @@ void u_arena_set_alignment(UArena *a, size_t alignment)
 			"Specified alignment is not a power of two or is > 4096");
 }
 
-void *u_arena_pos(UArena *a)
+inline void *u_arena_pos(UArena *a)
 {
 	void *pos = a->mem + a->cur;
 	return pos;
 }
 
-void *u_arena_seek(UArena *a, size_t pos)
+inline void *u_arena_seek(UArena *a, size_t pos)
 {
-	if (likely(pos <= a->cap && (pos % a->alignment) == 0)) {
+	if (LM_LIKELY(pos <= a->cap && (pos % a->alignment) == 0)) {
 		a->cur = pos;
 		return a->mem + a->cur;
 	}

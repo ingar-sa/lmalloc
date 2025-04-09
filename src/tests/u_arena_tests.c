@@ -10,124 +10,87 @@ LM_LOG_REGISTER(u_arena_test);
 #include <stddef.h>
 #include <sys/wait.h>
 
-static void small_zalloc(UArena *a, uint alloc_iterations,
-			 bool running_in_debugger, LmString log_filename)
+typedef void *(*u_arena_alloc_fn)(UArena *a, size_t sz);
+
+static const int n_u_arena_alloc_fns = 4;
+
+static const u_arena_alloc_fn u_arena_alloc_functions[] = {
+	u_arena_alloc, u_arena_zalloc, u_arena_falloc, u_arena_fzalloc
+};
+
+static const char *u_arena_alloc_function_names[] = { "alloc", "zalloc",
+						      "falloc", "fzalloc" };
+
+static void small_sizes_test(UArena *a, uint alloc_iterations,
+			     bool running_in_debugger,
+			     u_arena_alloc_fn alloc_fn,
+			     const char *alloc_fn_name, LmString log_filename,
+			     const char *file_mode)
 {
-	FILE *log_file = lm_open_file_by_name(log_filename, "a");
+	FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
 	LmSetLogFileLocal(log_file);
 
 	LmLogDebugR("\n------------------------------");
-	LmLogDebug("Small zalloc");
+	LmLogDebug("%s -- small", alloc_fn_name);
 
+	// TODO: (isa): Average for all small sizes
 	for (int j = 0; j < (int)LmArrayLen(small_sizes); ++j) {
-		LmLogDebugR("\nAllocating %zd bytes %d times", small_sizes[j],
-			    alloc_iterations);
+		LmLogDebugR("\n%s'ing %zd bytes %d times", alloc_fn_name,
+			    small_sizes[j], alloc_iterations);
 
 		LM_TIME_LOOP(individual_sizes, PROC_CPUTIME, uint, ss, 0,
 			     alloc_iterations, <, ++,
-			     uint8_t *ptr = u_arena_zalloc(a, small_sizes[j]);
+			     uint8_t *ptr = alloc_fn(a, small_sizes[j]);
 			     *ptr = 1;)
 
-		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
-				  "Timing of individual size", US, LM_LOG_RAW,
-				  DBG, LM_LOG_MODULE_LOCAL);
+		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations, "Avg", US,
+				  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
+
 		u_arena_free(a);
 	}
 
-	LmLogDebugR("\nAllocating all sizes repeatedly %d times",
+	LmLogDebugR("\n%sing all sizes repeatedly %d times", alloc_fn_name,
 		    alloc_iterations);
+
+	// TODO: (isa): Determine if mod operation adds a lot of overhead
 	LM_TIME_LOOP(all_sizes, PROC_CPUTIME, uint, ss, 0, alloc_iterations, <,
 		     ++,
-		     uint8_t *ptr = u_arena_zalloc(
+		     uint8_t *ptr = alloc_fn(
 			     a, small_sizes[ss % LmArrayLen(small_sizes)]);
 		     *ptr = 1;)
-	// TODO: (isa): Determine if mod operation adds a lot of overhead
-	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations,
-			  "Timing of allocating all sizes repeatedly", US,
-			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
 
+	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations, "Avg", US, LM_LOG_RAW,
+			  DBG, LM_LOG_MODULE_LOCAL);
+
+	u_arena_free(a);
 	lm_close_file(log_file);
 	if (!running_in_debugger)
 		exit(EXIT_SUCCESS);
-}
-
-static void small_alloc(UArena *a, uint alloc_iterations,
-			bool running_in_debugger, LmString log_filename)
-{
-	FILE *log_file = lm_open_file_by_name(log_filename, "a");
-	LmSetLogFileLocal(log_file);
-
-	LmLogDebugR("\n------------------------------");
-	LmLogDebug("Small alloc");
-
-	for (int j = 0; j < (int)LmArrayLen(small_sizes); ++j) {
-		LmLogDebugR("\nAllocating %zd bytes %d times", small_sizes[j],
-			    alloc_iterations);
-
-		LM_TIME_LOOP(individual_sizes, PROC_CPUTIME, uint, ss, 0,
-			     alloc_iterations, <, ++,
-			     uint8_t *ptr = u_arena_alloc(a, small_sizes[j]);
-			     *ptr = 1;)
-
-		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
-				  "Timing of individual size", US, LM_LOG_RAW,
-				  DBG, LM_LOG_MODULE_LOCAL);
-		u_arena_free(a);
-	}
-
-	LmLogDebugR("\nAllocating all sizes repeatedly %d times",
-		    alloc_iterations);
-	LM_TIME_LOOP(all_sizes, PROC_CPUTIME, uint, ss, 0, alloc_iterations, <,
-		     ++,
-		     uint8_t *ptr = u_arena_alloc(
-			     a, small_sizes[ss % LmArrayLen(small_sizes)]);
-		     *ptr = 1;)
-	// TODO: (isa): Determine if mod operation adds a lot of overhead
-	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations,
-			  "Timing of allocating all sizes repeatedly", US,
-			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
-
-	lm_close_file(log_file);
-	if (!running_in_debugger)
-		exit(EXIT_SUCCESS);
-}
-
-static void _medium_allocations(void)
-{
-}
-
-static void large_allocations(void)
-{
-}
-
-static void bulk_allocations(void)
-{
 }
 
 int u_arena_tests(struct u_arena_test_params *params)
 {
-	LmString filename = lm_string_make("./logs/u_arena_tests_");
-	filename = lm_string_append_fmt(filename, "%s_%s.txt",
-					(params->mallocd ? "m" : "nm"),
-					(params->contiguous ? "c" : "nc"));
+	const char *file_mode = "a";
 	pid_t pid;
 	int status;
-	if ((pid = fork()) == 0) {
-		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
-					   params->mallocd, params->alignment);
 
-		small_alloc(a, params->alloc_iterations, false, filename);
-	} else {
-		waitpid(pid, &status, 0);
-	}
+	for (int i = 0; i < n_u_arena_alloc_fns; ++i) {
+		if ((pid = fork()) == 0) {
+			u_arena_alloc_fn alloc_fn = u_arena_alloc_functions[i];
+			const char *alloc_fn_name =
+				u_arena_alloc_function_names[i];
 
-	if ((pid = fork()) == 0) {
-		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
-					   params->mallocd, params->alignment);
+			UArena *a = u_arena_create(params->arena_sz,
+						   params->contiguous,
+						   params->mallocd,
+						   params->alignment);
 
-		small_zalloc(a, params->alloc_iterations, false, filename);
-	} else {
-		waitpid(pid, &status, 0);
+			small_sizes_test(a, params->alloc_iterations, false,
+					 alloc_fn, alloc_fn_name,
+					 params->log_filename, file_mode);
+		} else {
+			waitpid(pid, &status, 0);
+		}
 	}
 
 	return 0;
@@ -135,22 +98,21 @@ int u_arena_tests(struct u_arena_test_params *params)
 
 int u_arena_tests_debug(struct u_arena_test_params *params)
 {
-	LmString filename = lm_string_make("./logs/u_arena_tests_");
-	filename = lm_string_append_fmt(filename, "%s_%s.txt",
-					(params->mallocd ? "m" : "nm"),
-					(params->contiguous ? "c" : "nc"));
+	const char *file_mode = "a";
 
-	UArena *a = u_arena_create(params->arena_sz, params->contiguous,
-				   params->mallocd, params->alignment);
+	for (int i = 0; i < n_u_arena_alloc_fns; ++i) {
+		u_arena_alloc_fn alloc_fn = u_arena_alloc_functions[i];
+		const char *alloc_fn_name = u_arena_alloc_function_names[i];
 
-	small_alloc(a, params->alloc_iterations, true, filename);
+		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
+					   params->mallocd, params->alignment);
 
-	u_arena_destroy(&a);
+		small_sizes_test(a, params->alloc_iterations, true, alloc_fn,
+				 alloc_fn_name, params->log_filename,
+				 file_mode);
 
-	a = u_arena_create(params->arena_sz, params->contiguous,
-			   params->mallocd, params->alignment);
-
-	small_zalloc(a, params->alloc_iterations, true, filename);
+		u_arena_destroy(&a);
+	}
 
 	return 0;
 }
