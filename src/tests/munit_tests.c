@@ -163,7 +163,7 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 	{
 		cJSON *test_enabled_json =
 			cJSON_GetObjectItem(test_json, "enabled");
-		LmAssert(test_enabled_json, "Malformed suite test JSON");
+		LmAssert(test_enabled_json, "No 'enabled' field in test JSON");
 
 		if (cJSON_IsTrue(test_enabled_json))
 			++enabled_test_count;
@@ -188,7 +188,7 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 			cJSON *options_json =
 				cJSON_GetObjectItem(test_json, "options");
 			LmAssert(name_json && options_json,
-				 "Malformed suite test JSON");
+				 "No 'name' or 'options' field in test JSON");
 
 			cJSON *ctx_json;
 			bool has_ctx = cJSON_HasObjectItem(test_json, "ctx");
@@ -203,7 +203,7 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 			LmAssert(
 				!(has_ctx &&
 				  (test_definition->setup_fn == NULL)),
-				"The test %s has a context in its JSON but no setup function",
+				"The test %s has a context in its JSON but no setup function to parse it",
 				test_definition->test_name);
 
 			test->name = lm_string_make(test_definition->test_name);
@@ -223,7 +223,7 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 {
 	cJSON *suite_enabled_json =
 		cJSON_GetObjectItem(suite_conf_json, "enabled");
-	LmAssert(suite_enabled_json, "Malformed suite configuration JSON");
+	LmAssert(suite_enabled_json, "No 'enabled' field in suite JSON");
 
 	if (cJSON_IsFalse(suite_enabled_json))
 		return NULL;
@@ -237,9 +237,10 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 	cJSON *suite_options_json =
 		cJSON_GetObjectItem(suite_conf_json, "options");
 	cJSON *suite_tests_json = cJSON_GetObjectItem(suite_conf_json, "tests");
-	LmAssert(suite_prefix_json && sub_suites_json && iterations_json &&
-			 suite_options_json && suite_tests_json,
-		 "Malformed suite configuration JSON");
+	LmAssert(
+		suite_prefix_json && sub_suites_json && iterations_json &&
+			suite_options_json && suite_tests_json,
+		"No 'prefix', 'sub_suites', 'iterations', 'options', or 'tests' field in suite JSON");
 
 	MunitSuite *suite = malloc(sizeof(MunitSuite));
 	suite->prefix = lm_string_make(cJSON_GetStringValue(suite_prefix_json));
