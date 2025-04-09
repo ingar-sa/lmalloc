@@ -44,8 +44,8 @@ LM_BEGIN_EXTERN_C
 
 typedef unsigned int uint;
 
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
+#define LM_LIKELY(x) __builtin_expect(!!(x), 1)
+#define LM_UNLIKELY(x) __builtin_expect(!!(x), 0)
 
 #define LM_EXPAND(x) x
 #define LM__STRINGIFY__(x) #x
