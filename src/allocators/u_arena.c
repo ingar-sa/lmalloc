@@ -117,10 +117,9 @@ inline void *u_arena_alloc(UArena *a, size_t size)
 	return ptr;
 }
 
-// TODO: (isa): Zero entire pages instead of each individual allocation.
-// This might be an optimization, but it can also be the case that the
-// formula for checking if a new page has been touched causes a lot of
-// overhead
+// NOTE: (isa): See 'poc/page_zalloc/u_arena.c' for a short
+// discussion on why zeroing individual allocations is better
+// pre-zeroing larger chunks
 inline void *u_arena_zalloc(UArena *a, size_t size)
 {
 	void *ptr = NULL;
