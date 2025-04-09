@@ -27,8 +27,8 @@ static void calloc_test(uint alloc_iterations, bool running_in_debugger,
 			     *ptr = 1;)
 
 		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
-				  "Timing of individual size", US, LM_LOG_RAW,
-				  DBG, LM_LOG_MODULE_LOCAL);
+				  "Avg: ", US, LM_LOG_RAW, DBG,
+				  LM_LOG_MODULE_LOCAL);
 	}
 
 	LmLogDebugR("\nAllocating all sizes repeatedly %d times",
@@ -38,9 +38,8 @@ static void calloc_test(uint alloc_iterations, bool running_in_debugger,
 		     uint8_t *ptr = calloc(
 			     1, small_sizes[ss % LmArrayLen(small_sizes)]);
 		     *ptr = 1;)
-	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations,
-			  "Timing of allocating all sizes repeatedly", US,
-			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
+	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations, "Avg: ", US, LM_LOG_RAW,
+			  DBG, LM_LOG_MODULE_LOCAL);
 
 	lm_close_file(log_file);
 	if (!running_in_debugger)
@@ -67,8 +66,8 @@ static void malloc_test(uint alloc_iterations, bool running_in_debugger,
 			     *ptr = 1;)
 
 		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
-				  "Timing of individual size", US, LM_LOG_RAW,
-				  DBG, LM_LOG_MODULE_LOCAL);
+				  "Avg: ", US, LM_LOG_RAW, DBG,
+				  LM_LOG_MODULE_LOCAL);
 	}
 
 	LmLogDebugR("\nAllocating all sizes repeatedly %d times",
@@ -78,9 +77,8 @@ static void malloc_test(uint alloc_iterations, bool running_in_debugger,
 		     uint8_t *ptr =
 			     malloc(small_sizes[ss % LmArrayLen(small_sizes)]);
 		     *ptr = 1;)
-	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations,
-			  "Timing of allocating all sizes repeatedly", US,
-			  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
+	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations, "Avg: ", US, LM_LOG_RAW,
+			  DBG, LM_LOG_MODULE_LOCAL);
 
 	lm_close_file(log_file);
 	if (!running_in_debugger)

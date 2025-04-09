@@ -121,7 +121,7 @@ void lm_log_timing_avg(long long timing, long long count,
 	lm_format_timing(avg_ll, adjusted_fmt, timing_str);
 
 	LmLogManual(log_module, log_raw, log_level,
-		    "%s: %s (total: %lld ns, count: %lld)", description,
+		    "%s%s (total: %lld ns, count: %lld)", description,
 		    timing_str, timing, count);
 }
 

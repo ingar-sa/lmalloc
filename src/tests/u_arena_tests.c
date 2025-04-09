@@ -18,6 +18,8 @@ static const u_arena_alloc_fn u_arena_alloc_functions[] = {
 	u_arena_alloc, u_arena_zalloc, u_arena_falloc, u_arena_fzalloc
 };
 
+#define ARENA_ALLOC_FN_COUNT LmArrayLen(u_arena_alloc_functions)
+
 static const char *u_arena_alloc_function_names[] = { "alloc", "zalloc",
 						      "falloc", "fzalloc" };
 
@@ -43,8 +45,9 @@ static void small_sizes_test(UArena *a, uint alloc_iterations,
 			     uint8_t *ptr = alloc_fn(a, small_sizes[j]);
 			     *ptr = 1;)
 
-		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations, "Avg", US,
-				  LM_LOG_RAW, DBG, LM_LOG_MODULE_LOCAL);
+		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
+				  "Avg: ", US, LM_LOG_RAW, DBG,
+				  LM_LOG_MODULE_LOCAL);
 
 		u_arena_free(a);
 	}
@@ -59,7 +62,7 @@ static void small_sizes_test(UArena *a, uint alloc_iterations,
 			     a, small_sizes[ss % LmArrayLen(small_sizes)]);
 		     *ptr = 1;)
 
-	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations, "Avg", US, LM_LOG_RAW,
+	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations, "Avg: ", US, LM_LOG_RAW,
 			  DBG, LM_LOG_MODULE_LOCAL);
 
 	u_arena_free(a);
@@ -100,7 +103,7 @@ int u_arena_tests_debug(struct u_arena_test_params *params)
 {
 	const char *file_mode = "a";
 
-	for (int i = 0; i < n_u_arena_alloc_fns; ++i) {
+	for (int i = 0; i < (int)ARENA_ALLOC_FN_COUNT; ++i) {
 		u_arena_alloc_fn alloc_fn = u_arena_alloc_functions[i];
 		const char *alloc_fn_name = u_arena_alloc_function_names[i];
 

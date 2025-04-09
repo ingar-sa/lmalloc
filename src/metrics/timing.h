@@ -38,6 +38,11 @@ struct timing_comp {
 	double multiplier;
 };
 
+struct timing_interval {
+	long long start;
+	long long end;
+};
+
 static const char *lm_clock_type_str(clockid_t type)
 {
 	switch (type) {
