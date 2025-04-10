@@ -24,8 +24,11 @@ static size_t arena_cache_aligned_sz(void)
 void u_arena_init(UArena *a, bool contiguous, bool mallocd, size_t alignment,
 		  size_t page_sz, size_t cap, uint8_t *mem)
 {
-	LmAssert(LmIsPowerOfTwo(alignment) && alignment <= 4096,
-		 "Provided alignment is not a power of two and/or <= 4096");
+	LmAssert(
+		LmIsPowerOfTwo(alignment) && 8 <= alignment &&
+			alignment <= page_sz,
+		"Provided alignment is not a power of two and/or aligment not in [8, %zd]",
+		page_sz);
 
 	a->contiguous = contiguous;
 	a->mallocd = mallocd;
@@ -119,7 +122,7 @@ inline void *u_arena_alloc(UArena *a, size_t size)
 
 // NOTE: (isa): See 'poc/page_zalloc/u_arena.c' for a short
 // discussion on why zeroing individual allocations is better
-// pre-zeroing larger chunks
+// than pre-zeroing larger chunks
 inline void *u_arena_zalloc(UArena *a, size_t size)
 {
 	void *ptr = NULL;
