@@ -2,16 +2,11 @@
 LM_LOG_REGISTER(munit_tests);
 
 #include "allocator_tests.h"
-#include "munit_tests.h"
 
 #include <src/allocators/u_arena.h>
 
 #include <src/munit/munit.h>
 #include <src/cJSON/cJSON.h>
-
-#define ARENA_SZ LmKibiByte(512)
-
-#define BOOL_STRING(bool) (bool ? "true" : "false")
 
 MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 {
@@ -21,8 +16,8 @@ MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 		 "Number of allocation iterations is 0");
 
 	LmLogDebug("Params: %zd, %zd, %s, %s", params->arena_sz,
-		   params->alignment, BOOL_STRING(params->mallocd),
-		   BOOL_STRING(params->contiguous));
+		   params->alignment, LmBoolToString(params->mallocd),
+		   LmBoolToString(params->contiguous));
 
 	MunitResult success = (u_arena_tests(params) == 0) ? MUNIT_OK :
 							     MUNIT_FAIL;

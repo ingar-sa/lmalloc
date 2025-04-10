@@ -3,7 +3,9 @@
 
 #include <src/lm.h>
 
-#include <stdlib.h>
+#include <src/munit/munit.h>
+#include <src/cJSON/cJSON.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -248,6 +250,20 @@ static inline const char *arena_alloc_type_str(enum arena_alloc_type type)
 		return "unknown_alloc_type";
 	}
 }
+
+typedef void (*test_debug_fn)(void *test_ctx);
+
+struct test_definition {
+	MunitTestFunc test_fn;
+	MunitTestSetup setup_fn;
+	MunitTestTearDown teardown_fn;
+	test_debug_fn debug_fn;
+	const char *test_name;
+};
+
+MunitSuite *create_munit_suite(cJSON *suite_conf);
+MunitTest *get_suite_tests(cJSON *suite_tests_json);
+struct test_definition *get_test_definition(cJSON *test_name_json);
 
 struct u_arena_test_params {
 	size_t arena_sz;

@@ -9,8 +9,6 @@ LM_LOG_REGISTER(validation);
 #include <src/tests/allocator_tests.h>
 #include <src/allocators/u_arena.h>
 
-#include <src/tests/munit_tests.h>
-
 #include <src/munit/munit.h>
 
 #include <stdlib.h>
@@ -26,7 +24,7 @@ LM_LOG_REGISTER(validation);
 
 int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
-	int success = EXIT_SUCCESS;
+	int result = EXIT_SUCCESS;
 
 	lm_file_data *test_config_file =
 		lm_load_file_into_memory("./configs/validation.json");
@@ -39,8 +37,7 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 	if (!RUN_IN_DEBUGGER) {
 		MunitSuite *main_suite = create_munit_suite(main_suite_json);
 		if (main_suite)
-			success =
-				munit_suite_main(main_suite, NULL, argc, argv);
+			result = munit_suite_main(main_suite, NULL, argc, argv);
 		else
 			LmLogWarning("Main suite is disabled!");
 	} else {
@@ -63,5 +60,5 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 		}
 	}
 
-	return success;
+	return result;
 }
