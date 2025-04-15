@@ -454,8 +454,6 @@ typedef struct {
 	MunitTestTearDown tear_down;
 	MunitTestOptions options;
 	MunitParameterEnum *parameters;
-	test_debug_fn
-		debug_fn; // NOTE: (isa): Added by me. Only used by us, not in the library.
 	void *ctx; // NOTE: (isa): Added by me. Only used by us, not in the library.
 } MunitTest;
 
@@ -469,6 +467,8 @@ struct MunitSuite_ {
 	MunitSuite *suites;
 	unsigned int iterations;
 	MunitSuiteOptions options;
+	munit_bool
+		running_in_debugger; // NOTE: (isa): Added by me. Only used by us, not in the library.
 };
 
 int munit_suite_main(const MunitSuite *suite, void *user_data, int argc,

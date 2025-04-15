@@ -24,17 +24,10 @@ static MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 	return success;
 }
 
-static void u_arena_test_debug(void *test_ctx)
-{
-	struct u_arena_test_params *params = test_ctx;
-	u_arena_tests_debug(params);
-}
-
 static void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 				void *test_ctx)
 {
 	(void)mu_params;
-	(void)data;
 
 	cJSON *ctx_json = test_ctx;
 	cJSON *arena_sz_json = cJSON_GetObjectItem(ctx_json, "arena_sz");
@@ -61,6 +54,7 @@ static void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 		(uint)cJSON_GetNumberValue(alloc_iterations_json);
 	test_params->log_filename =
 		lm_string_make(cJSON_GetStringValue(log_filename_json));
+	test_params->running_in_debugger = (bool)data;
 
 	LmAssert(test_params->alloc_iterations > 0,
 		 "u_arena_test's alloc_iterations is 0");
@@ -77,17 +71,10 @@ static MunitResult malloc_test(const MunitParameter mu_params[], void *data)
 	return result;
 }
 
-static void malloc_test_debug(void *test_ctx)
-{
-	struct malloc_test_params *params = test_ctx;
-	malloc_tests_debug(params);
-}
-
 static void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 			       void *test_ctx)
 {
 	(void)mu_params;
-	(void)data;
 
 	cJSON *ctx_json = test_ctx;
 	cJSON *alloc_iterations_json =
@@ -103,6 +90,7 @@ static void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 		(uint)cJSON_GetNumberValue(alloc_iterations_json);
 	test_params->log_filename =
 		lm_string_make(cJSON_GetStringValue(log_filename_json));
+	test_params->running_in_debugger = (bool)data;
 
 	LmAssert(test_params->alloc_iterations > 0,
 		 "malloc_test's alloc_iterations is 0");
@@ -111,16 +99,14 @@ static void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 }
 
 static struct test_definition test_definitions[] = {
-	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
-	  "u_arena_mallocd_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
+	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_mallocd_cont_test" },
+	{ u_arena_test, u_arena_test_setup, NULL,
 	  "u_arena_mallocd_non_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
+	{ u_arena_test, u_arena_test_setup, NULL,
 	  "u_arena_not_mallocd_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL, u_arena_test_debug,
+	{ u_arena_test, u_arena_test_setup, NULL,
 	  "u_arena_not_mallocd_non_cont_test" },
-	{ malloc_test, malloc_test_setup, NULL, malloc_test_debug,
-	  "malloc_test" },
+	{ malloc_test, malloc_test_setup, NULL, "malloc_test" },
 	{ 0 }
 };
 
@@ -221,7 +207,6 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 			test->test = test_definition->test_fn;
 			test->setup = test_definition->setup_fn;
 			test->tear_down = test_definition->teardown_fn;
-			test->debug_fn = test_definition->debug_fn;
 			test->options = get_test_options_STUB(options_json);
 			test->ctx = (has_ctx ? ctx_json : NULL);
 		}
@@ -250,10 +235,11 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 	cJSON *suite_options_json =
 		cJSON_GetObjectItem(suite_conf_json, "options");
 	cJSON *suite_tests_json = cJSON_GetObjectItem(suite_conf_json, "tests");
+	cJSON *debugger_json = cJSON_GetObjectItem(suite_conf_json, "debugger");
 	LmAssert(
 		suite_prefix_json && sub_suites_json && iterations_json &&
-			suite_options_json && suite_tests_json,
-		"No 'prefix', 'sub_suites', 'iterations', 'options', or 'tests' field in suite JSON");
+			suite_options_json && suite_tests_json && debugger_json,
+		"No 'prefix', 'sub_suites', 'iterations', 'options', 'tests', or 'debugger' field in suite JSON");
 
 	MunitSuite *suite = malloc(sizeof(MunitSuite));
 	suite->prefix = lm_string_make(cJSON_GetStringValue(suite_prefix_json));
@@ -261,6 +247,7 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 	suite->iterations = (uint)cJSON_GetNumberValue(iterations_json);
 	suite->options = get_suite_options_STUB(suite_options_json);
 	suite->tests = get_suite_tests(suite_tests_json);
+	suite->running_in_debugger = cJSON_IsTrue(debugger_json);
 
 	return suite;
 }

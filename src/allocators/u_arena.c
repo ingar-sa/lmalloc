@@ -68,7 +68,7 @@ UArena *u_arena_create(size_t cap, bool contiguous, bool mallocd,
 			size_t allocation_sz = arena_cache_aligned_sz + cap;
 			mem = mmap(NULL, allocation_sz, PROT_READ | PROT_WRITE,
 				   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-			arena = (UArena *)mem;
+			arena = (UArena *)((uintptr_t)mem);
 			mem += arena_cache_aligned_sz;
 		} else {
 			arena = malloc(sizeof(UArena));
@@ -180,11 +180,11 @@ inline void u_arena_pop(UArena *a, size_t size)
 
 void u_arena_set_alignment(UArena *a, size_t alignment)
 {
-	if (LmIsPowerOfTwo(alignment) && alignment <= 4096)
+	if (LM_LIKELY(LmIsPowerOfTwo(alignment) && alignment <= a->page_sz))
 		a->alignment = alignment;
 	else
 		LmLogWarning(
-			"Specified alignment is not a power of two or is > 4096");
+			"Specified alignment is not a power of two or is > page size");
 }
 
 inline void *u_arena_pos(UArena *a)

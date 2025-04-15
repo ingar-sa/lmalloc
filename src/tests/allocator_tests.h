@@ -12,40 +12,40 @@
 // NOTE: (isa): Start structs created by claude
 
 // 8 bytes
-struct SmallPoint {
+typedef struct {
 	int x;
 	int y;
-};
+} Point;
 
 // 16 bytes
-struct RGBAColor {
+typedef struct {
 	uint8_t r;
 	uint8_t g;
 	uint8_t b;
 	uint8_t a;
 	float opacity;
-};
+} RgbaColor;
 
 // 24 bytes
-struct Triangle {
-	struct SmallPoint p1;
-	struct SmallPoint p2;
-	struct SmallPoint p3;
-};
+typedef struct {
+	Point p1;
+	Point p2;
+	Point p3;
+} Triangle;
 
 // 32 bytes
-struct CircleShape {
-	struct SmallPoint center;
+typedef struct {
+	Point center;
 	float radius;
 	float thickness;
 	int32_t segments;
 	uint32_t color;
 	uint8_t filled;
 	uint8_t padding[3]; // Explicit padding for alignment
-};
+} CircleShape;
 
 // 48 bytes
-struct NetworkPacket {
+typedef struct {
 	uint32_t source_ip;
 	uint32_t dest_ip;
 	uint16_t source_port;
@@ -55,29 +55,29 @@ struct NetworkPacket {
 	uint8_t data[24];
 	uint8_t flags;
 	uint8_t padding[3]; // Explicit padding for alignment
-};
+} NetworkPacket;
 
 // 64 bytes
-struct FileRecord {
+typedef struct {
 	char filename[32];
 	uint64_t size;
 	uint64_t created_time;
 	uint64_t modified_time;
 	uint32_t permissions;
 	uint32_t owner_id;
-};
+} FileRecord;
 
 // 96 bytes
-struct UserAccount {
+typedef struct {
 	char username[32];
 	char email[48];
 	uint64_t user_id;
 	uint32_t login_count;
 	uint32_t permissions;
-};
+} UserAccount;
 
 // 128 bytes
-struct ImageMetadata {
+typedef struct {
 	char filename[64];
 	uint32_t width;
 	uint32_t height;
@@ -92,7 +92,7 @@ struct ImageMetadata {
 	uint8_t padding;
 	float dpi_x;
 	float dpi_y;
-};
+} ImageMetadata;
 
 // 8 bytes - aligned
 typedef struct {
@@ -228,37 +228,10 @@ static size_t large_sizes[16] = {
 
 // NOTE: (isa): End arrays created by Claude
 
-enum arena_alloc_type {
-	ALLOC,
-	ZALLOC,
-	FALLOC,
-	FZALLOC,
-};
-
-// NOTE: (isa): Enum-to-string functions created by Claude
-static inline const char *arena_alloc_type_str(enum arena_alloc_type type)
-{
-	switch (type) {
-	case ALLOC:
-		return "alloc";
-	case ZALLOC:
-		return "zalloc";
-	case FALLOC:
-		return "falloc";
-	case FZALLOC:
-		return "fzalloc";
-	default:
-		return "unknown_alloc_type";
-	}
-}
-
-typedef void (*test_debug_fn)(void *test_ctx);
-
 struct test_definition {
 	MunitTestFunc test_fn;
 	MunitTestSetup setup_fn;
 	MunitTestTearDown teardown_fn;
-	test_debug_fn debug_fn;
 	const char *test_name;
 };
 
@@ -273,11 +246,13 @@ struct u_arena_test_params {
 	bool mallocd;
 	uint alloc_iterations;
 	LmString log_filename;
+	bool running_in_debugger;
 };
 
 struct malloc_test_params {
 	uint alloc_iterations;
 	LmString log_filename;
+	bool running_in_debugger;
 };
 
 int u_arena_tests(struct u_arena_test_params *params);

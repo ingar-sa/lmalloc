@@ -14,10 +14,6 @@ LM_LOG_REGISTER(validation);
 #include <stdlib.h>
 #include <stddef.h>
 
-#ifndef RUN_IN_DEBUGGER
-#define RUN_IN_DEBUGGER false
-#endif
-
 // NOTE: (isa): We are pretty much not freeing any of the memory used by cJSON
 // or munit atm, but that memory can live happily for the entire lifetime of
 // the program, so it's not an issue (famous last words, I know).
@@ -34,29 +30,26 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 	LmAssert(main_suite_json != NULL,
 		 "main_suite not present in validation.json");
 
-	if (!RUN_IN_DEBUGGER) {
-		MunitSuite *main_suite = create_munit_suite(main_suite_json);
-		if (main_suite)
-			result = munit_suite_main(main_suite, NULL, argc, argv);
-		else
-			LmLogWarning("Main suite is disabled!");
-	} else {
-		cJSON *tests_json =
-			cJSON_GetObjectItem(main_suite_json, "tests");
-		LmAssert(tests_json != NULL, "'tests' not in main_suite");
+	MunitSuite *main_suite = create_munit_suite(main_suite_json);
+	if (!main_suite) {
+		LmLogWarning("Main suite is disabled!");
+		return result;
+	}
 
-		MunitTest *tests = get_suite_tests(tests_json);
-		for (MunitTest *test = tests; test->test != NULL; test++) {
-			void *test_ctx =
-				test->setup != NULL ?
-					test->setup(NULL, NULL, test->ctx) :
-					NULL;
-			if (test->debug_fn != NULL)
-				test->debug_fn(test_ctx);
-			else
-				LmLogDebug(
-					"Test '%s' has no debug function. Skipping",
-					test->name);
+	if (!main_suite->running_in_debugger) {
+		// TODO: (isa): See if we can pass in the flag for not forking
+		result =
+			munit_suite_main(main_suite, (void *)false, argc, argv);
+	} else {
+		for (MunitTest *test = main_suite->tests; test->test != NULL;
+		     test++) {
+			if (test->setup == NULL) {
+				test->test(NULL, (void *)true);
+			} else {
+				void *test_ctx = test->setup(NULL, (void *)true,
+							     test->ctx);
+				test->test(NULL, test_ctx);
+			}
 		}
 	}
 

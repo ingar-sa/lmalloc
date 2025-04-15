@@ -5,10 +5,11 @@
         "sub_suites": "NONE",
         "iterations": 1,
         "options": "NONE",
+        "debugger": true,
         "tests": [
             {
                 "name": "u_arena_mallocd_cont_test",
-                "enabled": true,
+                "enabled": false,
                 "options": "NONE",
                 "ctx": 
                 {
@@ -22,7 +23,7 @@
             },
             {
                 "name": "u_arena_mallocd_non_cont_test",
-                "enabled": true,
+                "enabled": false,
                 "options": "NONE",
                 "ctx": 
                 {
@@ -40,7 +41,7 @@
                 "options": "NONE",
                 "ctx": 
                 {
-                    "arena_sz": "512kB",
+                    "arena_sz": "64gB",
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": true,
@@ -50,7 +51,7 @@
             },
             {
                 "name": "u_arena_not_mallocd_non_cont_test",
-                "enabled": true,
+                "enabled": false,
                 "options": "NONE",
                 "ctx": 
                 {

@@ -12,96 +12,159 @@ LM_LOG_REGISTER(u_arena_test);
 
 typedef void *(*u_arena_alloc_fn)(UArena *a, size_t sz);
 
-static const int n_u_arena_alloc_fns = 4;
+typedef void *(*alloc_fn_t)(UArena *a, size_t sz);
 
-static const u_arena_alloc_fn u_arena_alloc_functions[] = {
+inline void *malloc_wrapper(UArena *a, size_t sz)
+{
+	(void)a;
+	return malloc(sz);
+}
+
+static const alloc_fn_t u_arena_alloc_functions[] = {
 	u_arena_alloc, u_arena_zalloc, u_arena_falloc, u_arena_fzalloc
 };
-
-#define ARENA_ALLOC_FN_COUNT LmArrayLen(u_arena_alloc_functions)
 
 static const char *u_arena_alloc_function_names[] = { "alloc", "zalloc",
 						      "falloc", "fzalloc" };
 
-static void small_sizes_test(UArena *a, uint alloc_iterations,
-			     bool running_in_debugger,
-			     u_arena_alloc_fn alloc_fn,
-			     const char *alloc_fn_name, LmString log_filename,
-			     const char *file_mode)
+#define TIME_TIGHT_LOOP(clock, iterations, op)                               \
+	do {                                                                 \
+		LM_START_TIMING(loop, clock);                                \
+		for (uint i = 0; i < iterations; ++i) {                      \
+			op                                                   \
+		}                                                            \
+		LM_END_TIMING(loop, clock);                                  \
+		LM_LOG_TIMING_AVG(loop, iterations, "Avg: ", US, LM_LOG_RAW, \
+				  DBG, LM_LOG_MODULE_LOCAL);                 \
+	} while (0)
+
+static void tight_loop_test(struct u_arena_test_params *params,
+			    alloc_fn_t alloc_fn, const char *alloc_fn_name,
+			    size_t *alloc_sizes, size_t alloc_sizes_len,
+			    const char *size_name, const char *file_mode)
 {
-	int small_sizes_arr_len = (int)LmArrayLen(small_sizes);
-	size_t largest_sz = small_sizes[small_sizes_arr_len - 1];
+	uint alloc_iterations = params->alloc_iterations;
+	size_t largest_sz = alloc_sizes[alloc_sizes_len - 1];
 	size_t mem_needed_for_largest_sz =
-		largest_sz * (size_t)alloc_iterations;
+		largest_sz * (size_t)params->alloc_iterations;
 	LmAssert(
-		a->cap >= mem_needed_for_largest_sz,
-		"Arena has insufficient memory for small sizes allocation test. Arena size: %zd, needed size: %zd",
-		a->cap, mem_needed_for_largest_sz);
-	FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
+		params->arena_sz >= mem_needed_for_largest_sz,
+		"Arena has insufficient memory for %s sizes allocation test. Arena size: %zd, needed size: %zd",
+		size_name, params->arena_sz, mem_needed_for_largest_sz);
+
+	FILE *log_file = lm_open_file_by_name(params->log_filename, file_mode);
 	LmSetLogFileLocal(log_file);
 
 	LmLogDebugR("\n------------------------------");
-	LmLogDebug("%s -- small", alloc_fn_name);
+	LmLogDebug("%s -- %s", alloc_fn_name, size_name);
+
+	UArena *a = u_arena_create(params->arena_sz, params->contiguous,
+				   params->mallocd, params->alignment);
 
 	// TODO: (isa): Average for all small sizes
-	for (int j = 0; j < small_sizes_arr_len; ++j) {
+	for (size_t j = 0; j < alloc_sizes_len; ++j) {
 		LmLogDebugR("\n%s'ing %zd bytes %d times", alloc_fn_name,
-			    small_sizes[j], alloc_iterations);
+			    alloc_sizes[j], alloc_iterations);
 
-		LM_TIME_LOOP(individual_sizes, PROC_CPUTIME, uint, ss, 0,
-			     alloc_iterations, <, ++,
-			     uint8_t *ptr = alloc_fn(a, small_sizes[j]);
-			     *ptr = 1;)
-
-		LM_LOG_TIMING_AVG(individual_sizes, alloc_iterations,
-				  "Avg: ", US, LM_LOG_RAW, DBG,
-				  LM_LOG_MODULE_LOCAL);
+		TIME_TIGHT_LOOP(PROC_CPUTIME, alloc_iterations,
+				uint8_t *ptr = alloc_fn(a, small_sizes[j]);
+				*ptr = 1;);
 
 		u_arena_free(a);
 	}
 
-	LmLogDebugR("\n%sing all sizes repeatedly %d times", alloc_fn_name,
+	LmLogDebugR("\n%s'ing all sizes repeatedly %d times", alloc_fn_name,
 		    alloc_iterations);
 
-	// TODO: (isa): Determine if mod operation adds a lot of overhead
-	LM_TIME_LOOP(all_sizes, PROC_CPUTIME, uint, ss, 0, alloc_iterations, <,
-		     ++,
-		     uint8_t *ptr = alloc_fn(
-			     a, small_sizes[ss % LmArrayLen(small_sizes)]);
-		     *ptr = 1;)
+	TIME_TIGHT_LOOP(PROC_CPUTIME, alloc_iterations,
+			size_t size = alloc_sizes[i % alloc_sizes_len];
+			uint8_t *ptr = alloc_fn(a, size); *ptr = 1;);
 
-	LM_LOG_TIMING_AVG(all_sizes, alloc_iterations, "Avg: ", US, LM_LOG_RAW,
-			  DBG, LM_LOG_MODULE_LOCAL);
+	u_arena_destroy(&a);
 
-	u_arena_free(a);
 	lm_close_file(log_file);
-	if (!running_in_debugger)
+	if (!params->running_in_debugger)
 		exit(EXIT_SUCCESS);
+}
+
+static void time_series_test(struct u_arena_test_params *params,
+			     u_arena_alloc_fn alloc_fn,
+			     const char *alloc_fn_name, const char *file_mode)
+{
+	(void)alloc_fn;
+	FILE *log_file = lm_open_file_by_name(params->log_filename, file_mode);
+	LmSetLogFileLocal(log_file);
+
+	LmLogDebugR("\n------------------------------");
+	LmLogDebug("%s -- time series test", alloc_fn_name);
+#if 0
+	UArena *a = u_arena_create(params->arena_sz, params->contiguous,
+				   params->mallocd, params->alignment);
+
+	TimeSeriesData ts_data;
+	EventHeader ev_header;
+	UserAccount usr_account;
+	PersonRecord p_record;
+	MessageBuffer msg_buf;
+#endif
+}
+
+#define FORK_AND_WAIT(fn_call)                    \
+	do {                                      \
+		pid_t pid;                        \
+		int status;                       \
+		if ((pid = fork()) == 0) {        \
+			fn_call;                  \
+		} else {                          \
+			waitpid(pid, &status, 0); \
+		}                                 \
+	} while (0)
+
+static void tight_loop(struct u_arena_test_params *params,
+		       u_arena_alloc_fn alloc_fn, const char *alloc_fn_name,
+		       const char *file_mode)
+{
+	if (!params->running_in_debugger) {
+		FORK_AND_WAIT(tight_loop_test(
+			params, alloc_fn, alloc_fn_name, small_sizes,
+			LmArrayLen(small_sizes), "small", file_mode));
+
+		FORK_AND_WAIT(tight_loop_test(
+			params, alloc_fn, alloc_fn_name, medium_sizes,
+			LmArrayLen(medium_sizes), "medium", file_mode));
+
+		FORK_AND_WAIT(tight_loop_test(
+			params, alloc_fn, alloc_fn_name, large_sizes,
+			LmArrayLen(large_sizes), "large", file_mode));
+		LmLogDebug("Hi from munit!");
+	} else {
+#if 1
+		tight_loop_test(params, alloc_fn, alloc_fn_name, small_sizes,
+				LmArrayLen(small_sizes), "small", file_mode);
+#endif
+
+#if 1
+		tight_loop_test(params, alloc_fn, alloc_fn_name, medium_sizes,
+				LmArrayLen(medium_sizes), "medium", file_mode);
+#endif
+
+#if 1
+		tight_loop_test(params, alloc_fn, alloc_fn_name, large_sizes,
+				LmArrayLen(large_sizes), "large", file_mode);
+#endif
+		LmRemoveLogFileLocal();
+		LmLogDebug("Hi from debugger!");
+	}
 }
 
 int u_arena_tests(struct u_arena_test_params *params)
 {
 	const char *file_mode = "a";
-	pid_t pid;
-	int status;
+	for (int i = 0; i < (int)LmArrayLen(u_arena_alloc_functions); ++i) {
+		u_arena_alloc_fn alloc_fn = u_arena_alloc_functions[i];
+		const char *alloc_fn_name = u_arena_alloc_function_names[i];
 
-	for (int i = 0; i < n_u_arena_alloc_fns; ++i) {
-		if ((pid = fork()) == 0) {
-			u_arena_alloc_fn alloc_fn = u_arena_alloc_functions[i];
-			const char *alloc_fn_name =
-				u_arena_alloc_function_names[i];
-
-			UArena *a = u_arena_create(params->arena_sz,
-						   params->contiguous,
-						   params->mallocd,
-						   params->alignment);
-
-			small_sizes_test(a, params->alloc_iterations, false,
-					 alloc_fn, alloc_fn_name,
-					 params->log_filename, file_mode);
-		} else {
-			waitpid(pid, &status, 0);
-		}
+		tight_loop(params, alloc_fn, alloc_fn_name, file_mode);
 	}
 
 	return 0;
@@ -109,21 +172,6 @@ int u_arena_tests(struct u_arena_test_params *params)
 
 int u_arena_tests_debug(struct u_arena_test_params *params)
 {
-	const char *file_mode = "a";
-
-	for (int i = 0; i < (int)ARENA_ALLOC_FN_COUNT; ++i) {
-		u_arena_alloc_fn alloc_fn = u_arena_alloc_functions[i];
-		const char *alloc_fn_name = u_arena_alloc_function_names[i];
-
-		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
-					   params->mallocd, params->alignment);
-
-		small_sizes_test(a, params->alloc_iterations, true, alloc_fn,
-				 alloc_fn_name, params->log_filename,
-				 file_mode);
-
-		u_arena_destroy(&a);
-	}
-
+	(void)params;
 	return 0;
 }
