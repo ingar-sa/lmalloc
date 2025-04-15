@@ -11,3 +11,12 @@
     itself, making the comparison unfair.
 - Since this is not part of the treatment, it can be made without starting a new DSR cycle.
 - Such an arena can also implement memory use optimizations to a larger degree by using madvise.
+
+what to do tooday? 
+Save test results to file.
+What does this include?
+- Timing data (duh)
+- Test metadata
+    - Parameters
+    - Make flags (this might just be easier to manually log
+
