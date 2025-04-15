@@ -6,7 +6,7 @@ LM_LOG_GLOBAL_REGISTER();
 LM_LOG_REGISTER(validation);
 
 #include <src/metrics/timing.h>
-#include <src/tests/allocator_tests.h>
+#include <src/tests/test_setup.h>
 #include <src/allocators/u_arena.h>
 
 #include <src/munit/munit.h>

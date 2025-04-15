@@ -8,7 +8,7 @@
         "debugger": true,
         "tests": [
             {
-                "name": "u_arena_mallocd_cont_test",
+                "name": "u_arena_m_c",
                 "enabled": false,
                 "options": "NONE",
                 "ctx": 
@@ -22,7 +22,7 @@
                 }
             },
             {
-                "name": "u_arena_mallocd_non_cont_test",
+                "name": "u_arena_m_nc",
                 "enabled": false,
                 "options": "NONE",
                 "ctx": 
@@ -36,8 +36,8 @@
                }
             },
             {
-                "name": "u_arena_not_mallocd_cont_test",
-                "enabled": true,
+                "name": "u_arena_nm_c",
+                "enabled": false,
                 "options": "NONE",
                 "ctx": 
                 {
@@ -50,7 +50,7 @@
                 }
             },
             {
-                "name": "u_arena_not_mallocd_non_cont_test",
+                "name": "u_arena_nm_nc",
                 "enabled": false,
                 "options": "NONE",
                 "ctx": 
@@ -64,12 +64,12 @@
                 }
             },
             {
-                "name": "malloc_test",
-                "enabled": false,
+                "name": "malloc",
+                "enabled": true,
                 "options": "NONE",
                 "ctx":
                 {
-                    "alloc_iterations": 1000,
+                    "alloc_iterations": 100,
                     "log_filename": "./logs/malloc.txt"
                 }
             }

@@ -1,7 +1,7 @@
 #include <src/lm.h>
-LM_LOG_REGISTER(munit_tests);
+LM_LOG_REGISTER(test_setup);
 
-#include "allocator_tests.h"
+#include "test_setup.h"
 
 #include <src/allocators/u_arena.h>
 
@@ -99,14 +99,11 @@ static void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 }
 
 static struct test_definition test_definitions[] = {
-	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_mallocd_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL,
-	  "u_arena_mallocd_non_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL,
-	  "u_arena_not_mallocd_cont_test" },
-	{ u_arena_test, u_arena_test_setup, NULL,
-	  "u_arena_not_mallocd_non_cont_test" },
-	{ malloc_test, malloc_test_setup, NULL, "malloc_test" },
+	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_m_c" },
+	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_m_nc" },
+	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_nm_c" },
+	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_nm_nc" },
+	{ malloc_test, malloc_test_setup, NULL, "malloc" },
 	{ 0 }
 };
 
@@ -141,7 +138,8 @@ struct test_definition *get_test_definition(cJSON *test_name_json)
 	}
 
 	LmLogWarning(
-		"No definition found with this name! Is it spelled incorecctly, either in the config or in the code?");
+		"No definition found for test %s! Is it spelled incorecctly, either in the config or in the code?",
+		test_name);
 	return NULL;
 }
 
