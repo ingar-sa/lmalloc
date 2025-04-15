@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 
 #if !defined(__cplusplus)
 #include <stdbool.h>
@@ -85,6 +86,8 @@ typedef unsigned int uint;
 
 size_t lm_mem_sz_from_string(const char *string);
 
+bool lm_doubles_equal(double a, double b, double epsilon);
+
 ////////////////////////////////////////
 //              LOGGING               //
 ////////////////////////////////////////
@@ -115,18 +118,6 @@ enum lm_log_level {
 
 #if !defined(LM_LOG_LEVEL)
 #define LM_LOG_LEVEL 3
-#endif
-
-#if LM_LOG_LEVEL >= 4 && LM_PRINTF_DEBUG_ENABLE == 1
-#define LmPrintfDebug(...) printf("DBG: " __VA_ARGS__);
-#else
-#define LmPrintfDebug(...)
-#endif
-
-#if LM_LOG_LEVEL >= LM_LOG_LEVEL_WRN && LM_PRINTF_WARN_ENABLE == 1
-#define LmPrintfWarn(...) printf("WRN: " __VA_ARGS__);
-#else
-#define LmPrintfWarn(...)
 #endif
 
 typedef struct lm__log_module__ {
@@ -260,6 +251,7 @@ void lm__disable_log_to_term__(lm__log_module__ *module);
 							  ##__VA_ARGS__);  \
 				break;                                     \
 			}                                                  \
+			assert(log_ret >= 0);                              \
 		}                                                          \
 	} while (0)
 
@@ -314,8 +306,6 @@ typedef struct {
 	size_t len;
 	size_t cap;
 } LmStringHeader;
-
-#define LM_STRING_HEADER(str) ((LmStringHeader *)(str) - 1)
 
 size_t lm_string_len(LmString string);
 size_t lm_string_cap(LmString string);
@@ -483,6 +473,13 @@ size_t lm_mem_sz_from_string(const char *string)
 
 	return value * multiplier;
 }
+
+bool lm_doubles_equal(double a, double b, double epsilon)
+{
+	bool equal = fabs(a - b) < epsilon;
+	return equal;
+}
+
 ////////////////////////////////////////
 //              LOGGING               //
 ////////////////////////////////////////
@@ -501,7 +498,7 @@ int lm__write_log__(lm__log_module__ *module, bool log_raw,
 
 	size_t chars_written = 0;
 	size_t buf_remaining = module->buf_size;
-	int fmt_ret = 0;
+	ssize_t fmt_ret = 0;
 
 	if (!log_raw) {
 		time_t posix_time;
@@ -517,8 +514,8 @@ int lm__write_log__(lm__log_module__ *module, bool log_raw,
 			goto out;
 		}
 
-		int fmt_ret = strftime(module->buf, buf_remaining,
-				       "%T::", &time_info);
+		fmt_ret = (ssize_t)strftime(module->buf, buf_remaining,
+					    "%T::", &time_info);
 		if (0 == fmt_ret) {
 			// NOTE(ingar): Since the buffer size is at least 128, this should never happen
 			assert(fmt_ret);
@@ -526,8 +523,8 @@ int lm__write_log__(lm__log_module__ *module, bool log_raw,
 			goto out;
 		}
 
-		chars_written = fmt_ret;
-		buf_remaining -= fmt_ret;
+		chars_written = (size_t)fmt_ret;
+		buf_remaining -= (size_t)fmt_ret;
 
 		fmt_ret = snprintf(module->buf + chars_written, buf_remaining,
 				   "%s::%s: ", module->name, log_level);
@@ -542,8 +539,8 @@ int lm__write_log__(lm__log_module__ *module, bool log_raw,
 			goto out;
 		}
 
-		chars_written += fmt_ret;
-		buf_remaining -= fmt_ret;
+		chars_written += (size_t)fmt_ret;
+		buf_remaining -= (size_t)fmt_ret;
 	}
 
 	va_list va_args;
@@ -569,7 +566,7 @@ int lm__write_log__(lm__log_module__ *module, bool log_raw,
 		}
 	}
 
-	chars_written += fmt_ret;
+	chars_written += (size_t)fmt_ret;
 	module->buf[chars_written++] = '\n';
 
 	if (module->write_to_term) {
@@ -662,11 +659,13 @@ void *lm_memset_s(void *dest, int ch, size_t count)
 //              STRINGS               //
 ////////////////////////////////////////
 
+#define LM_STRING_HEADER(str) \
+	((LmStringHeader *)((uintptr_t)(str) - sizeof(LmStringHeader)))
+
 size_t lm_string_len(LmString string)
 {
 	return LM_STRING_HEADER(string)->len;
 }
-size_t lm_string_cap(LmString string);
 
 size_t lm_string_cap(LmString string)
 {
@@ -685,39 +684,32 @@ size_t lm_string_alloc_sz(LmString string)
 	return sz;
 }
 
-void lm__string_set_len__(LmString string, size_t len)
+static void lm__string_set_len__(LmString string, size_t len)
 {
 	LM_STRING_HEADER(string)->len = len;
 }
 
-void lm__string_set_cap__(LmString string, size_t cap)
+static void lm__string_set_cap__(LmString string, size_t cap)
 {
 	LM_STRING_HEADER(string)->cap = cap;
 }
 
-LmString lm__string_make__(const void *init_string, size_t len)
+// NOTE: (isa): Modified by Claude
+static LmString lm__string_make__(const void *init_string, size_t len)
 {
-	size_t header_sz = sizeof(LmStringHeader);
-	void *ptr = calloc(1, header_sz + len + 1);
-	if (ptr == NULL) {
+	char *mem = malloc(sizeof(LmStringHeader) + len + 1);
+	if (mem == NULL)
 		return NULL;
-	}
-	if (init_string == NULL) {
-		memset(ptr, 0, header_sz + len + 1);
-	}
 
-	LmString string;
-	LmStringHeader *header;
-
-	string = (char *)ptr + header_sz;
-	header = LM_STRING_HEADER(string);
+	LmStringHeader *header = (LmStringHeader *)((uintptr_t)mem);
+	LmString string = mem + sizeof(LmStringHeader);
 
 	header->len = len;
 	header->cap = len;
-	if (len > 0 && (init_string != NULL)) {
+
+	if (len > 0 && init_string != NULL)
 		memcpy(string, init_string, len);
-		string[len] = '\0';
-	}
+	string[len] = '\0';
 
 	return string;
 }
@@ -773,8 +765,8 @@ LmString lm_string_make_space(LmString string, size_t add_len)
 	return string;
 }
 
-LmString lm__string_append__(LmString string, const void *other,
-			     size_t other_len)
+static LmString lm__string_append__(LmString string, const void *other,
+				    size_t other_len)
 {
 	string = lm_string_make_space(string, other_len);
 	if (string == NULL)
@@ -802,9 +794,10 @@ LmString lm_string_append_fmt(LmString string, const char *fmt, ...)
 	char buf[1024] = { 0 };
 	va_list va;
 	va_start(va, fmt);
-	size_t fmt_len = vsnprintf(buf, LmArrayLen(buf) - 1, fmt, va);
+	int fmt_ret = vsnprintf(buf, LmArrayLen(buf) - 1, fmt, va);
+	assert(fmt_ret >= 0);
 	va_end(va);
-	return lm__string_append__(string, buf, fmt_len);
+	return lm__string_append__(string, buf, (size_t)fmt_ret);
 }
 
 LmString lm_string_set(LmString string, const char *c_string)
@@ -841,8 +834,8 @@ void *lm__malloc_trace__(size_t size, int line, const char *func,
 			 lm__log_module__ *module)
 {
 	void *ptr = malloc(size);
-	lm__write_log__(module, "DBG", "MALLOC (%s,%d): %p (%zd B)", func, line,
-			ptr, size);
+	lm__write_log__(module, false, "DBG", "MALLOC (%s,%d): %p (%zd B)",
+			func, line, ptr, size);
 	return ptr;
 }
 
@@ -850,7 +843,7 @@ void *lm__calloc_trace__(size_t count, size_t size, int line, const char *func,
 			 lm__log_module__ *module)
 {
 	void *ptr = calloc(count, size);
-	lm__write_log__(module, "DBG",
+	lm__write_log__(module, false, "DBG",
 			"CALLOC (%s,%d): %p (%lu * %luB = %zd B)", func, line,
 			ptr, count, size, (count * size));
 	return ptr;
@@ -864,15 +857,17 @@ void *lm__realloc_trace__(void *ptr, size_t size, int line, const char *func,
 	if (ptr != NULL) {
 		reallocd = realloc(ptr, size);
 	}
-	lm__write_log__(module, "DBG", "REALLOC (%s,%d): %p -> %p (%zd B)",
-			func, line, original, reallocd, size);
+	lm__write_log__(module, false, "DBG",
+			"REALLOC (%s,%d): %p -> %p (%zd B)", func, line,
+			original, reallocd, size);
 	return reallocd;
 }
 
 void lm__free_trace__(void *ptr, int line, const char *func,
 		      lm__log_module__ *module)
 {
-	lm__write_log__(module, "DBG", "FREE (%s,%d): %p", func, line, ptr);
+	lm__write_log__(module, false, "DBG", "FREE (%s,%d): %p", func, line,
+			ptr);
 	if (ptr != NULL) {
 		free(ptr);
 	}
@@ -947,7 +942,7 @@ FILE *lm_open_file_by_name(const char *filename, const char *mode)
 int lm_close_file(FILE *file)
 {
 	if (EOF == fclose(file)) {
-		LmLogErrorG("Failed to close file %p", (void *)file);
+		LmLogErrorG("Failed to close file. EOF");
 		return -EOF;
 	}
 

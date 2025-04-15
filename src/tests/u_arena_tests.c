@@ -29,6 +29,14 @@ static void small_sizes_test(UArena *a, uint alloc_iterations,
 			     const char *alloc_fn_name, LmString log_filename,
 			     const char *file_mode)
 {
+	int small_sizes_arr_len = (int)LmArrayLen(small_sizes);
+	size_t largest_sz = small_sizes[small_sizes_arr_len - 1];
+	size_t mem_needed_for_largest_sz =
+		largest_sz * (size_t)alloc_iterations;
+	LmAssert(
+		a->cap >= mem_needed_for_largest_sz,
+		"Arena has insufficient memory for small sizes allocation test. Arena size: %zd, needed size: %zd",
+		a->cap, mem_needed_for_largest_sz);
 	FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
 	LmSetLogFileLocal(log_file);
 
@@ -36,7 +44,7 @@ static void small_sizes_test(UArena *a, uint alloc_iterations,
 	LmLogDebug("%s -- small", alloc_fn_name);
 
 	// TODO: (isa): Average for all small sizes
-	for (int j = 0; j < (int)LmArrayLen(small_sizes); ++j) {
+	for (int j = 0; j < small_sizes_arr_len; ++j) {
 		LmLogDebugR("\n%s'ing %zd bytes %d times", alloc_fn_name,
 			    small_sizes[j], alloc_iterations);
 

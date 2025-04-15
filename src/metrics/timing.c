@@ -14,8 +14,8 @@ long long lm_get_time_stamp(clockid_t type)
 }
 
 // NOTE: (isa): "Filled out" by Claude
-void lm_format_timing(long long timing, enum time_stamp_fmt stamp_fmt,
-		      char buf[64])
+static void lm_format_timing(long long timing, enum time_stamp_fmt stamp_fmt,
+			     char buf[64])
 {
 	switch (stamp_fmt) {
 	case S_NS:
@@ -85,7 +85,7 @@ void lm_print_timing_avg(long long timing, long long count,
 			 const char *description, enum time_stamp_fmt stamp_fmt)
 {
 	char timing_str[64];
-	double avg = (double)timing / count;
+	double avg = (double)timing / (double)count;
 	enum time_stamp_fmt adjusted_fmt = stamp_fmt;
 
 	if (avg < 1000.0 && stamp_fmt != NS) {
@@ -108,7 +108,7 @@ void lm_log_timing_avg(long long timing, long long count,
 		       lm_log_module *log_module)
 {
 	char timing_str[64];
-	double avg = (double)timing / count;
+	double avg = (double)timing / (double)count;
 	enum time_stamp_fmt adjusted_fmt = stamp_fmt;
 
 	if (avg < 1000.0 && stamp_fmt != NS) {
@@ -136,12 +136,12 @@ int lm_compare_timing(long long t1, long long t2, struct timing_comp *tc)
 	}
 
 	if (t1 < t2) {
-		tc->percentage = ((double)(t2 - t1) / t2) * 100.0;
-		tc->multiplier = (double)t2 / t1;
+		tc->percentage = ((double)(t2 - t1) / (double)t2) * 100.0;
+		tc->multiplier = (double)t2 / (double)t1;
 		return 1;
 	} else {
-		tc->percentage = ((double)(t1 - t2) / t2) * 100.0;
-		tc->multiplier = (double)t1 / t2;
+		tc->percentage = ((double)(t1 - t2) / (double)t2) * 100.0;
+		tc->multiplier = (double)t1 / (double)t2;
 		return -1;
 	}
 }

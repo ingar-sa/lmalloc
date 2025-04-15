@@ -1121,7 +1121,7 @@ int munit_rand_int_range(int min, int max)
 	if (range > (~((munit_uint32_t)0U)))
 		range = (~((munit_uint32_t)0U));
 
-	return min + munit_rand_at_most(0, (munit_uint32_t)range);
+	return min + (int)munit_rand_at_most(0, (munit_uint32_t)range);
 }
 
 double munit_rand_double(void)
@@ -1254,7 +1254,7 @@ static munit_uint32_t munit_str_hash(const char *name)
 	munit_uint32_t h = 5381U;
 
 	for (p = name; *p != '\0'; p++)
-		h = (h << 5) + h + *p;
+		h = (h << 5) + h + (munit_uint32_t)((unsigned char)*p);
 
 	return h;
 }
@@ -1276,8 +1276,9 @@ static void munit_splice(int from, int to)
 		if (len > 0) {
 			bytes_written = 0;
 			do {
-				write_res = write(to, buf + bytes_written,
-						  len - bytes_written);
+				write_res =
+					write(to, buf + bytes_written,
+					      (size_t)(len - bytes_written));
 				if (write_res < 0)
 					break;
 				bytes_written += write_res;
@@ -1452,8 +1453,9 @@ munit_test_runner_run_test_with_params(MunitTestRunner *runner,
 				first = 0;
 			}
 
-			output_l += fprintf(MUNIT_OUTPUT_FILE, "%s=%s",
-					    param->name, param->value);
+			output_l += (unsigned int)fprintf(MUNIT_OUTPUT_FILE,
+							  "%s=%s", param->name,
+							  param->value);
 		}
 		while (output_l++ < MUNIT_TEST_NAME_LEN) {
 			fputc(' ', MUNIT_OUTPUT_FILE);
@@ -1499,11 +1501,11 @@ munit_test_runner_run_test_with_params(MunitTestRunner *runner,
 			close(orig_stderr);
 
 			do {
-				write_res =
-					write(pipefd[1],
-					      ((munit_uint8_t *)(&report)) +
-						      bytes_written,
-					      sizeof(report) - bytes_written);
+				write_res = write(
+					pipefd[1],
+					((munit_uint8_t *)(&report)) +
+						bytes_written,
+					sizeof(report) - (size_t)bytes_written);
 				if (write_res < 0) {
 					if (stderr_buf != NULL) {
 						munit_log_errno(
@@ -1535,7 +1537,8 @@ munit_test_runner_run_test_with_params(MunitTestRunner *runner,
 				read_res = read(pipefd[0],
 						((munit_uint8_t *)(&report)) +
 							bytes_read,
-						sizeof(report) - bytes_read);
+						sizeof(report) -
+							(size_t)bytes_read);
 				if (read_res < 1)
 					break;
 				bytes_read += read_res;
@@ -1589,7 +1592,7 @@ munit_test_runner_run_test_with_params(MunitTestRunner *runner,
 #endif
 	{
 #if !defined(MUNIT_NO_BUFFER)
-		const volatile int orig_stderr =
+		const volatile int orig_stderr_no_buffer =
 			munit_replace_stderr(stderr_buf);
 #endif
 
@@ -1607,7 +1610,7 @@ munit_test_runner_run_test_with_params(MunitTestRunner *runner,
 #endif
 
 #if !defined(MUNIT_NO_BUFFER)
-		munit_restore_stderr(orig_stderr);
+		munit_restore_stderr(orig_stderr_no_buffer);
 #endif
 
 		/* Here just so that the label is used on Windows and we don't get
@@ -1738,11 +1741,9 @@ static void munit_test_runner_run_test_wild(MunitTestRunner *runner,
 /* Run a single test, with every combination of parameters
  * requested. */
 static void munit_test_runner_run_test(MunitTestRunner *runner,
-				       const MunitTest *test,
-				       const char *prefix)
+				       const MunitTest *test, char *prefix)
 {
-	char *test_name =
-		munit_maybe_concat(NULL, (char *)prefix, (char *)test->name);
+	char *test_name = munit_maybe_concat(NULL, prefix, (char *)test->name);
 	/* The array of parameters to pass to
    * munit_test_runner_run_test_with_params */
 	MunitParameter *params = NULL;
@@ -1811,7 +1812,7 @@ static void munit_test_runner_run_test(MunitTestRunner *runner,
          * running a single test, but we don't want every test with
          * the same number of parameters to choose the same parameter
          * number, so use the test name as a primitive salt. */
-				pidx = munit_rand_at_most(
+				pidx = (int)munit_rand_at_most(
 					munit_str_hash(test_name),
 					possible - 1);
 				if (MUNIT_UNLIKELY(munit_parameters_add(
@@ -1873,12 +1874,10 @@ cleanup:
  * tests to run was provied on the command line, run only those
  * tests.  */
 static void munit_test_runner_run_suite(MunitTestRunner *runner,
-					const MunitSuite *suite,
-					const char *prefix)
+					const MunitSuite *suite, char *prefix)
 {
 	size_t pre_l;
-	char *pre = munit_maybe_concat(&pre_l, (char *)prefix,
-				       (char *)suite->prefix);
+	char *pre = munit_maybe_concat(&pre_l, prefix, (char *)suite->prefix);
 	const MunitTest *test;
 	const char **test_name;
 	const MunitSuite *child_suite;
@@ -1998,11 +1997,10 @@ munit_arguments_find(const MunitArgument arguments[], const char *name)
 }
 
 static void munit_suite_list_tests(const MunitSuite *suite,
-				   munit_bool show_params, const char *prefix)
+				   munit_bool show_params, char *prefix)
 {
 	size_t pre_l;
-	char *pre = munit_maybe_concat(&pre_l, (char *)prefix,
-				       (char *)suite->prefix);
+	char *pre = munit_maybe_concat(&pre_l, prefix, (char *)suite->prefix);
 	const MunitTest *test;
 	const MunitParameterEnum *params;
 	munit_bool first;

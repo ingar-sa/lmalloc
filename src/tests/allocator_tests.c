@@ -8,7 +8,7 @@ LM_LOG_REGISTER(munit_tests);
 #include <src/munit/munit.h>
 #include <src/cJSON/cJSON.h>
 
-MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
+static MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 {
 	(void)mu_params;
 	struct u_arena_test_params *params = data;
@@ -24,14 +24,14 @@ MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 	return success;
 }
 
-void u_arena_test_debug(void *test_ctx)
+static void u_arena_test_debug(void *test_ctx)
 {
 	struct u_arena_test_params *params = test_ctx;
 	u_arena_tests_debug(params);
 }
 
-void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
-			 void *test_ctx)
+static void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
+				void *test_ctx)
 {
 	(void)mu_params;
 	(void)data;
@@ -54,11 +54,11 @@ void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 		malloc(sizeof(struct u_arena_test_params));
 	test_params->arena_sz =
 		lm_mem_sz_from_string(cJSON_GetStringValue(arena_sz_json));
-	test_params->alignment = cJSON_GetNumberValue(alignment_json);
+	test_params->alignment = (size_t)cJSON_GetNumberValue(alignment_json);
 	test_params->mallocd = cJSON_IsTrue(mallocd_json);
 	test_params->contiguous = cJSON_IsTrue(contiguous_json);
 	test_params->alloc_iterations =
-		cJSON_GetNumberValue(alloc_iterations_json);
+		(uint)cJSON_GetNumberValue(alloc_iterations_json);
 	test_params->log_filename =
 		lm_string_make(cJSON_GetStringValue(log_filename_json));
 
@@ -68,7 +68,7 @@ void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 	return test_params;
 }
 
-MunitResult malloc_test(const MunitParameter mu_params[], void *data)
+static MunitResult malloc_test(const MunitParameter mu_params[], void *data)
 {
 	(void)mu_params;
 	struct malloc_test_params *params = data;
@@ -77,14 +77,14 @@ MunitResult malloc_test(const MunitParameter mu_params[], void *data)
 	return result;
 }
 
-void malloc_test_debug(void *test_ctx)
+static void malloc_test_debug(void *test_ctx)
 {
 	struct malloc_test_params *params = test_ctx;
 	malloc_tests_debug(params);
 }
 
-void *malloc_test_setup(const MunitParameter *mu_params, void *data,
-			void *test_ctx)
+static void *malloc_test_setup(const MunitParameter *mu_params, void *data,
+			       void *test_ctx)
 {
 	(void)mu_params;
 	(void)data;
@@ -100,7 +100,7 @@ void *malloc_test_setup(const MunitParameter *mu_params, void *data,
 	struct malloc_test_params *test_params =
 		malloc(sizeof(struct malloc_test_params));
 	test_params->alloc_iterations =
-		cJSON_GetNumberValue(alloc_iterations_json);
+		(uint)cJSON_GetNumberValue(alloc_iterations_json);
 	test_params->log_filename =
 		lm_string_make(cJSON_GetStringValue(log_filename_json));
 
@@ -124,19 +124,19 @@ static struct test_definition test_definitions[] = {
 	{ 0 }
 };
 
-MunitSuite *get_sub_suites_STUB(cJSON *sub_suites_json)
+static MunitSuite *get_sub_suites_STUB(cJSON *sub_suites_json)
 {
 	(void)sub_suites_json;
 	return NULL;
 }
 
-MunitSuiteOptions get_suite_options_STUB(cJSON *suite_options_json)
+static MunitSuiteOptions get_suite_options_STUB(cJSON *suite_options_json)
 {
 	(void)suite_options_json;
 	return MUNIT_SUITE_OPTION_NONE;
 }
 
-MunitTestOptions get_test_options_STUB(cJSON *test_options_json)
+static MunitTestOptions get_test_options_STUB(cJSON *test_options_json)
 {
 	(void)test_options_json;
 	return MUNIT_TEST_OPTION_NONE;
@@ -181,7 +181,7 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 	}
 
 	// NOTE: (isa): Using calloc ensures that the final entry will be a nil-entry
-	tests = calloc(enabled_test_count + 1, sizeof(MunitTest));
+	tests = calloc((size_t)enabled_test_count + 1, sizeof(MunitTest));
 
 	int test_json_idx = 0;
 	cJSON_ArrayForEach(test_json, suite_tests_json)
@@ -258,7 +258,7 @@ MunitSuite *create_munit_suite(cJSON *suite_conf_json)
 	MunitSuite *suite = malloc(sizeof(MunitSuite));
 	suite->prefix = lm_string_make(cJSON_GetStringValue(suite_prefix_json));
 	suite->suites = get_sub_suites_STUB(sub_suites_json);
-	suite->iterations = cJSON_GetNumberValue(iterations_json);
+	suite->iterations = (uint)cJSON_GetNumberValue(iterations_json);
 	suite->options = get_suite_options_STUB(suite_options_json);
 	suite->tests = get_suite_tests(suite_tests_json);
 
