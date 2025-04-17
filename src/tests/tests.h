@@ -5,40 +5,7 @@
 
 // NOTE: (isa): Start structs created by claude
 
-// 8 bytes
-typedef struct {
-	int x;
-	int y;
-} Point;
-
-// 16 bytes
-typedef struct {
-	uint8_t r;
-	uint8_t g;
-	uint8_t b;
-	uint8_t a;
-	float opacity;
-} RgbaColor;
-
-// 24 bytes
-typedef struct {
-	Point p1;
-	Point p2;
-	Point p3;
-} Triangle;
-
-// 32 bytes
-typedef struct {
-	Point center;
-	float radius;
-	float thickness;
-	int32_t segments;
-	uint32_t color;
-	uint8_t filled;
-	uint8_t padding[3]; // Explicit padding for alignment
-} CircleShape;
-
-// 48 bytes
+// 56 bytes
 typedef struct {
 	uint32_t source_ip;
 	uint32_t dest_ip;
@@ -46,10 +13,27 @@ typedef struct {
 	uint16_t dest_port;
 	uint32_t sequence_number;
 	uint32_t ack_number;
-	uint8_t data[24];
-	uint8_t flags;
+	uint8_t data[32];
+	uint8_t data_sz;
 	uint8_t padding[3]; // Explicit padding for alignment
 } NetworkPacket;
+
+// 32 bytes - aligned
+typedef struct {
+	uint64_t timestamp;
+	uint64_t sequence;
+	uint64_t source_id;
+	uint32_t type;
+	uint32_t flags;
+} EventHeader;
+
+// 72 bytes
+typedef struct {
+	char name[32];
+	char email[32];
+	uint32_t age;
+	uint32_t id;
+} PersonRecord;
 
 // 64 bytes
 typedef struct {
@@ -69,6 +53,33 @@ typedef struct {
 	uint32_t login_count;
 	uint32_t permissions;
 } UserAccount;
+
+typedef struct AccountList {
+	UserAccount *account;
+	struct AccountList *next;
+} AccountList;
+
+typedef struct File {
+	uint8_t *data;
+} File;
+
+typedef struct Disk {
+	size_t file_count;
+	size_t max_file_count;
+	FileRecord *records;
+	File *files;
+} Disk;
+
+// 128 bytes - aligned
+typedef struct {
+	char buffer[128];
+} MessageBuffer;
+
+// 77 bytes - not aligned to 8-byte boundary
+typedef struct {
+	char identifier[13];
+	uint64_t timestamps[8];
+} TimeSeriesData;
 
 // 128 bytes
 typedef struct {
@@ -118,14 +129,38 @@ typedef struct {
 	uint32_t flags;
 } PositionData;
 
-// 32 bytes - aligned
+// 8 bytes
 typedef struct {
-	uint64_t timestamp;
-	uint64_t sequence;
-	uint64_t source_id;
-	uint32_t type;
-	uint32_t flags;
-} EventHeader;
+	int x;
+	int y;
+} Point;
+
+// 16 bytes
+typedef struct {
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+	uint8_t a;
+	float opacity;
+} RgbaColor;
+
+// 24 bytes
+typedef struct {
+	Point p1;
+	Point p2;
+	Point p3;
+} Triangle;
+
+// 32 bytes
+typedef struct {
+	Point center;
+	float radius;
+	float thickness;
+	int32_t segments;
+	uint32_t color;
+	uint8_t filled;
+	uint8_t padding[3]; // Explicit padding for alignment
+} CircleShape;
 
 // 40 bytes - aligned
 typedef struct {
@@ -156,20 +191,6 @@ typedef struct {
 	double matrix[3][3];
 } Matrix3x3;
 
-// 77 bytes - not aligned to 8-byte boundary
-typedef struct {
-	char identifier[13];
-	uint64_t timestamps[8];
-} TimeSeriesData;
-
-// 88 bytes - aligned
-typedef struct {
-	char name[32];
-	uint32_t age;
-	char address[48];
-	uint32_t id;
-} PersonRecord;
-
 // 96 bytes - aligned
 typedef struct {
 	uint64_t nodes[12];
@@ -180,11 +201,6 @@ typedef struct {
 	double coordinates[12];
 	uint8_t flags[7];
 } GeometryObject;
-
-// 120 bytes - aligned
-typedef struct {
-	char buffer[120];
-} MessageBuffer;
 
 // 128 bytes - aligned
 typedef struct {

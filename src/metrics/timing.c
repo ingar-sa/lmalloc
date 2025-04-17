@@ -4,6 +4,8 @@
 
 #include <time.h>
 
+// TODO: (isa): RDTSC timing
+
 long long lm_get_time_stamp(clockid_t type)
 {
 	struct timespec ts;

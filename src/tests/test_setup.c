@@ -180,7 +180,7 @@ MunitTest *get_suite_tests(cJSON *suite_tests_json)
 			LmAssert(name_json && options_json,
 				 "No 'name' or 'options' field in test JSON");
 
-			cJSON *ctx_json;
+			cJSON *ctx_json = NULL;
 			bool has_ctx = cJSON_HasObjectItem(test_json, "ctx");
 			if (has_ctx)
 				ctx_json =
