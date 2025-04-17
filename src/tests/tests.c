@@ -39,10 +39,13 @@ static inline void *u_arena_realloc_wrapper(UArena *a, void *ptr, size_t old_sz,
 {
 	(void)ptr;
 	ure_start = lm_get_time_stamp(PROC_CPUTIME);
+	//--------------------------------------
 	void *new = u_arena_alloc(a, sz);
 	memcpy(new, ptr, old_sz);
+	//--------------------------------------
 	ure_end = lm_get_time_stamp(PROC_CPUTIME);
 	ure_total += ure_end - ure_start;
+	//--------------------------------------
 	return new;
 }
 
@@ -51,9 +54,12 @@ static inline void *malloc_wrapper(UArena *a, size_t sz)
 {
 	(void)a;
 	malloc_start = lm_get_time_stamp(PROC_CPUTIME);
+	//--------------------------------------
 	void *ptr = malloc(sz);
+	//--------------------------------------
 	malloc_end = lm_get_time_stamp(PROC_CPUTIME);
 	malloc_total += malloc_end - malloc_start;
+	//--------------------------------------
 	return ptr;
 }
 
@@ -62,9 +68,12 @@ static inline void *calloc_wrapper(UArena *a, size_t sz)
 {
 	(void)a;
 	calloc_start = lm_get_time_stamp(PROC_CPUTIME);
+	//--------------------------------------
 	void *ptr = calloc(1, sz);
+	//--------------------------------------
 	calloc_end = lm_get_time_stamp(PROC_CPUTIME);
 	calloc_total += calloc_end - calloc_start;
+	//--------------------------------------
 	return ptr;
 }
 static const alloc_fn_t malloc_and_fam[] = { malloc_wrapper, calloc_wrapper };
@@ -75,7 +84,9 @@ static inline void free_wrapper(UArena *a, void *ptr)
 {
 	(void)a;
 	free_start = lm_get_time_stamp(PROC_CPUTIME);
+	//--------------------------------------
 	free(ptr);
+	//--------------------------------------
 	free_end = lm_get_time_stamp(PROC_CPUTIME);
 	free_total += free_end - free_start;
 }
@@ -87,9 +98,12 @@ static inline void *realloc_wrapper(UArena *a, void *ptr, size_t old_sz,
 	(void)a;
 	(void)old_sz;
 	realloc_start = lm_get_time_stamp(PROC_CPUTIME);
+	//--------------------------------------
 	void *new = realloc(ptr, sz);
+	//--------------------------------------
 	realloc_end = lm_get_time_stamp(PROC_CPUTIME);
 	realloc_total += realloc_end - realloc_start;
+	//--------------------------------------
 	return new;
 }
 
@@ -119,7 +133,7 @@ static void tight_loop_test(UArena *a, uint alloc_iterations,
 			    alloc_fn_t alloc_fn, const char *alloc_fn_name,
 			    size_t *alloc_sizes, size_t alloc_sizes_len,
 			    const char *size_name, const char *log_filename,
-			    const char *file_mode, bool running_in_debugger)
+			    const char *file_mode)
 {
 	if (a) {
 		size_t largest_sz = alloc_sizes[alloc_sizes_len - 1];
@@ -159,8 +173,6 @@ static void tight_loop_test(UArena *a, uint alloc_iterations,
 
 	LmRemoveLogFileLocal();
 	lm_close_file(log_file);
-	if (!running_in_debugger)
-		exit(EXIT_SUCCESS);
 }
 
 static void cpy_from_precord(PersonRecord *precord, void *to,
@@ -386,11 +398,15 @@ static void network_test(UArena *a, alloc_fn_t alloc_fn,
 			if (precord->age >= 18) {
 				new_account_start =
 					lm_get_time_stamp(PROC_CPUTIME);
+				//--------------------------------------
+
 				UserAccount *new_account = create_new_account(
 					precord, a, alloc_fn);
 				add_account(&account_list, new_account, a,
 					    alloc_fn);
-				++new_accounts_count;
+				new_accounts_count += 1;
+
+				//--------------------------------------
 				new_account_end =
 					lm_get_time_stamp(PROC_CPUTIME);
 				new_account_total +=
@@ -400,11 +416,15 @@ static void network_test(UArena *a, alloc_fn_t alloc_fn,
 			if (new_accounts_count >= save_new_accounts_threshold) {
 				save_to_disk_start =
 					lm_get_time_stamp(PROC_CPUTIME);
+				//--------------------------------------
+
 				new_accounts_count = 0;
 				save_accounts_to_disk(
 					disk, account_list,
 					save_new_accounts_threshold, a,
 					alloc_fn, realloc_fn);
+
+				//--------------------------------------
 				save_to_disk_end =
 					lm_get_time_stamp(PROC_CPUTIME);
 				save_to_disk_total +=
@@ -495,8 +515,8 @@ static void u_arena_tight_loop(struct u_arena_test_params *params,
 			tight_loop_test(a, params->alloc_iterations, alloc_fn,
 					alloc_fn_name, small_sizes,
 					LmArrayLen(small_sizes), "small",
-					params->log_filename, file_mode,
-					params->running_in_debugger);
+					params->log_filename, file_mode);
+			exit(EXIT_SUCCESS);
 		} else {
 			waitpid(pid, &status, 0);
 		}
@@ -511,7 +531,8 @@ static void u_arena_tight_loop(struct u_arena_test_params *params,
 					(sizeof(medium_sizes) /
 					 sizeof(medium_sizes[0])),
 					"medium", params->log_filename,
-					file_mode, params->running_in_debugger);
+					file_mode);
+			exit(EXIT_SUCCESS);
 		} else {
 			waitpid(pid, &status, 0);
 		}
@@ -525,8 +546,8 @@ static void u_arena_tight_loop(struct u_arena_test_params *params,
 				a, params->alloc_iterations, alloc_fn,
 				alloc_fn_name, large_sizes,
 				(sizeof(large_sizes) / sizeof(large_sizes[0])),
-				"large", params->log_filename, file_mode,
-				params->running_in_debugger);
+				"large", params->log_filename, file_mode);
+			exit(EXIT_SUCCESS);
 		} else {
 			waitpid(pid, &status, 0);
 		}
@@ -539,8 +560,7 @@ static void u_arena_tight_loop(struct u_arena_test_params *params,
 		tight_loop_test(a, params->alloc_iterations, alloc_fn,
 				alloc_fn_name, large_sizes,
 				LmArrayLen(large_sizes), "large",
-				params->log_filename, file_mode,
-				params->running_in_debugger);
+				params->log_filename, file_mode);
 		u_arena_destroy(&a);
 
 #endif
@@ -550,8 +570,7 @@ static void u_arena_tight_loop(struct u_arena_test_params *params,
 		tight_loop_test(a, params->alloc_iterations, alloc_fn,
 				alloc_fn_name, large_sizes,
 				LmArrayLen(large_sizes), "large",
-				params->log_filename, file_mode,
-				params->running_in_debugger);
+				params->log_filename, file_mode);
 		u_arena_destroy(&a);
 #endif
 #if 1
@@ -560,8 +579,7 @@ static void u_arena_tight_loop(struct u_arena_test_params *params,
 		tight_loop_test(a, params->alloc_iterations, alloc_fn,
 				alloc_fn_name, large_sizes,
 				LmArrayLen(large_sizes), "large",
-				params->log_filename, file_mode,
-				params->running_in_debugger);
+				params->log_filename, file_mode);
 		u_arena_destroy(&a);
 #endif
 		LmLogDebug("Hi from debugger!");
@@ -573,6 +591,23 @@ static void u_arena_network_test(struct u_arena_test_params *params,
 				 const char *file_mode)
 {
 	if (!params->running_in_debugger) {
+		pid_t pid;
+		int status;
+		if ((pid = fork()) == 0) {
+			UArena *a = u_arena_create(params->arena_sz,
+						   params->contiguous,
+						   params->mallocd,
+						   params->alignment);
+			network_test(a, alloc_fn, alloc_fn_name,
+				     u_arena_free_wrapper,
+				     u_arena_realloc_wrapper,
+				     params->alloc_iterations,
+				     params->log_filename, file_mode);
+			exit(EXIT_SUCCESS);
+			u_arena_destroy(&a);
+		} else {
+			waitpid(pid, &status, 0);
+		}
 	} else {
 		UArena *a = u_arena_create(params->arena_sz, params->contiguous,
 					   params->mallocd, params->alignment);
@@ -590,7 +625,7 @@ int u_arena_tests(struct u_arena_test_params *params)
 		alloc_fn_t alloc_fn = u_arena_alloc_functions[i];
 		const char *alloc_fn_name = u_arena_alloc_function_names[i];
 
-		//u_arena_tight_loop(params, alloc_fn, alloc_fn_name, file_mode);
+		u_arena_tight_loop(params, alloc_fn, alloc_fn_name, file_mode);
 		u_arena_network_test(params, alloc_fn, alloc_fn_name,
 				     file_mode);
 	}
@@ -611,8 +646,8 @@ static void malloc_tight_loop(struct malloc_test_params *params,
 				((void *)0), params->alloc_iterations, alloc_fn,
 				alloc_fn_name, small_sizes,
 				(sizeof(small_sizes) / sizeof(small_sizes[0])),
-				"small", params->log_filename, file_mode,
-				params->running_in_debugger);
+				"small", params->log_filename, file_mode);
+			exit(EXIT_SUCCESS);
 		} else {
 			waitpid(pid, &status, 0);
 		}
@@ -623,7 +658,8 @@ static void malloc_tight_loop(struct malloc_test_params *params,
 					(sizeof(medium_sizes) /
 					 sizeof(medium_sizes[0])),
 					"medium", params->log_filename,
-					file_mode, params->running_in_debugger);
+					file_mode);
+			exit(EXIT_SUCCESS);
 		} else {
 			waitpid(pid, &status, 0);
 		}
@@ -633,8 +669,8 @@ static void malloc_tight_loop(struct malloc_test_params *params,
 				((void *)0), params->alloc_iterations, alloc_fn,
 				alloc_fn_name, large_sizes,
 				(sizeof(large_sizes) / sizeof(large_sizes[0])),
-				"large", params->log_filename, file_mode,
-				params->running_in_debugger);
+				"large", params->log_filename, file_mode);
+			exit(EXIT_SUCCESS);
 		} else {
 			waitpid(pid, &status, 0);
 		}
@@ -643,20 +679,39 @@ static void malloc_tight_loop(struct malloc_test_params *params,
 		tight_loop_test(NULL, params->alloc_iterations, alloc_fn,
 				alloc_fn_name, small_sizes,
 				LmArrayLen(small_sizes), "small",
-				params->log_filename, file_mode,
-				params->running_in_debugger);
+				params->log_filename, file_mode);
 
 		tight_loop_test(NULL, params->alloc_iterations, alloc_fn,
 				alloc_fn_name, medium_sizes,
 				LmArrayLen(medium_sizes), "medium",
-				params->log_filename, file_mode,
-				params->running_in_debugger);
+				params->log_filename, file_mode);
 
 		tight_loop_test(NULL, params->alloc_iterations, alloc_fn,
 				alloc_fn_name, large_sizes,
 				LmArrayLen(large_sizes), "large",
-				params->log_filename, file_mode,
-				params->running_in_debugger);
+				params->log_filename, file_mode);
+	}
+}
+
+static void malloc_network_test(alloc_fn_t alloc_fn, const char *alloc_fn_name,
+				uint iterations, const char *log_filename,
+				const char *file_mode, bool running_in_debuger)
+{
+	if (!running_in_debuger) {
+		pid_t pid;
+		int status;
+		if ((pid = fork()) == 0) {
+			network_test(NULL, alloc_fn, alloc_fn_name,
+				     free_wrapper, realloc_wrapper, iterations,
+				     log_filename, file_mode);
+			exit(EXIT_SUCCESS);
+		} else {
+			waitpid(pid, &status, 0);
+		}
+	} else {
+		network_test(NULL, alloc_fn, alloc_fn_name, free_wrapper,
+			     realloc_wrapper, iterations, log_filename,
+			     file_mode);
 	}
 }
 
@@ -667,10 +722,11 @@ int malloc_tests(struct malloc_test_params *params)
 		alloc_fn_t alloc_fn = malloc_and_fam[i];
 		const char *alloc_fn_name = malloc_and_fam_names[i];
 
-		//malloc_tight_loop(params, alloc_fn, alloc_fn_name, file_mode);
-		network_test(NULL, alloc_fn, alloc_fn_name, free_wrapper,
-			     realloc_wrapper, params->alloc_iterations,
-			     params->log_filename, file_mode);
+		malloc_tight_loop(params, alloc_fn, alloc_fn_name, file_mode);
+		malloc_network_test(alloc_fn, alloc_fn_name,
+				    params->alloc_iterations,
+				    params->log_filename, file_mode,
+				    params->running_in_debugger);
 	}
 
 	return 0;
