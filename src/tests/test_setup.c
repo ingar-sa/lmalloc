@@ -24,6 +24,29 @@ static MunitResult u_arena_test(const MunitParameter mu_params[], void *data)
 	return success;
 }
 
+static MunitResult karena_test(const MunitParameter mu_params[], void *data)
+{
+	(void)mu_params;
+	struct karena_test_params *params = data;
+	LmAssert(params->alloc_iterations > 0,
+		 "Number of allocation iterations is 0");
+	MunitResult success = (karena_tests(params) == 0) ? MUNIT_OK :
+							    MUNIT_FAIL;
+	return success;
+}
+
+void u_arena_test_debug(void *test_ctx)
+{
+	struct u_arena_test_params *params = test_ctx;
+	u_arena_tests_debug(params);
+}
+
+void karena_test_debug(void *test_ctx)
+{
+	struct karena_test_params *params = test_ctx;
+	karena_tests_debug(params);
+}
+
 static void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 				void *test_ctx)
 {
@@ -58,6 +81,33 @@ static void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 
 	LmAssert(test_params->alloc_iterations > 0,
 		 "u_arena_test's alloc_iterations is 0");
+
+	return test_params;
+}
+
+void *karena_test_setup(const MunitParameter *mu_params, void *data,
+			void *test_ctx)
+{
+	(void)mu_params;
+	(void)data;
+
+	cJSON *ctx_json = test_ctx;
+	cJSON *arena_sz_json = cJSON_GetObjectItem(ctx_json, "arena_sz");
+	cJSON *alloc_iterations_json =
+		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
+	cJSON *log_filename_json =
+		cJSON_GetObjectItem(ctx_json, "log_filename");
+	LmAssert(arena_sz_json && alloc_iterations_json && log_filename_json,
+		 "karena_test's context JSON is malformed");
+
+	struct karena_test_params *test_params =
+		malloc(sizeof(struct karena_test_params));
+	test_params->arena_sz =
+		lm_mem_sz_from_string(cJSON_GetStringValue(arena_sz_json));
+	test_params->alloc_iterations =
+		cJSON_GetNumberValue(alloc_iterations_json);
+	test_params->log_filename =
+		lm_string_make(cJSON_GetStringValue(log_filename_json));
 
 	return test_params;
 }
@@ -104,6 +154,7 @@ static struct test_definition test_definitions[] = {
 	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_nm_c" },
 	{ u_arena_test, u_arena_test_setup, NULL, "u_arena_nm_nc" },
 	{ malloc_test, malloc_test_setup, NULL, "malloc" },
+	{ karena_test, karena_test_setup, NULL, "karena_test" },
 	{ 0 }
 };
 

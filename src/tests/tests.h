@@ -236,6 +236,5 @@ static size_t large_sizes[16] = {
 	LmKibiByte(8192) /* 8 MB (aligned) */
 };
 
-// NOTE: (isa): End arrays created by Claude
 
 #endif

@@ -35,7 +35,14 @@ struct malloc_test_params {
 	bool running_in_debugger;
 };
 
+struct karena_test_params {
+	size_t arena_sz;
+	uint alloc_iterations;
+	LmString log_filename;
+};
+
 int u_arena_tests(struct u_arena_test_params *params);
 int malloc_tests(struct malloc_test_params *param);
+int karena_tests(struct karena_test_params *params);
 
 #endif
