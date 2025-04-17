@@ -227,7 +227,7 @@ void lm__disable_log_to_term__(lm__log_module__ *module);
 
 #define LM__LOG_MANUAL__(module, log_raw, log_level, fmt, ...)             \
 	do {                                                               \
-		if (log_level >= LM_LOG_LEVEL) {                           \
+		if (log_level <= LM_LOG_LEVEL) {                           \
 			int log_ret;                                       \
 			switch (log_level) {                               \
 			case ERR:                                          \
