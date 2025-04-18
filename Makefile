@@ -12,7 +12,7 @@ REL_LOG_LEVEL ?= 2
 MEM_TRACE ?= 0
 DISABLE_DEBUG_WARNINGS ?= 1
 
-WARNING_FLAGS ?= -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow -Wundef -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wredundant-decls -Wnested-externs -Winline -Wfloat-equal -Wpointer-arith -Wwrite-strings -Waggregate-return -Wold-style-definition -Wcpp
+WARNING_FLAGS ?= -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow -Wundef -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wredundant-decls -Wnested-externs -Winline -Wfloat-equal -Wpointer-arith -Wwrite-strings -Waggregate-return -Wold-style-definition 
 
 ifeq ($(DISABLE_DEBUG_WARNINGS), 1)
 DISABLED_WARNING_FLAGS ?= -Wno-unused-function -Wno-unused-variable
@@ -23,9 +23,9 @@ endif
 LM_FLAGS = -DLM_MEM_TRACE=$(MEM_TRACE) -DLM_LOG_GLOBAL=1 -DLM_LOG_LEVEL=$(LOG_LEVEL) -DLM_ASSERT=1
 RELEASE_LM_FLAGS = -DLM_MEM_TRACE=0 -DLM_PRINTF_DEBUG_ENABLE=0 -DLM_LOG_LEVEL=$(REL_LOG_LEVEL)-DLM_ASSERT=0 
 
-DEBUG_FLAGS = -std=gnu11 -g -O$(DEBUG_OPT_LEVEL) $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DDEBUG
-RELWDB_FLAGS = -std=gnu11 -g -O2 $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DNDEBUG 
-RELEASE_FLAGS = -std=gnu11 -O3 -march=native $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DNDEBUG
+DEBUG_FLAGS = -std=gnu11 -g -O$(DEBUG_OPT_LEVEL) $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -Wno-cpp -DDEBUG
+RELWDB_FLAGS = -std=gnu11 -g -O2 $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -Wno-cpp -DNDEBUG 
+RELEASE_FLAGS = -std=gnu11 -O3 -march=native $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -Wno-cpp -DNDEBUG
 
 PROGRAM_NAME = validation
 
