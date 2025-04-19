@@ -3,6 +3,7 @@ LM_LOG_REGISTER(tests);
 
 #include <src/metrics/timing.h>
 #include <src/allocators/u_arena.h>
+#include <src/allocators/karena.h>
 #include <src/metrics/timing.h>
 
 #include "test_setup.h"
@@ -629,6 +630,33 @@ int u_arena_tests(struct u_arena_test_params *params)
 		u_arena_network_test(params, alloc_fn, alloc_fn_name,
 				     file_mode);
 	}
+
+	return 0;
+}
+
+int karena_tests(struct karena_test_params *params)
+{
+	FILE *log_file = lm_open_file_by_name(params->log_filename, "a");
+	LmSetLogFileLocal(log_file);
+
+	size_t arena_size = small_sizes[LmArrayLen(small_sizes) - 1] *
+			    params->alloc_iterations * 10;
+	void *a = karena_create(arena_size);
+
+	LmLogDebugR("\n------------------------------");
+	LmLogDebug("%s -- %s", "karena", "small");
+
+	for (size_t j = 0; j < LmArrayLen(small_sizes); ++j) {
+		LmLogDebugR("\n%s'ing %zd bytes %d times", "alloc",
+			    small_sizes[j], params->alloc_iterations);
+
+		TIME_TIGHT_LOOP(PROC_CPUTIME, params->alloc_iterations,
+				uint8_t *ptr = karena_alloc(a, small_sizes[j]);
+				*ptr = 1;);
+	}
+
+	LmRemoveLogFileLocal();
+	lm_close_file(log_file);
 
 	return 0;
 }

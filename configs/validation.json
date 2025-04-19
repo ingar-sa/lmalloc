@@ -37,7 +37,7 @@
             },
             {
                 "name": "u_arena_nm_c",
-                "enabled": true,
+                "enabled": false,
                 "options": "NONE",
                 "ctx": 
                 {
@@ -51,7 +51,7 @@
             },
             {
                 "name": "u_arena_nm_nc",
-                "enabled": false,
+                "enabled": true,
                 "options": "NONE",
                 "ctx": 
                 {
@@ -65,14 +65,26 @@
             },
             {
                 "name": "malloc",
-                "enabled": true,
+                "enabled": false,
                 "options": "NONE",
                 "ctx":
                 {
                     "alloc_iterations": 1000,
                     "log_filename": "./logs/malloc.txt"
                 }
+            },
+            {
+                "name": "karena_test",
+                "enabled": true,
+                "options": "NONE",
+                "ctx":
+                {
+                    "alloc_iterations": 1000,
+                    "log_filename": "./logs/karena.txt",
+                    "arena_sz": "512kB"
+                }
             }
+
         ]
     }
 }

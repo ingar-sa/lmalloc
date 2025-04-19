@@ -35,17 +35,17 @@ static MunitResult karena_test(const MunitParameter mu_params[], void *data)
 	return success;
 }
 
-void u_arena_test_debug(void *test_ctx)
-{
-	struct u_arena_test_params *params = test_ctx;
-	u_arena_tests_debug(params);
-}
-
-void karena_test_debug(void *test_ctx)
-{
-	struct karena_test_params *params = test_ctx;
-	karena_tests_debug(params);
-}
+// void u_arena_test_debug(void *test_ctx)
+// {
+// 	struct u_arena_test_params *params = test_ctx;
+// 	u_arena_tests_debug(params);
+// }
+//
+// void karena_test_debug(void *test_ctx)
+// {
+// 	struct karena_test_params *params = test_ctx;
+// 	karena_tests_debug(params);
+// }
 
 static void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 				void *test_ctx)
@@ -85,8 +85,8 @@ static void *u_arena_test_setup(const MunitParameter *mu_params, void *data,
 	return test_params;
 }
 
-void *karena_test_setup(const MunitParameter *mu_params, void *data,
-			void *test_ctx)
+static void *karena_test_setup(const MunitParameter *mu_params, void *data,
+			       void *test_ctx)
 {
 	(void)mu_params;
 	(void)data;
@@ -105,7 +105,7 @@ void *karena_test_setup(const MunitParameter *mu_params, void *data,
 	test_params->arena_sz =
 		lm_mem_sz_from_string(cJSON_GetStringValue(arena_sz_json));
 	test_params->alloc_iterations =
-		cJSON_GetNumberValue(alloc_iterations_json);
+		(uint)cJSON_GetNumberValue(alloc_iterations_json);
 	test_params->log_filename =
 		lm_string_make(cJSON_GetStringValue(log_filename_json));
 
