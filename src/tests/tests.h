@@ -236,5 +236,10 @@ static size_t large_sizes[16] = {
 	LmKibiByte(8192) /* 8 MB (aligned) */
 };
 
+typedef struct {
+	size_t *array;
+	size_t len;
+	const char *name;
+} array_test;
 
 #endif

@@ -528,7 +528,7 @@ static void u_arena_tight_loop(struct u_arena_test_params *params,
 						   params->mallocd,
 						   params->alignment);
 			tight_loop_test(a, params->alloc_iterations, alloc_fn,
-					alloc_fn_name, small_sizes,
+					alloc_fn_name, medium_sizes,
 					(sizeof(medium_sizes) /
 					 sizeof(medium_sizes[0])),
 					"medium", params->log_filename,
@@ -634,30 +634,53 @@ int u_arena_tests(struct u_arena_test_params *params)
 	return 0;
 }
 
-int karena_tests(struct karena_test_params *params)
+static void karena_tight_loop(struct karena_test_params *params,
+			      const array_test *test)
 {
 	FILE *log_file = lm_open_file_by_name(params->log_filename, "a");
 	LmSetLogFileLocal(log_file);
 
-	size_t arena_size = small_sizes[LmArrayLen(small_sizes) - 1] *
-			    params->alloc_iterations * 10;
-	void *a = karena_create(arena_size);
+	size_t arena_size = test->array[test->len] * params->alloc_iterations;
 
 	LmLogDebugR("\n------------------------------");
-	LmLogDebug("%s -- %s", "karena", "small");
+	LmLogDebug("%s -- %s", "karena", test->name);
 
-	for (size_t j = 0; j < LmArrayLen(small_sizes); ++j) {
+	for (size_t j = 0; j < test->len; ++j) {
+		void *a = karena_create(arena_size);
 		LmLogDebugR("\n%s'ing %zd bytes %d times", "alloc",
-			    small_sizes[j], params->alloc_iterations);
+			    test->array[j], params->alloc_iterations);
 
 		TIME_TIGHT_LOOP(PROC_CPUTIME, params->alloc_iterations,
-				uint8_t *ptr = karena_alloc(a, small_sizes[j]);
+				uint8_t *ptr = karena_alloc(a, test->array[j]);
 				*ptr = 1;);
 	}
 
 	LmRemoveLogFileLocal();
 	lm_close_file(log_file);
+}
 
+int karena_tests(struct karena_test_params *params)
+{
+	array_test small = {
+		.array = small_sizes,
+		.len = LmArrayLen(small_sizes),
+		.name = "small",
+	};
+
+	array_test medium = {
+		.array = medium_sizes,
+		.len = LmArrayLen(medium_sizes),
+		.name = "medium",
+	};
+
+	array_test large = { .array = large_sizes,
+			     .len = LmArrayLen(large_sizes),
+			     .name = "large" };
+
+	karena_tight_loop(params, &small);
+	karena_tight_loop(params, &medium);
+	// large no work ):
+	// karena_tight_loop(params, &large);
 	return 0;
 }
 
