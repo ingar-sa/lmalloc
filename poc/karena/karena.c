@@ -91,6 +91,8 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	size_t size;
 	struct mmap_info *info;
 	struct karena_alloc alloc;
+	unsigned long addr;
+	struct vm_area_struct *vma;
 
 	switch (cmd) {
 	case KARENA_CREATE:
@@ -145,12 +147,12 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		}
 
-		struct vm_area_struct *vma;
 		vma = find_vma(current->mm, alloc.addr);
 		if (!vma) {
 			pr_err("No vma for the address %lu\n", alloc.addr);
 			return -EFAULT;
 		}
+		pr_info("Alloc found vma @ %lx\n", vma->vm_start);
 
 		info = vma->vm_private_data;
 		pr_info("cur at before: %lu\n", info->cur);
@@ -158,13 +160,33 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		info->cur += alloc.size;
 		vma->vm_private_data = info;
 
-		pr_info("addr at: %lu\n", alloc.addr);
+		pr_info("addr at: %lx\n", alloc.addr);
 		pr_info("cur at after: %lu\n", info->cur);
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
 			pr_err("Could not copy alloc back to user\n");
 			return -EFAULT;
 		}
+
+		break;
+	case KARENA_FREE:
+		pr_info("Top of free\n");
+		if (copy_from_user(&addr, (void __user *)arg, sizeof(addr))) {
+			pr_err("Could not copy address to free\n");
+			return -EFAULT;
+		}
+
+		pr_info("Looking for vma @ %lx", addr);
+
+		vma = 0;
+		vma = find_vma(current->mm, addr);
+		if (!vma) {
+			pr_err("No vma for the address %lx\n", addr);
+			return -EFAULT;
+		}
+		pr_info("Found vma @ %lx\n", vma->vm_start);
+
+		((struct mmap_info *)vma->vm_private_data)->cur = 0;
 
 		break;
 

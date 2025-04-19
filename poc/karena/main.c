@@ -67,6 +67,24 @@ void *karena_alloc(void *arena, size_t size)
 	return (void *)alloc.addr;
 }
 
+void *karena_free(void *arena)
+{
+	int fd;
+	fd = open("/dev/karena", O_RDWR);
+	if (fd < 0) {
+		perror("Failed to open device");
+		return 0;
+	}
+
+	printf("Freeing %lx\n", (unsigned long)arena);
+	if (ioctl(fd, KARENA_FREE, (unsigned long *)&arena)) {
+		perror("Arena free failed");
+		return 0;
+	}
+
+	return arena;
+}
+
 int main(void)
 {
 	int *memory = karena_create(1024);
@@ -87,6 +105,21 @@ int main(void)
 	*second = 44L;
 	printf("First: %lu @ %p\n", *first, first);
 	printf("Second: %lu @ %p\n", *second, second);
+
+	printf("Trying to free %lx\n", (unsigned long)memory);
+
+	fflush(stdout);
+
+	karena_free(memory);
+
+	if (!memory) {
+		printf("Arena is null pointer after free\n");
+		exit(1);
+	}
+	unsigned long *third = karena_alloc(memory, sizeof(unsigned long));
+	*third = 69L;
+
+	printf("Third: %lu @ %p\n", *third, third);
 
 	return 0;
 }
