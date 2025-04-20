@@ -9,6 +9,8 @@ LM_LOG_REGISTER(validation);
 #include <src/tests/test_setup.h>
 #include <src/allocators/u_arena.h>
 
+#include <src/sdhs/Sdhs.h>
+
 #include <src/munit/munit.h>
 
 #include <stdlib.h>
@@ -22,6 +24,12 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
 	int result = EXIT_SUCCESS;
 
+#if 1
+	// NOTE: (isa): This #if/else is just a quick way to run debug stuff instead of the main code
+
+	//LmLogDebug("Sizeof UArena: %zd", sizeof(UArena));
+	SdhsMain(0, NULL);
+#else
 	lm_file_data *test_config_file =
 		lm_load_file_into_memory("./configs/validation.json");
 	cJSON *test_config_json = cJSON_Parse((char *)test_config_file->data);
@@ -52,6 +60,6 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 			}
 		}
 	}
-
+#endif
 	return result;
 }

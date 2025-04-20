@@ -143,3 +143,4 @@ glibc*
 data/testdata
 compile_commands.json
 .cache
+**foo.c

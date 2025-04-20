@@ -1,5 +1,3 @@
-#include <src/allocators/sdhs_arena.h>
-
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -11,6 +9,8 @@ SDB_LOG_REGISTER(ThreadGroup);
 #include <src/sdhs/Common/ThreadGroup.h>
 #include <src/sdhs/Common/Time.h>
 #include <src/sdhs/Signals.h>
+
+#include <src/allocators/sdhs_arena.h>
 
 tg_manager *
 TgCreateManager(tg_group **Groups, u64 GroupCount, SdhsArena *A)
@@ -113,13 +113,13 @@ TgCreateGroup(u64 GroupId, u64 ThreadCount, void *SharedData, tg_init Init, tg_t
             return NULL;
         }
 
-        Group = (tg_group *)GroupMem;
+        Group = (tg_group *)(uintptr_t)GroupMem;
         GroupMem += sizeof(tg_group);
 
-        Group->Threads = (pthread_t *)GroupMem;
+        Group->Threads = (pthread_t *)(uintptr_t)GroupMem;
         GroupMem += ThreadCount * sizeof(pthread_t);
 
-        Group->Tasks = (tg_task *)GroupMem;
+        Group->Tasks = (tg_task *)(uintptr_t)GroupMem;
     }
 
     Group->GroupId     = GroupId;
