@@ -7,5 +7,7 @@ pkgs.mkShell {
     bear
     doxygen
     cppcheck
+    postgresql
+    docker-compose
   ];
 }
