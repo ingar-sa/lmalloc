@@ -70,9 +70,10 @@ SdpCreate(u64 BufCount, u64 BufSize, SdhsArena *Arena)
     atomic_init(&Pipe->ReadBufIdx, 0);
     atomic_init(&Pipe->FullBuffersCount, 0);
 
-    Pipe->BufCount = BufCount;
-    u64 InitVal    = BufCount - 1;
-    write(Pipe->WriteEventFd, &InitVal, sizeof(InitVal));
+    Pipe->BufCount  = BufCount;
+    u64     InitVal = BufCount - 1;
+    ssize_t ignore  = write(Pipe->WriteEventFd, &InitVal, sizeof(InitVal));
+    (void)ignore;
 
     return Pipe;
 }

@@ -288,7 +288,7 @@ void network_test(UArena *ua, alloc_fn_t alloc_fn, const char *alloc_fn_name,
 		      LM_LOG_MODULE_LOCAL);
 
 	if (ua) {
-		long long alloc_timing = 0;
+		uint64_t alloc_timing = 0;
 		if (alloc_fn == ua_alloc_wrapper_timed) {
 			alloc_timing = get_and_clear_u_alloc_timing();
 		} else if (alloc_fn == ua_zalloc_wrapper_timed) {
@@ -298,26 +298,32 @@ void network_test(UArena *ua, alloc_fn_t alloc_fn, const char *alloc_fn_name,
 		} else if (alloc_fn == ua_fzalloc_wrapper_timed) {
 			alloc_timing = get_and_clear_u_fzalloc_timing();
 		}
-		lm_log_timing(alloc_timing, "Total time spent in alloc: ", MS,
-			      false, INF, LM_LOG_MODULE_LOCAL);
-		lm_log_timing(get_and_clear_u_realloc_timing(),
-			      "Total time spent in realloc: ", MS, false, INF,
-			      LM_LOG_MODULE_LOCAL);
+		lm_log_tsc_timing(alloc_timing,
+				  "Total time spent in alloc: ", MS, false, DBG,
+				  LM_LOG_MODULE_LOCAL);
+		lm_log_tsc_timing(get_and_clear_u_realloc_timing(),
+				  "Total time spent in realloc: ", MS, false,
+				  DBG, LM_LOG_MODULE_LOCAL);
 		LmLogDebug("Arena memory use: %zd", ua->cur);
 		ua_free(ua);
 	} else {
-		lm_log_timing(get_and_clear_malloc_timing(),
-			      "Total time spent in malloc: ", MS, false, INF,
-			      LM_LOG_MODULE_LOCAL);
-		lm_log_timing(get_and_clear_calloc_timing(),
-			      "Total time spent in calloc: ", MS, false, INF,
-			      LM_LOG_MODULE_LOCAL);
-		lm_log_timing(get_and_clear_realloc_timing(),
-			      "Total time spent in realloc: ", MS, false, INF,
-			      LM_LOG_MODULE_LOCAL);
-		lm_log_timing(get_and_clear_free_timing(),
-			      "Total time spent in free: ", MS, false, INF,
-			      LM_LOG_MODULE_LOCAL);
+		uint64_t alloc_timing, realloc_timing, free_timing;
+		if (alloc_fn == malloc_wrapper_timed)
+			alloc_timing = get_and_clear_malloc_timing();
+		else if (alloc_fn == calloc_wrapper_timed)
+			alloc_timing = get_and_clear_calloc_timing();
+		else
+			alloc_timing = 0;
+		realloc_timing = get_and_clear_realloc_timing();
+		free_timing = get_and_clear_free_timing();
+		lm_log_tsc_timing(alloc_timing,
+				  "Total time spent in alloc: ", MS, false, DBG,
+				  LM_LOG_MODULE_LOCAL);
+		lm_log_tsc_timing(realloc_timing,
+				  "Total time spent in realloc: ", MS, false,
+				  DBG, LM_LOG_MODULE_LOCAL);
+		lm_log_tsc_timing(free_timing, "Total time spent in free: ", MS,
+				  false, DBG, LM_LOG_MODULE_LOCAL);
 	}
 
 	LmRemoveLogFileLocal();

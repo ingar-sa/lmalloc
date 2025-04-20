@@ -134,15 +134,15 @@ static void run_network_test(struct u_arena_test_params *u_arena_params,
 
 int u_arena_tests(struct u_arena_test_params *params)
 {
-#if 0
+#if 1
 	const char *file_mode = "a";
-	for (int i = 0; i < (int)LmArrayLen(u_arena_alloc_functions); ++i) {
-		alloc_fn_t alloc_fn = u_arena_alloc_functions[i];
-		const char *alloc_fn_name = u_arena_alloc_function_names[i];
-		free_fn_t free_fn = u_arena_free_functions[0];
-		realloc_fn_t realloc_fn = u_arena_realloc_functions[0];
+	for (int i = 0; i < (int)LmArrayLen(ua_alloc_functions); ++i) {
+		alloc_fn_t alloc_fn = ua_alloc_functions[i];
+		const char *alloc_fn_name = ua_alloc_function_names[i];
+		free_fn_t free_fn = ua_free_functions[0];
+		realloc_fn_t realloc_fn = ua_realloc_functions[0];
 
-#if 0
+#if 1
 		run_tight_loop_test_all_sizes(params,
 					      params->running_in_debugger,
 					      params->alloc_iterations,
@@ -150,7 +150,7 @@ int u_arena_tests(struct u_arena_test_params *params)
 					      params->log_filename, file_mode);
 #endif
 
-#if 1
+#if 0
 		run_network_test(params, params->running_in_debugger, alloc_fn,
 				 alloc_fn_name, free_fn, realloc_fn,
 				 params->alloc_iterations, params->log_filename,
@@ -172,14 +172,14 @@ int malloc_tests(struct malloc_test_params *params)
 		free_fn_t free_fn = free_functions[0];
 		realloc_fn_t realloc_fn = realloc_functions[0];
 
-#if 0
+#if 1
 		run_tight_loop_test_all_sizes(NULL, params->running_in_debugger,
 					      params->alloc_iterations,
 					      alloc_fn, alloc_fn_name,
 					      params->log_filename, file_mode);
 #endif
 
-#if 1
+#if 0
 		run_network_test(NULL, params->running_in_debugger, alloc_fn,
 				 alloc_fn_name, free_fn, realloc_fn,
 				 params->alloc_iterations, params->log_filename,

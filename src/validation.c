@@ -8,6 +8,7 @@ LM_LOG_REGISTER(validation);
 #include <src/metrics/timing.h>
 #include <src/tests/test_setup.h>
 #include <src/allocators/u_arena.h>
+#include <src/utils/system_info.h>
 
 #include <src/sdhs/Sdhs.h>
 
@@ -24,11 +25,14 @@ int main(int argc, char *argv[MUNIT_ARRAY_PARAM(argc + 1)])
 {
 	int result = EXIT_SUCCESS;
 
-#if 1
+#if 0
 	// NOTE: (isa): This #if/else is just a quick way to run debug stuff instead of the main code
 
 	//LmLogDebug("Sizeof UArena: %zd", sizeof(UArena));
-	SdhsMain(0, NULL);
+	//SdhsMain(0, NULL);
+	LmLogDebug("TSC freq: %f", calibrate_tsc() / 1e9);
+	LmLogDebug("CPU has invariant tsc: %s",
+		   LmBoolToString(cpu_has_invariant_tsc()));
 #else
 	lm_file_data *test_config_file =
 		lm_load_file_into_memory("./configs/validation.json");

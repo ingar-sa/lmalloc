@@ -6,6 +6,9 @@ LM_LOG_REGISTER(tight_loop_test);
 #include "tests.h"
 #include "tight_loop_test.h"
 
+// WARN: (isa): If the arena functions suddenly take a lot of time,
+// check if TIME_U_ARENA is set to 1 in the header. If so, set it to 0
+
 #define TIME_TIGHT_LOOP(clock, iterations, op)                               \
 	do {                                                                 \
 		LM_START_TIMING(loop, clock);                                \

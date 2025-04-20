@@ -106,13 +106,12 @@ PgRun(void *Arg)
     SdbBarrierWait(&Ctx->Barrier);
     SdbLogInfo("Exited barrier. Starting main loop");
 
-    u64             PgFailCounter  = 0;
-    u64             TimeoutCounter = 0;
-    struct timespec LoopStart, CopyStart, CopyEnd, TimeDiff;
-    static u64      TotalInsertedItems = 0;
+    u64        PgFailCounter      = 0;
+    u64        TimeoutCounter     = 0;
+    static u64 TotalInsertedItems = 0;
+    SdhsArena *Buf                = NULL;
     SdbLogDebug("Item count/buf: %lu\n", Pipe->ItemMaxCount);
 
-    SdbTimeMonotonic(&LoopStart);
     while(!SdbShouldShutdown()) {
         struct epoll_event Events[1];
         int                EpollRet = epoll_wait(EpollFd, Events, 1, SDB_TIME_MS(100));
@@ -142,7 +141,6 @@ PgRun(void *Arg)
         }
 
         if(Events[0].events & EPOLLIN) {
-            SdhsArena *Buf = NULL;
             while((Buf = SdPipeGetReadBuffer(Pipe)) != NULL) {
                 SdbAssert(Buf->cur % Pipe->PacketSize == 0,
                           "Pipe does not contain a multiple of the packet size");
@@ -152,17 +150,8 @@ PgRun(void *Arg)
                             TotalInsertedItems);
                 TotalInsertedItems += ItemCount;
 
-                SdbTimeMonotonic(&CopyStart);
                 sdb_errno InsertRet
                     = PgInsertData(Conn, TableInfo, (const char *)Buf->mem, ItemCount);
-                SdbTimeMonotonic(&CopyEnd);
-
-                SdbTimePrintSpecDiffWT(&CopyStart, &CopyEnd, &TimeDiff);
-                SdbLogDebug("Copy transaction time: %ld.%09ld ", TimeDiff.tv_sec, TimeDiff.tv_nsec);
-
-                SdbTimePrintSpecDiffWT(&LoopStart, &CopyEnd, &TimeDiff);
-                SdbLogDebug("Time since loop start: %ld.%09ld\n", TimeDiff.tv_sec,
-                            TimeDiff.tv_nsec);
 
                 if(TotalInsertedItems >= 1e6) {
                     break;
@@ -183,7 +172,6 @@ PgRun(void *Arg)
         }
     }
 
-    SdbLogDebug("Total time in loop: %ld.%09ld\n", TimeDiff.tv_sec, TimeDiff.tv_nsec);
 
     PQfinish(PgCtx->DbConn);
     close(EpollFd);

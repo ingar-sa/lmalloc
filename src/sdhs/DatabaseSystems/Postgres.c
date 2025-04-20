@@ -206,6 +206,7 @@ postgres_ctx *
 PgPrepareCtx(SdhsArena *PgArena, sensor_data_pipe *Pipe)
 {
     sdb_errno        Errno   = 0;
+    postgres_ctx    *PgCtx   = NULL;
     SdhsArenaScratch Scratch = ScratchGet(NULL, 0);
 
     // TODO(ingar): Make pg config a json file??
@@ -228,9 +229,9 @@ PgPrepareCtx(SdhsArena *PgArena, sensor_data_pipe *Pipe)
         goto cleanup;
     }
 
-    u64           SensorCount = (u64)cJSON_GetArraySize(SensorSchemaArray);
-    postgres_ctx *PgCtx       = ArenaPushStruct(PgArena, postgres_ctx);
-    PgCtx->TablesInfo         = ArenaPushArray(PgArena, pg_table_info *, SensorCount);
+    u64 SensorCount   = (u64)cJSON_GetArraySize(SensorSchemaArray);
+    PgCtx             = ArenaPushStruct(PgArena, postgres_ctx);
+    PgCtx->TablesInfo = ArenaPushArray(PgArena, pg_table_info *, SensorCount);
 
     const char *ConnInfo = (const char *)ConfFile->Data;
     PgCtx->DbConn        = PQconnectdb(ConnInfo);
@@ -345,7 +346,7 @@ cleanup:
     if(SchemaConf != NULL) {
         cJSON_Delete(SchemaConf);
     }
-    if(Errno != 0) {
+    if(Errno != 0 && PgCtx != NULL) {
         PQfinish(PgCtx->DbConn);
     }
 

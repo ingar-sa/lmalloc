@@ -108,7 +108,7 @@ DumpProcessMemory(int SignalNum, siginfo_t *Info)
              "Process ID: %d\n\n",
              ctime(&Now), SignalNum, ThreadId, ThreadName, Info->si_addr, getpid());
 
-    write(DumpFd, Header, strlen(Header));
+    ssize_t ignore = write(DumpFd, Header, strlen(Header));
 
     void  *Backtrace[BACKTRACE_SIZE];
     int    BacktraceSize    = backtrace(Backtrace, BACKTRACE_SIZE);
@@ -133,8 +133,9 @@ DumpProcessMemory(int SignalNum, siginfo_t *Info)
 
             if(sscanf(Line, "%lx-%lx %4s", &Start, &End, Perms) == 3) {
                 if(strchr(Perms, 'r')) {
-                    write(DumpFd, "\n--- Region: ", 12);
-                    write(DumpFd, Line, strlen(Line));
+                    ignore = write(DumpFd, "\n--- Region: ", 12);
+                    ignore = write(DumpFd, Line, strlen(Line));
+                    (void)ignore;
 
                     if((End - Start) < 1024 * 1024) { // 1MB limit per region
                         if(write(DumpFd, (void *)Start, End - Start) == -1) {
