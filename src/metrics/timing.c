@@ -1,4 +1,5 @@
 #include <src/lm.h>
+LM_LOG_REGISTER(timing);
 
 #include "timing.h"
 
