@@ -4,6 +4,7 @@
 #include <src/lm.h>
 #include <src/allocators/u_arena.h>
 #include <src/metrics/timing.h>
+#include <src/allocators/allocator_wrappers.h>
 
 // NOTE: (isa): Start structs created by claude
 // 77 bytes - not aligned to 8-byte boundary
@@ -93,17 +94,19 @@ typedef struct {
 // NOTE: (isa): End structs created by Claude
 
 // NOTE: (isa): Start arrays created by Claude
-static size_t small_sizes[16] = { 8,  13, 16, 27, 32,  45,  56,	 64,
-				  71, 80, 91, 96, 103, 112, 125, 128 };
+static size_t small_sizes[] = { 8,  13, 16, 27, 32,  45,  56,  64,
+				71, 80, 91, 96, 103, 112, 125, 128 };
 
-static size_t medium_sizes[16] = { 256,	 300,  378,  512,  768,	 818,
-				   1000, 1024, 1359, 1700, 2000, 2048,
-				   2222, 2918, 3875, 4096 };
+static size_t medium_sizes[] = {
+	256,  300,  378,  512,	768,  818,  1000, 1024,
+	1359, 1700, 2000, 2048, 2222, 2918, 3875, 4096
+};
 
-static size_t large_sizes[16] = {
+static size_t large_sizes[] = {
 	LmKibiByte(16) + 35, /* ~16 KB (unaligned) */
 	LmKibiByte(32), /* 32 KB (aligned) */
 	LmKibiByte(64) + 127, /* ~64 KB (unaligned) */
+#if 0
 	LmKibiByte(128), /* 128 KB (aligned) */
 	LmKibiByte(256) + 511, /* ~256 KB (unaligned) */
 	LmKibiByte(512), /* 512 KB (aligned) */
@@ -117,6 +120,7 @@ static size_t large_sizes[16] = {
 	LmKibiByte(6144), /* 6 MB (aligned) */
 	LmKibiByte(7168) + 4095, /* ~7 MB (unaligned) */
 	LmKibiByte(8192) /* 8 MB (aligned) */
+#endif
 };
 // NOTE: (isa): End arrays created by Claude
 

@@ -32,42 +32,20 @@ uint64_t get_and_clear_malloc_timing(void);
 uint64_t get_and_clear_calloc_timing(void);
 uint64_t get_and_clear_realloc_timing(void);
 uint64_t get_and_clear_free_timing(void);
-uint64_t get_and_clear_u_alloc_timing(void);
-uint64_t get_and_clear_u_zalloc_timing(void);
-uint64_t get_and_clear_u_falloc_timing(void);
-uint64_t get_and_clear_u_fzalloc_timing(void);
-uint64_t get_and_clear_u_realloc_timing(void);
+uint64_t get_and_clear_ua_alloc_timing(void);
+uint64_t get_and_clear_ua_zalloc_timing(void);
+uint64_t get_and_clear_ua_falloc_timing(void);
+uint64_t get_and_clear_ua_fzalloc_timing(void);
+uint64_t get_and_clear_ua_realloc_timing(void);
 
-#define TIME_U_ARENA 1
-#define TIME_MALLOC 1
+uint64_t get_and_clear_malloc_iterations(void);
+uint64_t get_and_clear_calloc_iterations(void);
+uint64_t get_and_clear_realloc_iterations(void);
+uint64_t get_and_clear_free_iterations(void);
+uint64_t get_and_clear_ua_alloc_iterations(void);
+uint64_t get_and_clear_ua_zalloc_iterations(void);
+uint64_t get_and_clear_ua_falloc_iterations(void);
+uint64_t get_and_clear_ua_fzalloc_iterations(void);
+uint64_t get_and_clear_ua_realloc_iterations(void);
 
-#if TIME_U_ARENA == 0
-static const alloc_fn_t ua_alloc_functions[] = { ua_alloc_wrapper_timed,
-						 ua_zalloc_wrapper_timed,
-						 ua_falloc_wrapper_timed,
-						 ua_fzalloc_wrapper_timed };
-static const free_fn_t ua_free_functions[] = { ua_free_wrapper };
-static const realloc_fn_t ua_realloc_functions[] = { ua_realloc_wrapper_timed };
-#else
-static const alloc_fn_t ua_alloc_functions[] = { ua_alloc, ua_zalloc, ua_falloc,
-						 ua_fzalloc };
-static const free_fn_t ua_free_functions[] = { ua_free_wrapper };
-static const realloc_fn_t ua_realloc_functions[] = { ua_realloc_wrapper };
-#endif
-
-#if TIME_MALLOC == 0
-static const alloc_fn_t malloc_and_fam[] = { malloc_wrapper_timed,
-					     calloc_wrapper_timed };
-static const free_fn_t free_functions[] = { free_wrapper_timed };
-static const realloc_fn_t realloc_functions[] = { realloc_wrapper_timed };
-#else
-static const alloc_fn_t malloc_and_fam[] = { malloc_wrapper, calloc_wrapper };
-static const free_fn_t free_functions[] = { free_wrapper };
-static const realloc_fn_t realloc_functions[] = { realloc_wrapper };
-#endif
-
-static const char *ua_alloc_function_names[] = { "alloc", "zalloc", "falloc",
-						 "fzalloc" };
-
-static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
 #endif

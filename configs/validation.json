@@ -5,7 +5,7 @@
         "sub_suites": "NONE",
         "iterations": 1,
         "options": "NONE",
-        "debugger": false,
+        "debugger": true,
         "tests": [
             {
                 "name": "u_arena_m_c",
@@ -45,7 +45,7 @@
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": true,
-                    "alloc_iterations": 1000,
+                    "alloc_iterations": 10000,
                     "log_filename": "./logs/u_arena_nm_c.txt"
                 }
             },
@@ -69,7 +69,7 @@
                 "options": "NONE",
                 "ctx":
                 {
-                    "alloc_iterations": 1000,
+                    "alloc_iterations": 100000,
                     "log_filename": "./logs/malloc.txt"
                 }
             }

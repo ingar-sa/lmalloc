@@ -290,18 +290,18 @@ void network_test(UArena *ua, alloc_fn_t alloc_fn, const char *alloc_fn_name,
 	if (ua) {
 		uint64_t alloc_timing = 0;
 		if (alloc_fn == ua_alloc_wrapper_timed) {
-			alloc_timing = get_and_clear_u_alloc_timing();
+			alloc_timing = get_and_clear_ua_alloc_timing();
 		} else if (alloc_fn == ua_zalloc_wrapper_timed) {
-			alloc_timing = get_and_clear_u_zalloc_timing();
+			alloc_timing = get_and_clear_ua_zalloc_timing();
 		} else if (alloc_fn == ua_falloc_wrapper_timed) {
-			alloc_timing = get_and_clear_u_falloc_timing();
+			alloc_timing = get_and_clear_ua_falloc_timing();
 		} else if (alloc_fn == ua_fzalloc_wrapper_timed) {
-			alloc_timing = get_and_clear_u_fzalloc_timing();
+			alloc_timing = get_and_clear_ua_fzalloc_timing();
 		}
 		lm_log_tsc_timing(alloc_timing,
 				  "Total time spent in alloc: ", MS, false, DBG,
 				  LM_LOG_MODULE_LOCAL);
-		lm_log_tsc_timing(get_and_clear_u_realloc_timing(),
+		lm_log_tsc_timing(get_and_clear_ua_realloc_timing(),
 				  "Total time spent in realloc: ", MS, false,
 				  DBG, LM_LOG_MODULE_LOCAL);
 		LmLogDebug("Arena memory use: %zd", ua->cur);

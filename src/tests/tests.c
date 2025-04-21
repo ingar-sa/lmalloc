@@ -14,6 +14,39 @@ LM_LOG_REGISTER(tests);
 #include <stddef.h>
 #include <sys/wait.h>
 
+#define TIME_U_ARENA 1
+#define TIME_MALLOC 1
+
+#if TIME_U_ARENA == 1
+static const alloc_fn_t ua_alloc_functions[] = { ua_alloc_wrapper_timed,
+						 ua_zalloc_wrapper_timed,
+						 ua_falloc_wrapper_timed,
+						 ua_fzalloc_wrapper_timed };
+static const free_fn_t ua_free_functions[] = { ua_free_wrapper };
+static const realloc_fn_t ua_realloc_functions[] = { ua_realloc_wrapper_timed };
+#else
+static const alloc_fn_t ua_alloc_functions[] = { ua_alloc, ua_zalloc, ua_falloc,
+						 ua_fzalloc };
+static const free_fn_t ua_free_functions[] = { ua_free_wrapper };
+static const realloc_fn_t ua_realloc_functions[] = { ua_realloc_wrapper };
+#endif
+
+#if TIME_MALLOC == 1
+static const alloc_fn_t malloc_and_fam[] = { malloc_wrapper_timed,
+					     calloc_wrapper_timed };
+static const free_fn_t free_functions[] = { free_wrapper_timed };
+static const realloc_fn_t realloc_functions[] = { realloc_wrapper_timed };
+#else
+static const alloc_fn_t malloc_and_fam[] = { malloc_wrapper, calloc_wrapper };
+static const free_fn_t free_functions[] = { free_wrapper };
+static const realloc_fn_t realloc_functions[] = { realloc_wrapper };
+#endif
+
+static const char *ua_alloc_function_names[] = { "alloc", "zalloc", "falloc",
+						 "fzalloc" };
+
+static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
+
 static void run_tight_loop_test(struct u_arena_test_params *u_arena_params,
 				uint alloc_iterations, alloc_fn_t alloc_fn,
 				const char *alloc_fn_name, size_t *alloc_sizes,
@@ -61,6 +94,7 @@ static void run_tight_loop_test_all_sizes(struct u_arena_test_params *params,
 					  const char *log_filename,
 					  const char *file_mode)
 {
+#if 0
 	if (iterations > 1000) {
 		LmLogWarning(
 			"%u iterations will allocate a lot of memory. Setting 'iterations'"
@@ -68,7 +102,7 @@ static void run_tight_loop_test_all_sizes(struct u_arena_test_params *params,
 			iterations);
 		iterations = 1000;
 	}
-
+#endif
 	if (!running_in_debugger) {
 		run_tight_loop_test_forked(params, iterations, alloc_fn,
 					   alloc_fn_name, small_sizes,
