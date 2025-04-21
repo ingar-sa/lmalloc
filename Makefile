@@ -50,7 +50,7 @@ release: CFLAGS = $(RELEASE_FLAGS) $(LM_RELEASE_FLAGS) $(SDHS_RELEASE_FLAGS)
 release: build_suite
 
 run:
-	./build/$(PROGRAM_NAME)
+	taskset -c 0 ./build/$(PROGRAM_NAME)
 
 docs:
 	@echo "Generating documentation..."
