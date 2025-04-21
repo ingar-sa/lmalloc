@@ -5,7 +5,9 @@
  * including connection management, event handling, and performance monitoring.
  */
 
+#include <src/allocators/allocator_wrappers.h>
 #include <src/allocators/sdhs_arena.h>
+#include <src/metrics/timing.h>
 
 #include <signal.h>
 #include <sys/epoll.h>
@@ -176,7 +178,6 @@ PgRun(void *Arg)
     PQfinish(PgCtx->DbConn);
     close(EpollFd);
     ArenaDestroy(&PgArena);
-
     SdbLogDebug("Postgres loop finished. Exiting");
 
     return Ret;

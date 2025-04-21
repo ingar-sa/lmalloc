@@ -188,6 +188,10 @@ void lm_log_tsc_timing(uint64_t tsc, const char *description,
 		       enum time_stamp_fmt stamp_fmt, bool log_raw,
 		       enum lm_log_level log_level, lm_log_module *log_module);
 
+void lm_print_tsc_timing_avg(uint64_t timing, uint64_t count,
+			     const char *description,
+			     enum time_stamp_fmt stamp_fmt);
+
 void lm_log_tsc_timing_avg(uint64_t tsc_timing, long long count,
 			   const char *description,
 			   enum time_stamp_fmt stamp_fmt, bool log_raw,

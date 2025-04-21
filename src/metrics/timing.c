@@ -308,6 +308,30 @@ void lm_log_tsc_timing_avg(uint64_t tsc_timing, long long count,
 		    description, timing_str, tsc_timing, timing_ns, count);
 }
 
+void lm_print_tsc_timing_avg(uint64_t tsc_timing, uint64_t count,
+			     const char *description,
+			     enum time_stamp_fmt stamp_fmt)
+{
+	char timing_str[64];
+	double tsc_freq = calibrate_tsc();
+
+	uint64_t timing_ns = TscToNs(tsc_timing, tsc_freq);
+
+	double avg = (double)timing_ns / (double)count;
+	enum time_stamp_fmt adjusted_fmt = stamp_fmt;
+	if (avg < 1000.0 && stamp_fmt != NS) {
+		adjusted_fmt = NS;
+	} else if (avg < 1000000.0 && stamp_fmt != NS && stamp_fmt != US) {
+		adjusted_fmt = US;
+	}
+
+	format_tsc_timing((uint64_t)(avg * (tsc_freq / 1e9)), adjusted_fmt,
+			  timing_str);
+
+	printf("%s%s (total: %lu cycles ≈ %lu ns, count: %lu)", description,
+	       timing_str, tsc_timing, timing_ns, count);
+}
+
 int lm_compare_tsc_timing(uint64_t t1, uint64_t t2, struct timing_comp *tc)
 {
 	if (t1 == t2) {

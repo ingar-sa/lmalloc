@@ -10,7 +10,9 @@ SDB_LOG_REGISTER(ThreadGroup);
 #include <src/sdhs/Common/Time.h>
 #include <src/sdhs/Signals.h>
 
+#include <src/allocators/allocator_wrappers.h>
 #include <src/allocators/sdhs_arena.h>
+#include <src/metrics/timing.h>
 
 tg_manager *
 TgCreateManager(tg_group **Groups, u64 GroupCount, SdhsArena *A)
@@ -205,6 +207,11 @@ TgManagerWaitForAll(tg_manager *Manager)
         SdbLogInfo("Shutdown requested, marking remaining groups as completed");
         Manager->CompletedCount = Manager->GroupCount;
     }
+
+    uint64_t alloc_time = get_and_clear_ua_alloc_timing();
+    uint64_t alloc_iter = get_and_clear_ua_alloc_iterations();
+    lm_print_tsc_timing_avg(alloc_time, alloc_iter, "Average time spent in alloc: ", NS);
+
 
     SdbLogInfo("All groups have completed or shutdown requested");
     SdbMutexUnlock(&Manager->Mutex);

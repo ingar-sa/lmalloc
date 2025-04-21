@@ -12,6 +12,7 @@
 #if SDHS_TEST_U_ARENA == 1
 
 #include "u_arena.h"
+#include "allocator_wrappers.h"
 
 typedef UArena SdhsArena;
 typedef UArenaScratch SdhsArenaScratch;
@@ -29,7 +30,7 @@ typedef UArenaScratch SdhsArenaScratch;
 #define ArenaDestroy(uap) ua_destroy(uap)
 #define ArenaBootstrap(ua, new_existing, cap, alignment) \
 	ua_bootstrap(ua, new_existing, cap, alignment)
-#define ArenaAlloc(ua, size) ua_alloc(ua, size)
+#define ArenaAlloc(ua, size) ua_alloc_wrapper_timed(ua, size)
 #define ArenaZalloc(ua, size) ua_zalloc(ua, size)
 #define ArenaFalloc(ua, size) ua_falloc(ua, size)
 #define ArenaFzalloc(ua, size) ua_fzalloc(ua, size)
