@@ -7,7 +7,7 @@
                 "enabled": false,
                 "ctx": 
                 {
-                    "arena_sz": "512kB",
+                    "arena_sz": "4gB",
                     "alignment": 16,
                     "mallocd": true,
                     "contiguous": true,
@@ -20,7 +20,7 @@
                 "enabled": false,
                 "ctx": 
                 {
-                    "arena_sz": "512kB",
+                    "arena_sz": "4gB",
                     "alignment": 16,
                     "mallocd": true,
                     "contiguous": false,
@@ -33,7 +33,7 @@
                 "enabled": false,
                 "ctx": 
                 {
-                    "arena_sz": "64gB",
+                    "arena_sz": "4gB",
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": true,
@@ -46,7 +46,7 @@
                 "enabled": false,
                 "ctx": 
                 {
-                    "arena_sz": "512kB",
+                    "arena_sz": "4gB",
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": false,

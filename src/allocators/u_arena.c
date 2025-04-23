@@ -235,6 +235,23 @@ inline size_t ua_reserve(UArena *ua, size_t sz)
 	}
 }
 
+LmString ua_info_string(UArena *ua, UArena *string_allocator)
+{
+	LmString info_string =
+		lm_string_make("\tUArena info:\n", string_allocator);
+	lm_string_append_fmt(info_string,
+			     "\tContiguous:   %s\n"
+			     "\tMallocd:      %s\n"
+			     "\tBootstrapped: %s\n"
+			     "\tAlignment:    %zd\n"
+			     "\tCap:          %zd",
+			     LmBoolToString(UaIsContiguous(ua->flags)),
+			     LmBoolToString(UaIsMallocd(ua->flags)),
+			     LmBoolToString(UaIsBootstrapped(ua->flags)),
+			     ua->alignment, ua->cap);
+	return info_string;
+}
+
 void ua__thread_arenas_init__(UArena *ta_buf[], struct ua__thread_arenas__ *tas,
 			      struct ua__thread_arenas__ **ta_instance)
 {
@@ -258,16 +275,16 @@ int ua__thread_arenas_add__(UArena *a, struct ua__thread_arenas__ *ta_instance)
 	return 1;
 }
 
-UArenaScratch ua_scratch_begin(UArena *ua)
+UAScratch ua_scratch_begin(UArena *ua)
 {
-	UArenaScratch uas;
+	UAScratch uas;
 	uas.ua = ua;
 	uas.f5 = ua->cur;
 	return uas;
 }
 
-UArenaScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
-				struct ua__thread_arenas__ *tas)
+UAScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
+			    struct ua__thread_arenas__ *tas)
 {
 	UArena *ua = NULL;
 	if (conflict_count > 0) {
@@ -283,10 +300,10 @@ UArenaScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
 		ua = tas->uas[0];
 	}
 exit:
-	return (ua == NULL) ? (UArenaScratch){ 0 } : ua_scratch_begin(ua);
+	return (ua == NULL) ? (UAScratch){ 0 } : ua_scratch_begin(ua);
 }
 
-void ua__scratch_release__(UArenaScratch uas)
+void ua__scratch_release__(UAScratch uas)
 {
 	ua_seek(uas.ua, uas.f5);
 }
