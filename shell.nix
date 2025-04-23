@@ -2,6 +2,7 @@
 
 pkgs.mkShell {
   buildInputs = with pkgs; [
+    gdb
     gcc13
     clang-tools
     bear
