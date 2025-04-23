@@ -305,6 +305,7 @@ void *lm_memset_s(void *s, int c, size_t n);
 
 typedef char *LmString;
 typedef struct {
+	UArena *ua;
 	size_t len;
 	size_t cap;
 } LmStringHeader;
@@ -315,10 +316,10 @@ size_t lm_string_space_avail(LmString string);
 size_t lm_string_alloc_sz(LmString string);
 
 LmString lm_string_make_space(LmString string, size_t add_len);
-LmString lm_string_make(const char *string);
+LmString lm_string_make(const char *string, UArena *ua);
 void lm_string_free(LmString string);
 
-LmString lm_string_dup(const LmString string);
+LmString lm_string_dup(const LmString string, UArena *ua);
 void lm_string_clear(LmString string);
 LmString lm_string_set(LmString string, const char *c_string);
 void lm_string_backspace(LmString string, size_t n);
@@ -698,15 +699,17 @@ static void lm__string_set_cap__(LmString string, size_t cap)
 }
 
 // NOTE: (isa): Modified by Claude
-static LmString lm__string_make__(const void *init_string, size_t len)
+static LmString lm__string_make__(const void *init_string, size_t len,
+				  UArena *ua)
 {
-	char *mem = malloc(sizeof(LmStringHeader) + len + 1);
+	char *mem = ua_zalloc(ua, (sizeof(LmStringHeader) + len + 1));
 	if (mem == NULL)
 		return NULL;
 
 	LmStringHeader *header = (LmStringHeader *)((uintptr_t)mem);
 	LmString string = mem + sizeof(LmStringHeader);
 
+	header->ua = ua;
 	header->len = len;
 	header->cap = len;
 
@@ -717,23 +720,20 @@ static LmString lm__string_make__(const void *init_string, size_t len)
 	return string;
 }
 
-LmString lm_string_make(const char *string)
+LmString lm_string_make(const char *string, UArena *ua)
 {
 	size_t Len = (string != NULL) ? strlen(string) : 0;
-	return lm__string_make__(string, Len);
+	return lm__string_make__(string, Len, ua);
 }
 
 void lm_string_free(LmString string)
 {
-	if (string != NULL) {
-		LmStringHeader *h = LM_STRING_HEADER(string);
-		free(h);
-	}
+	(void)string;
 }
 
-LmString lm_string_dup(const LmString string)
+LmString lm_string_dup(const LmString string, UArena *ua)
 {
-	return lm__string_make__(string, lm_string_len(string));
+	return lm__string_make__(string, lm_string_len(string), ua);
 }
 
 void lm_string_clear(LmString string)
@@ -753,18 +753,15 @@ LmString lm_string_make_space(LmString string, size_t add_len)
 {
 	size_t available = lm_string_space_avail(string);
 	if (available < add_len) {
-		LmStringHeader *header = LM_STRING_HEADER(string);
-		size_t new_sz = sizeof(LmStringHeader) + header->cap + add_len;
-
-		LmStringHeader *new_string = realloc(header, new_sz);
-		if (new_string == NULL)
+		UArena *ua = LM_STRING_HEADER(string)->ua;
+		size_t reserved = ua_reserve(ua, add_len);
+		if (reserved < add_len)
 			return NULL;
 
-		size_t new_cap = new_string->cap + add_len;
-		string =
-			(LmString)((char *)new_string + sizeof(LmStringHeader));
+		size_t new_cap = lm_string_cap(string) + add_len;
 		lm__string_set_cap__(string, new_cap);
 	}
+
 	return string;
 }
 
@@ -826,7 +823,7 @@ bool lm_strings_are_equal(LmString lhs, LmString rhs)
 	if (l_string_len != r_string_len) {
 		return false;
 	} else {
-		return memcmp(lhs, rhs, l_string_len);
+		return (0 == memcmp(lhs, rhs, l_string_len));
 	}
 }
 ////////////////////////////////////////
