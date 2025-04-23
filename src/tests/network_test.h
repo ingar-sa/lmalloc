@@ -60,7 +60,10 @@ typedef struct Disk {
 	File *files;
 } Disk;
 
-void network_test(UArena *a, alloc_fn_t alloc_fn, const char *alloc_fn_name,
-		  free_fn_t free_fn, realloc_fn_t realloc_fn, uint iterations,
-		  const char *log_filename, const char *file_mode);
+void network_test(struct ua_params *ua_params, alloc_fn_t alloc_fn,
+		  const char *alloc_fn_name, free_fn_t free_fn,
+		  realloc_fn_t realloc_fn, uint64_t iterations,
+		  bool running_in_debugger, const char *log_filename,
+		  const char *file_mode);
+
 #endif

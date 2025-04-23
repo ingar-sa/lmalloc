@@ -5,6 +5,7 @@
 #include <src/allocators/u_arena.h>
 #include <src/metrics/timing.h>
 #include <src/allocators/allocator_wrappers.h>
+#include <src/cJSON/cJSON.h>
 
 // NOTE: (isa): Start structs created by claude
 // 77 bytes - not aligned to 8-byte boundary
@@ -123,5 +124,21 @@ static size_t large_sizes[] = {
 #endif
 };
 // NOTE: (isa): End arrays created by Claude
+
+typedef int (*test_fn_t)(void *ctx, bool running_in_debugger);
+
+struct test_definition {
+	test_fn_t test;
+	const char *test_name;
+};
+
+int run_tests(cJSON *conf);
+
+struct ua_params {
+	size_t arena_sz;
+	size_t alignment;
+	bool contiguous;
+	bool mallocd;
+};
 
 #endif

@@ -8,6 +8,10 @@ LM_LOG_REGISTER(network_test);
 
 #include "network_test.h"
 
+#include <stddef.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+
 static void cpy_from_precord(PersonRecord *precord, void *to,
 			     uint32_t sequence_number)
 {
@@ -192,15 +196,10 @@ static void free_disk(Disk *disk, UArena *ua, free_fn_t free)
 	free(ua, disk);
 }
 
-void network_test(UArena *ua, alloc_fn_t alloc_fn, const char *alloc_fn_name,
-		  free_fn_t free_fn, realloc_fn_t realloc_fn, uint iterations,
-		  const char *log_filename, const char *file_mode)
+static void run_network_test(UArena *ua, uint64_t iterations,
+			     alloc_fn_t alloc_fn, realloc_fn_t realloc_fn,
+			     free_fn_t free_fn)
 {
-	FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
-	LmSetLogFileLocal(log_file);
-	LmLogDebugR("\n------------------------------");
-	LmLogDebug("%s  -- network test", alloc_fn_name);
-
 	// TODO: (isa): Log total memory use
 	LM_START_TIMING(network_test, PROC_CPUTIME);
 
@@ -273,59 +272,116 @@ void network_test(UArena *ua, alloc_fn_t alloc_fn, const char *alloc_fn_name,
 	LM_END_TIMING(free_disk, PROC_CPUTIME);
 
 	LM_END_TIMING(network_test, PROC_CPUTIME);
-	LM_LOG_TIMING(network_test, "Timing for network test: ", MS, false, INF,
-		      LM_LOG_MODULE_LOCAL);
-	LM_LOG_TIMING(main_loop, "Timing for main loop: ", MS, false, INF,
-		      LM_LOG_MODULE_LOCAL);
-	lm_log_timing(new_account_total, "Time spent adding new accounts: ", MS,
-		      false, INF, LM_LOG_MODULE_LOCAL);
-	lm_log_timing(save_to_disk_total, "Time spent saving to disk: ", MS,
-		      false, INF, LM_LOG_MODULE_LOCAL);
-	LM_LOG_TIMING(free_account_list,
-		      "Timing for freeing account list: ", MS, false, INF,
-		      LM_LOG_MODULE_LOCAL);
-	LM_LOG_TIMING(free_disk, "Timing for freeing disk: ", MS, false, INF,
-		      LM_LOG_MODULE_LOCAL);
+
+	uint64_t alloc_timing = 0;
+	uint64_t realloc_timing = 0;
+	uint64_t free_timing = 0;
+	if (alloc_fn == ua_alloc_wrapper_timed) {
+		alloc_timing = get_and_clear_ua_alloc_timing();
+	} else if (alloc_fn == ua_zalloc_wrapper_timed) {
+		alloc_timing = get_and_clear_ua_zalloc_timing();
+	} else if (alloc_fn == ua_falloc_wrapper_timed) {
+		alloc_timing = get_and_clear_ua_falloc_timing();
+	} else if (alloc_fn == ua_fzalloc_wrapper_timed) {
+		alloc_timing = get_and_clear_ua_fzalloc_timing();
+	} else if (alloc_fn == malloc_wrapper_timed)
+		alloc_timing = get_and_clear_malloc_timing();
+	else if (alloc_fn == calloc_wrapper_timed)
+		alloc_timing = get_and_clear_calloc_timing();
+	else
+		alloc_timing = 0;
 
 	if (ua) {
-		uint64_t alloc_timing = 0;
-		if (alloc_fn == ua_alloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_alloc_timing();
-		} else if (alloc_fn == ua_zalloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_zalloc_timing();
-		} else if (alloc_fn == ua_falloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_falloc_timing();
-		} else if (alloc_fn == ua_fzalloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_fzalloc_timing();
-		}
-		lm_log_tsc_timing(alloc_timing,
-				  "Total time spent in alloc: ", MS, false, DBG,
-				  LM_LOG_MODULE_LOCAL);
-		lm_log_tsc_timing(get_and_clear_ua_realloc_timing(),
-				  "Total time spent in realloc: ", MS, false,
-				  DBG, LM_LOG_MODULE_LOCAL);
-		LmLogDebug("Arena memory use: %zd", ua->cur);
+		LmLogDebugR("Arena memory use: %zd\n", ua->cur);
+		realloc_timing = get_and_clear_ua_realloc_timing();
 		ua_free(ua);
 	} else {
-		uint64_t alloc_timing, realloc_timing, free_timing;
-		if (alloc_fn == malloc_wrapper_timed)
-			alloc_timing = get_and_clear_malloc_timing();
-		else if (alloc_fn == calloc_wrapper_timed)
-			alloc_timing = get_and_clear_calloc_timing();
-		else
-			alloc_timing = 0;
 		realloc_timing = get_and_clear_realloc_timing();
 		free_timing = get_and_clear_free_timing();
-		lm_log_tsc_timing(alloc_timing,
-				  "Total time spent in alloc: ", MS, false, DBG,
-				  LM_LOG_MODULE_LOCAL);
-		lm_log_tsc_timing(realloc_timing,
-				  "Total time spent in realloc: ", MS, false,
-				  DBG, LM_LOG_MODULE_LOCAL);
-		lm_log_tsc_timing(free_timing, "Total time spent in free: ", MS,
-				  false, DBG, LM_LOG_MODULE_LOCAL);
 	}
 
-	LmRemoveLogFileLocal();
-	lm_close_file(log_file);
+	LM_LOG_TIMING(network_test, "Timing for network test: ", MS, true, INF,
+		      LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+	LM_LOG_TIMING(main_loop, "Timing for main loop: ", MS, true, INF,
+		      LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+	lm_log_timing(new_account_total, "Time spent adding new accounts: ", MS,
+		      true, INF, LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+	lm_log_timing(save_to_disk_total, "Time spent saving to disk: ", MS,
+		      true, INF, LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+	LM_LOG_TIMING(free_account_list,
+		      "Timing for freeing account list: ", MS, true, INF,
+		      LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+	LM_LOG_TIMING(free_disk, "Timing for freeing disk: ", MS, true, INF,
+		      LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+
+	lm_log_tsc_timing(alloc_timing, "Total time spent in alloc: ", MS, true,
+			  DBG, LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+	lm_log_tsc_timing(realloc_timing, "Total time spent in realloc: ", MS,
+			  true, DBG, LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+	lm_log_tsc_timing(free_timing, "Total time spent in free: ", MS, true,
+			  DBG, LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+}
+
+void network_test(struct ua_params *u_arena_params, alloc_fn_t alloc_fn,
+		  const char *alloc_fn_name, free_fn_t free_fn,
+		  realloc_fn_t realloc_fn, uint64_t iterations,
+		  bool running_in_debugger, const char *log_filename,
+		  const char *file_mode)
+{
+	if (!running_in_debugger) {
+		pid_t pid;
+		int status;
+		if ((pid = fork()) == 0) {
+			FILE *log_file =
+				lm_open_file_by_name(log_filename, file_mode);
+			LmSetLogFileLocal(log_file);
+			LmLogDebugR("\n\n------------------------------\n");
+			LmLogDebug("%s  -- network test\n", alloc_fn_name);
+
+			UArena *ua = NULL;
+			if (u_arena_params)
+				ua = ua_create(u_arena_params->arena_sz,
+					       u_arena_params->contiguous,
+					       u_arena_params->mallocd,
+					       u_arena_params->alignment);
+
+			run_network_test(ua, iterations, alloc_fn, realloc_fn,
+					 free_fn);
+			if (ua)
+				ua_destroy(&ua);
+			LmRemoveLogFileLocal();
+			lm_close_file(log_file);
+			exit(EXIT_SUCCESS);
+		} else {
+			waitpid(pid, &status, 0);
+		}
+	} else {
+		FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
+		LmSetLogFileLocal(log_file);
+		LmLogDebugR("\n\n------------------------------\n");
+		LmLogDebug("%s  -- network test\n", alloc_fn_name);
+
+		UArena *ua = NULL;
+		if (u_arena_params)
+			ua = ua_create(u_arena_params->arena_sz,
+				       u_arena_params->contiguous,
+				       u_arena_params->mallocd,
+				       u_arena_params->alignment);
+
+		run_network_test(ua, iterations, alloc_fn, realloc_fn, free_fn);
+
+		if (ua)
+			ua_destroy(&ua);
+		LmRemoveLogFileLocal();
+		lm_close_file(log_file);
+	}
 }

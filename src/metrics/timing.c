@@ -280,7 +280,7 @@ void lm_log_tsc_timing(uint64_t tsc, const char *description,
 		    timing_str);
 }
 
-void lm_log_tsc_timing_avg(uint64_t tsc_timing, long long count,
+void lm_log_tsc_timing_avg(uint64_t tsc_timing, uint64_t count,
 			   const char *description,
 			   enum time_stamp_fmt stamp_fmt, bool log_raw,
 			   enum lm_log_level log_level,
@@ -304,7 +304,7 @@ void lm_log_tsc_timing_avg(uint64_t tsc_timing, long long count,
 			  timing_str);
 
 	LmLogManual(log_module, log_raw, log_level,
-		    "%s%s (total: %lu cycles ≈ %lu ns, count: %lld)",
+		    "%s%s\n(total: %lu cycles ≈ %lu ns, count: %lu)",
 		    description, timing_str, tsc_timing, timing_ns, count);
 }
 
@@ -328,7 +328,7 @@ void lm_print_tsc_timing_avg(uint64_t tsc_timing, uint64_t count,
 	format_tsc_timing((uint64_t)(avg * (tsc_freq / 1e9)), adjusted_fmt,
 			  timing_str);
 
-	printf("%s%s (total: %lu cycles ≈ %lu ns, count: %lu)", description,
+	printf("%s%s\n(total: %lu cycles ≈ %lu ns, count: %lu)", description,
 	       timing_str, tsc_timing, timing_ns, count);
 }
 
