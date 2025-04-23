@@ -1,9 +1,7 @@
 #ifndef SDHS_ARENA_H
 #define SDHS_ARENA_H
 
-// NOTE: (isa): This file can only use relative paths for its includes of project files
-// due to sdhs being compiled separately and having conflicting include paths with the validation
-#include "../lm.h"
+#include <src/lm.h>
 
 #ifndef SDHS_TEST_U_ARENA
 #define SDHS_TEST_U_ARENA 1
@@ -21,23 +19,14 @@ typedef UArenaScratch SdhsArenaScratch;
 #define SDHS_ARENA_TEST_IS_MALLOCD false
 #define SDHS_ARENA_TEST_ALIGNMENT 16
 
-#define ArenaInit(a, contiguous, mallocd, bootstrapped, alignment, page_sz,    \
-		  cap, mem)                                                    \
-	ua_init(a, contiguous, mallocd, bootstrapped, alignment, page_sz, cap, \
-		mem)
 #define ArenaCreate(cap, contiguous, mallocd, alignment) \
 	ua_create(cap, contiguous, mallocd, alignment)
 #define ArenaDestroy(uap) ua_destroy(uap)
 #define ArenaBootstrap(ua, new_existing, cap, alignment) \
 	ua_bootstrap(ua, new_existing, cap, alignment)
 #define ArenaAlloc(ua, size) ua_alloc_wrapper_timed(ua, size)
-#define ArenaZalloc(ua, size) ua_zalloc(ua, size)
-#define ArenaFalloc(ua, size) ua_falloc(ua, size)
-#define ArenaFzalloc(ua, size) ua_fzalloc(ua, size)
-#define ArenaRelease(ua, pos, size) ua_release(ua, pos, size)
 #define ArenaFree(ua) ua_free(ua)
 #define ArenaPop(ua, size) ua_pop(ua, size)
-#define ArenaSetAlignment(ua, alignment) ua_set_alignment(ua, alignment)
 #define ArenaPos(ua) ua_pos(ua)
 #define ArenaSeek(ua, pos) ua_seek(ua, pos)
 #define ArenaReserve(ua, sz) ua_reserve(ua, sz)

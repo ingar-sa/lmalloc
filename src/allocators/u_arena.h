@@ -117,8 +117,6 @@ void ua_free(UArena *ua);
 
 void ua_pop(UArena *ua, size_t size);
 
-void ua_set_alignment(UArena *ua, size_t alignment);
-
 size_t ua_pos(UArena *ua);
 
 void *ua_seek(UArena *ua, size_t pos);

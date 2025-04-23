@@ -209,15 +209,6 @@ inline void ua_pop(UArena *ua, size_t size)
 	}
 }
 
-void ua_set_alignment(UArena *ua, size_t alignment)
-{
-	if (LM_LIKELY(LmIsPowerOfTwo(alignment) && alignment <= ua->page_sz))
-		ua->alignment = alignment;
-	else
-		LmLogWarning(
-			"Specified alignment is not a power of two or is > page size");
-}
-
 inline size_t ua_pos(UArena *ua)
 {
 	size_t pos = ua->cur;
