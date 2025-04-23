@@ -7,43 +7,6 @@ LM_LOG_REGISTER(timing);
 
 #include <time.h>
 
-// NOTE: (isa): Written by Claude
-double calibrate_tsc(void)
-{
-	if (!cpu_has_invariant_tsc())
-		LmLogWarning(
-			"The CPU does not have an invariant TSC. This means that "
-			"it will increase variably with changes in clock frequency, "
-			"and comparisons between readings during execution with different "
-			"frequencies are meaningless. Consider using lm_get_time_stamp "
-			"instead.");
-
-	static double tsc_freq = 0.0;
-	static bool tsc_has_been_calibrated = false;
-	if (!tsc_has_been_calibrated) {
-		struct timespec start_ts, end_ts;
-		uint64_t start_tsc, end_tsc;
-		double elapsed_sec, cycles_per_sec;
-
-		clock_gettime(CLOCK_MONOTONIC, &start_ts);
-		start_tsc = rdtsc();
-
-		usleep(100000);
-
-		end_tsc = rdtscp();
-		clock_gettime(CLOCK_MONOTONIC, &end_ts);
-
-		elapsed_sec = (double)(end_ts.tv_sec - start_ts.tv_sec) +
-			      (double)(end_ts.tv_nsec - start_ts.tv_nsec) / 1e9;
-
-		cycles_per_sec = (double)(end_tsc - start_tsc) / elapsed_sec;
-		tsc_freq = cycles_per_sec;
-		tsc_has_been_calibrated = true;
-	}
-
-	return tsc_freq;
-}
-
 long long lm_get_time_stamp(clockid_t type)
 {
 	struct timespec ts;
@@ -106,7 +69,7 @@ static void format_timing(long long timing, enum time_stamp_fmt stamp_fmt,
 static void format_tsc_timing(uint64_t tsc_timing,
 			      enum time_stamp_fmt stamp_fmt, char buf[64])
 {
-	double tsc_freq = calibrate_tsc();
+	double tsc_freq = get_tsc_freq();
 	uint64_t timing_ns = TscToNs(tsc_timing, tsc_freq);
 
 	switch (stamp_fmt) {
@@ -287,7 +250,7 @@ void lm_log_tsc_timing_avg(uint64_t tsc_timing, uint64_t count,
 			   lm_log_module *log_module)
 {
 	char timing_str[64];
-	double tsc_freq = calibrate_tsc();
+	double tsc_freq = get_tsc_freq();
 
 	uint64_t timing_ns = TscToNs(tsc_timing, tsc_freq);
 
@@ -313,7 +276,7 @@ void lm_print_tsc_timing_avg(uint64_t tsc_timing, uint64_t count,
 			     enum time_stamp_fmt stamp_fmt)
 {
 	char timing_str[64];
-	double tsc_freq = calibrate_tsc();
+	double tsc_freq = get_tsc_freq();
 
 	uint64_t timing_ns = TscToNs(tsc_timing, tsc_freq);
 
