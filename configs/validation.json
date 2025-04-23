@@ -56,12 +56,16 @@
             },
             {
                 "name": "malloc",
-                "enabled": true,
+                "enabled": false,
                 "ctx":
                 {
                     "alloc_iterations": 1000,
                     "log_filename": "./logs/malloc_fork.txt"
                 }
-            }
+            },
+                {
+                        "name": "sdhs",
+                        "enabled": false
+                }
         ]
 }

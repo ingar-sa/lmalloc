@@ -33,20 +33,12 @@ void cjson_free(void *ptr)
 	(void)ptr;
 }
 
+// TODO: (isa): Log which cpu core the process is being run on
 int main(int argc, char **argv)
 {
 	int result = EXIT_SUCCESS;
-#if 0
-	// NOTE: (isa): This #if/else is just a quick way to run debug stuff instead of the main code
-
-	//LmLogDebug("Sizeof UArena: %zd", sizeof(UArena));
-	SdhsMain(0, NULL);
-	//LmLogDebug("TSC freq: %f", calibrate_tsc() / 1e9);
-	//LmLogDebug("CPU has invariant tsc: %s",
-	//	   LmBoolToString(cpu_has_invariant_tsc()));
-#else
 	size_t cjson_ua_sz = LmKibiByte(16);
-	cjson_arena = ua_create(cjson_ua_sz, true, false, 16);
+	cjson_arena = ua_create(cjson_ua_sz, UA_CONTIGUOUS, UA_NOT_MALLOCD, 16);
 	cJSON_Hooks cjson_hooks = { 0 };
 	cjson_hooks.malloc_fn = cjson_alloc;
 	cjson_hooks.free_fn = cjson_free;
@@ -55,6 +47,12 @@ int main(int argc, char **argv)
 	size_t main_ua_sz = LmMebiByte(1);
 	UArena *main_ua = ua_create(main_ua_sz, true, false, 16);
 
+#if 0
+	// NOTE: (isa): This #if/else is just a quick way to run debug stuff instead of the main code
+
+	LmLogDebugR("%s", ua_info_string(cjson_arena, main_ua));
+
+#else
 	lm_file_data *test_config_file =
 		lm_load_file_into_memory("./configs/validation.json", main_ua);
 	cJSON *test_config_json = cJSON_Parse((char *)test_config_file->data);

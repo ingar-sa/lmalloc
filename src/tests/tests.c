@@ -3,12 +3,13 @@ LM_LOG_REGISTER(tests);
 
 #include <src/cJSON/cJSON.h>
 #include <src/allocators/allocator_wrappers.h>
-
-#include <stddef.h>
-#include <sys/wait.h>
+#include <src/sdhs/Sdhs.h>
 
 #include "network_test.h"
 #include "tight_loop_test.h"
+
+#include <stddef.h>
+#include <sys/wait.h>
 
 static const alloc_fn_t ua_alloc_functions[] = { ua_alloc_wrapper_timed,
 						 ua_zalloc_wrapper_timed,
@@ -151,10 +152,22 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 	return 0;
 }
 
+static int sdhs_test(void *ctx, bool running_in_debugger)
+{
+	(void)ctx;
+	(void)running_in_debugger;
+	SdhsMain(0, NULL);
+	return 0;
+}
+
 static struct test_definition test_definitions[] = {
-	{ u_arena_test, "u_arena_m_c" },  { u_arena_test, "u_arena_m_nc" },
-	{ u_arena_test, "u_arena_nm_c" }, { u_arena_test, "u_arena_nm_nc" },
-	{ malloc_test, "malloc" },	  { 0 }
+	{ u_arena_test, "u_arena_m_c" },
+	{ u_arena_test, "u_arena_m_nc" },
+	{ u_arena_test, "u_arena_nm_c" },
+	{ u_arena_test, "u_arena_nm_nc" },
+	{ malloc_test, "malloc" },
+	{ sdhs_test, "sdhs" },
+	{ 0 }
 };
 
 static struct test_definition *get_test_definition(cJSON *test_name_json)
