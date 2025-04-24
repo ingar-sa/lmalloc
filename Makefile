@@ -1,7 +1,8 @@
 CC = gcc
-SRC = $(filter-out sdhs poc glibc linux gcc, $(shell find src -name "*.c"))
-INCLUDES = -I.
-LIBS =  -lpthread
+SRC = $(filter-out src/foo.c src/sdhs/DevUtils/TestDataGenerator.c poc glibc linux gcc, $(shell find src -name "*.c"))
+#SRC = src/foo.c
+INCLUDES = -I. -I/usr/include/postgresql
+LIBS =  -lpthread -lpq -lm
 
 LINTER = clang-tidy
 LINTER_FLAGS = -quiet
@@ -12,20 +13,29 @@ REL_LOG_LEVEL ?= 2
 MEM_TRACE ?= 0
 DISABLE_DEBUG_WARNINGS ?= 1
 
-WARNING_FLAGS ?= -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow -Wundef -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wredundant-decls -Wnested-externs -Winline -Wfloat-equal -Wpointer-arith -Wwrite-strings -Waggregate-return -Wold-style-definition -Wcpp
+WARNING_FLAGS ?= -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow -Wundef -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wredundant-decls -Wnested-externs -Winline -Wfloat-equal -Wpointer-arith -Wwrite-strings -Wold-style-definition 
 
 ifeq ($(DISABLE_DEBUG_WARNINGS), 1)
-DISABLED_WARNING_FLAGS ?= -Wno-unused-function -Wno-unused-variable
+DISABLED_DEBUG_WARNING_FLAGS ?= -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -Wno-discarded-qualifiers
 else
-DISABLED_WARNING_FLAGS = 
+DISABLED_DEBUG_WARNING_FLAGS = 
 endif
 
-LM_FLAGS = -DLM_MEM_TRACE=$(MEM_TRACE) -DLM_LOG_GLOBAL=1 -DLM_LOG_LEVEL=$(LOG_LEVEL) -DLM_ASSERT=1
-RELEASE_LM_FLAGS = -DLM_MEM_TRACE=0 -DLM_PRINTF_DEBUG_ENABLE=0 -DLM_LOG_LEVEL=$(REL_LOG_LEVEL)-DLM_ASSERT=0 
+DISABLED_WARNING_FLAGS = -Wno-gnu-zero-variadic-macro-arguments -Wno-cpp -Wno-aggregate-return
 
-DEBUG_FLAGS = -std=gnu11 -g -O$(DEBUG_OPT_LEVEL) $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DDEBUG
-RELWDB_FLAGS = -std=gnu11 -g -O2 $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DNDEBUG 
-RELEASE_FLAGS = -std=gnu11 -O3 -march=native $(WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DNDEBUG
+
+LM_DEBUG_FLAGS = -DLM_MEM_TRACE=$(MEM_TRACE) -DLM_LOG_GLOBAL=1 -DLM_LOG_LEVEL=$(LOG_LEVEL) -DLM_ASSERT=1
+LM_RELEASE_FLAGS = -DLM_MEM_TRACE=0 -DLM_PRINTF_DEBUG_ENABLE=0 -DLM_LOG_LEVEL=$(REL_LOG_LEVEL)-DLM_ASSERT=0 
+
+SDHS_LOG_LEVEL ?= -DSDHS_LOG_LEVEL=3
+SDHS_REL_LOG_LEVEL ?= -DSDHS_LOG_LEVEL=2
+
+SDHS_DEBUG_FLAGS = -DSDHS_MEM_TRACE=1 -DSDHS_PRINTF_DEBUG_ENABLE=1 -DSDHS_ASSERT=1 $(SDHS_LOG_LEVEL)
+RELEASE_SDHS_FLAGS = -DSDHS_MEM_TRACE=0 -DSDHS_PRINTF_DEBUG_ENABLE=0 -DSDHS_ASSERT=0 $(SDHS_REL_LOG_LEVEL)
+
+DEBUG_FLAGS = -std=gnu11 -g -O$(DEBUG_OPT_LEVEL) $(WARNING_FLAGS) $(DISABLED_DEBUG_WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DDEBUG
+RELWDB_FLAGS = -std=gnu11 -g -O2 $(WARNING_FLAGS) $(DISABLED_DEBUG_WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DNDEBUG
+RELEASE_FLAGS = -std=gnu11 -O3 -march=native $(WARNING_FLAGS) $(DISABLED_DEBUG_WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DNDEBUG
 
 PROGRAM_NAME = validation
 
@@ -33,17 +43,17 @@ PROGRAM_NAME = validation
 
 all: debug
 
-debug: CFLAGS = $(DEBUG_FLAGS) $(LM_FLAGS)
+debug: CFLAGS = $(DEBUG_FLAGS) $(LM_DEBUG_FLAGS) $(SDHS_DEBUG_FLAGS)
 debug: build_suite
 
-relwdb: CFLAGS = $(RELWDB_FLAGS) $(LM_FLAGS)
+relwdb: CFLAGS = $(RELWDB_FLAGS) $(LM_DEBUG_FLAGS) $(SDHS_DEBUG_FLAGS)
 relwdb: build_suite
 
-release: CFLAGS = $(RELEASE_FLAGS) $(RELEASE_LM_FLAGS)
+release: CFLAGS = $(RELEASE_FLAGS) $(LM_RELEASE_FLAGS) $(SDHS_RELEASE_FLAGS)
 release: build_suite
 
 run:
-	./build/$(PROGRAM_NAME)
+	taskset -c 0 ./build/$(PROGRAM_NAME)
 
 docs:
 	@echo "Generating documentation..."

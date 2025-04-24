@@ -1,16 +1,10 @@
 {
-    "main_suite": {
-        "prefix": "validation",
         "enabled": true,
-        "sub_suites": "NONE",
-        "iterations": 1,
-        "options": "NONE",
         "debugger": false,
         "tests": [
             {
                 "name": "u_arena_m_c",
                 "enabled": false,
-                "options": "NONE",
                 "ctx": 
                 {
                     "arena_sz": "512kB",
@@ -24,7 +18,6 @@
             {
                 "name": "u_arena_m_nc",
                 "enabled": false,
-                "options": "NONE",
                 "ctx": 
                 {
                     "arena_sz": "512kB",
@@ -38,7 +31,6 @@
             {
                 "name": "u_arena_nm_c",
                 "enabled": false,
-                "options": "NONE",
                 "ctx": 
                 {
                     "arena_sz": "64gB",
@@ -51,8 +43,7 @@
             },
             {
                 "name": "u_arena_nm_nc",
-                "enabled": true,
-                "options": "NONE",
+                "enabled": false,
                 "ctx": 
                 {
                     "arena_sz": "512kB",
@@ -65,17 +56,16 @@
             },
             {
                 "name": "malloc",
-                "enabled": false,
-                "options": "NONE",
+                "enabled": true,
                 "ctx":
                 {
                     "alloc_iterations": 1000,
-                    "log_filename": "./logs/malloc.txt"
+                    "log_filename": "./logs/malloc_fork.txt"
                 }
             },
             {
                 "name": "karena_test",
-                "enabled": true,
+                "enabled": false,
                 "options": "NONE",
                 "ctx":
                 {
@@ -86,5 +76,4 @@
             }
 
         ]
-    }
 }

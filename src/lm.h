@@ -26,6 +26,8 @@
 #include <stdbool.h>
 #endif
 
+#include <src/allocators/u_arena.h>
+
 ////////////////////////////////////////
 //              DEFINES               //
 ////////////////////////////////////////
@@ -360,7 +362,7 @@ typedef struct lm_file_data {
 	uint8_t *data;
 } lm_file_data;
 
-lm_file_data *lm_load_file_into_memory(const char *filename);
+lm_file_data *lm_load_file_into_memory(const char *filename, UArena *ua);
 void lm_free_file_data(lm_file_data **file_data);
 
 FILE *lm_open_file_by_name(const char *filename, const char *mode);
@@ -567,7 +569,8 @@ int lm__write_log__(lm__log_module__ *module, bool log_raw,
 	}
 
 	chars_written += (size_t)fmt_ret;
-	module->buf[chars_written++] = '\n';
+	if (!log_raw)
+		module->buf[chars_written++] = '\n';
 
 	if (module->write_to_term) {
 		int out_fd;
@@ -873,7 +876,7 @@ void lm__free_trace__(void *ptr, int line, const char *func,
 	}
 }
 
-lm_file_data *lm_load_file_into_memory(const char *filename)
+lm_file_data *lm_load_file_into_memory(const char *filename, UArena *ua)
 {
 	FILE *file = fopen(filename, "rb");
 	if (!file) {
@@ -892,7 +895,11 @@ lm_file_data *lm_load_file_into_memory(const char *filename)
 
 	lm_file_data *file_data;
 	size_t file_data_size = sizeof(lm_file_data) + file_size + 1;
-	file_data = calloc(1, file_data_size);
+	if (ua)
+		file_data = ua_zalloc(ua, file_data_size);
+	else
+		file_data = calloc(1, file_data_size);
+
 	if (!file_data) {
 		LmLogErrorG(
 			"Failed to allocate memory for file data for file %s",

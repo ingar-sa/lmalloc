@@ -1,6 +1,7 @@
 CC = gcc
 SRC = $(filter-out src/DevUtils/TestDataGenerator.c, $(shell find src -name "*.c"))
-INCLUDES = -I. -I/usr/include/postgresql
+#SRC = src/foo.c
+INCLUDES = -I. -I/usr/include/postgresql -I../src/allocators/
 LIBS =  -lpthread -lpq -lm
 
 LINTER = clang-tidy

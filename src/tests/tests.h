@@ -2,21 +2,17 @@
 #define TESTS_H
 
 #include <src/lm.h>
+#include <src/allocators/u_arena.h>
+#include <src/metrics/timing.h>
+#include <src/allocators/allocator_wrappers.h>
+#include <src/cJSON/cJSON.h>
 
 // NOTE: (isa): Start structs created by claude
-
-// 56 bytes
+// 77 bytes - not aligned to 8-byte boundary
 typedef struct {
-	uint32_t source_ip;
-	uint32_t dest_ip;
-	uint16_t source_port;
-	uint16_t dest_port;
-	uint32_t sequence_number;
-	uint32_t ack_number;
-	uint8_t data[32];
-	uint8_t data_sz;
-	uint8_t padding[3]; // Explicit padding for alignment
-} NetworkPacket;
+	char identifier[13];
+	uint64_t timestamps[8];
+} TimeSeriesData;
 
 // 32 bytes - aligned
 typedef struct {
@@ -27,59 +23,12 @@ typedef struct {
 	uint32_t flags;
 } EventHeader;
 
-// 72 bytes
+// 56 bytes - aligned
 typedef struct {
-	char name[32];
-	char email[32];
-	uint32_t age;
-	uint32_t id;
-} PersonRecord;
-
-// 64 bytes
-typedef struct {
-	char filename[32];
-	uint64_t size;
-	uint64_t created_time;
-	uint64_t modified_time;
-	uint32_t permissions;
-	uint32_t owner_id;
-} FileRecord;
-
-// 96 bytes
-typedef struct {
-	char username[32];
-	char email[48];
-	uint64_t user_id;
-	uint32_t login_count;
-	uint32_t permissions;
-} UserAccount;
-
-typedef struct AccountList {
-	UserAccount *account;
-	struct AccountList *next;
-} AccountList;
-
-typedef struct File {
-	uint8_t *data;
-} File;
-
-typedef struct Disk {
-	size_t file_count;
-	size_t max_file_count;
-	FileRecord *records;
-	File *files;
-} Disk;
-
-// 128 bytes - aligned
-typedef struct {
-	char buffer[128];
-} MessageBuffer;
-
-// 77 bytes - not aligned to 8-byte boundary
-typedef struct {
-	char identifier[13];
-	uint64_t timestamps[8];
-} TimeSeriesData;
+	uint64_t keys[4];
+	uint32_t counts[4];
+	uint32_t checksum;
+} KeyStore;
 
 // 128 bytes
 typedef struct {
@@ -98,17 +47,6 @@ typedef struct {
 	float dpi_x;
 	float dpi_y;
 } ImageMetadata;
-
-// 8 bytes - aligned
-typedef struct {
-	int64_t value;
-} SmallAligned;
-
-// 12 bytes - not aligned to 8-byte boundary
-typedef struct {
-	int64_t id;
-	uint32_t count;
-} SmallUnaligned;
 
 // 16 bytes - aligned
 typedef struct {
@@ -129,12 +67,6 @@ typedef struct {
 	uint32_t flags;
 } PositionData;
 
-// 8 bytes
-typedef struct {
-	int x;
-	int y;
-} Point;
-
 // 16 bytes
 typedef struct {
 	uint8_t r;
@@ -144,16 +76,9 @@ typedef struct {
 	float opacity;
 } RgbaColor;
 
-// 24 bytes
+// 40 bytes
 typedef struct {
-	Point p1;
-	Point p2;
-	Point p3;
-} Triangle;
-
-// 32 bytes
-typedef struct {
-	Point center;
+	Point2D center;
 	float radius;
 	float thickness;
 	int32_t segments;
@@ -167,60 +92,22 @@ typedef struct {
 	char name[32];
 	uint64_t id;
 } NamedEntity;
-
-// 45 bytes - not aligned to 8-byte boundary
-typedef struct {
-	char tag[5];
-	uint64_t values[5];
-} TaggedValues;
-
-// 56 bytes - aligned
-typedef struct {
-	uint64_t keys[4];
-	uint32_t counts[4];
-	uint32_t checksum;
-} KeyStore;
-
-// 64 bytes - aligned (cache line sized)
-typedef struct {
-	uint64_t data[8];
-} CacheLineBlock;
-
-// 72 bytes - aligned
-typedef struct {
-	double matrix[3][3];
-} Matrix3x3;
-
-// 96 bytes - aligned
-typedef struct {
-	uint64_t nodes[12];
-} GraphSegment;
-
-// 103 bytes - not aligned to 8-byte boundary
-typedef struct {
-	double coordinates[12];
-	uint8_t flags[7];
-} GeometryObject;
-
-// 128 bytes - aligned
-typedef struct {
-	uint64_t data[16];
-} LargeBlock;
-
 // NOTE: (isa): End structs created by Claude
 
 // NOTE: (isa): Start arrays created by Claude
-static size_t small_sizes[16] = { 8,  13, 16, 27, 32,  45,  56,	 64,
-				  71, 80, 91, 96, 103, 112, 125, 128 };
+static size_t small_sizes[] = { 8,  13, 16, 27, 32,  45,  56,  64,
+				71, 80, 91, 96, 103, 112, 125, 128 };
 
-static size_t medium_sizes[16] = { 256,	 300,  378,  512,  768,	 818,
-				   1000, 1024, 1359, 1700, 2000, 2048,
-				   2222, 2918, 3875, 4096 };
+static size_t medium_sizes[] = {
+	256,  300,  378,  512,	768,  818,  1000, 1024,
+	1359, 1700, 2000, 2048, 2222, 2918, 3875, 4096
+};
 
-static size_t large_sizes[16] = {
+static size_t large_sizes[] = {
 	LmKibiByte(16) + 35, /* ~16 KB (unaligned) */
 	LmKibiByte(32), /* 32 KB (aligned) */
 	LmKibiByte(64) + 127, /* ~64 KB (unaligned) */
+#if 0
 	LmKibiByte(128), /* 128 KB (aligned) */
 	LmKibiByte(256) + 511, /* ~256 KB (unaligned) */
 	LmKibiByte(512), /* 512 KB (aligned) */
@@ -234,12 +121,31 @@ static size_t large_sizes[16] = {
 	LmKibiByte(6144), /* 6 MB (aligned) */
 	LmKibiByte(7168) + 4095, /* ~7 MB (unaligned) */
 	LmKibiByte(8192) /* 8 MB (aligned) */
+#endif
 };
+
+// NOTE: (isa): End arrays created by Claude
 
 typedef struct {
 	size_t *array;
 	size_t len;
 	const char *name;
 } array_test;
+
+typedef int (*test_fn_t)(void *ctx, bool running_in_debugger);
+
+struct test_definition {
+	test_fn_t test;
+	const char *test_name;
+};
+
+int run_tests(cJSON *conf);
+
+struct ua_params {
+	size_t arena_sz;
+	size_t alignment;
+	bool contiguous;
+	bool mallocd;
+};
 
 #endif
