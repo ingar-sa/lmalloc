@@ -68,12 +68,14 @@ static void parse_args(int argc, char **argv, struct program_args *args)
 		}
 	}
 
-	LmAssert(args->cpu_core >= 0,
-		 "No CPU core number or a negative value were provided");
-	printf("Cpu core: %d\n", args->cpu_core);
+	if (args->cpu_core < 0) {
+		fprintf(stderr,
+			"Error: Invalid value for '-core' argument was provided (was %d, must be >= 0)",
+			args->cpu_core);
+		exit(EXIT_FAILURE);
+	}
 }
 
-// TODO: (isa): Log which cpu core the process is being run on
 int main(int argc, char **argv)
 {
 	int result = EXIT_SUCCESS;
@@ -81,8 +83,8 @@ int main(int argc, char **argv)
 	struct program_args args;
 	parse_args(argc, argv, &args);
 
-	size_t main_ua_sz = LmGibiByte(64);
-	main_ua = ua_create(main_ua_sz, true, false, 16);
+	size_t main_ua_sz = LmGibiByte(4);
+	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD, 16);
 
 	size_t cjson_ua_sz = LmKibiByte(16);
 	cjson_arena =
@@ -103,5 +105,6 @@ int main(int argc, char **argv)
 	cJSON *test_config_json = cJSON_Parse((char *)test_config_file->data);
 	result = run_tests(test_config_json);
 #endif
+	printf("\033[0;33m\nHave you remembered to run `sudo cpupower frequency-set -g performance`, Ingar?\n\033[0m");
 	return result;
 }

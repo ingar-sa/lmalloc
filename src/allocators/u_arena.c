@@ -182,20 +182,6 @@ inline void *ua_fzalloc(UArena *ua, size_t size)
 	return ptr;
 }
 
-void ua_release(UArena *ua, size_t pos, size_t size)
-{
-	LmAssert(pos < ua->cur, "pos > arena pos");
-	LmAssert(pos % ua->page_sz == 0, "pos is not a multiple of page size");
-	LmAssert(size % ua->page_sz == 0,
-		 "size is not a multiple of page size");
-	if (LM_UNLIKELY(UaIsMallocd(ua->flags))) {
-		LmLogWarning("Cannot call u_arena_release on mallocd arena");
-	} else {
-		if (madvise(ua->mem + pos, size, MADV_DONTNEED) != 0)
-			LmLogError("madvise failed: %s", strerror(errno));
-	}
-}
-
 inline void ua_free(UArena *ua)
 {
 	ua->cur = 0;

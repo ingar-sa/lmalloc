@@ -5,9 +5,19 @@
 
 #include "u_arena.h"
 
+struct timing_collection {
+	uint64_t cap;
+	uint64_t idx;
+	uint64_t *arr;
+};
+
 typedef void *(*alloc_fn_t)(UArena *ua, size_t sz);
 typedef void (*free_fn_t)(UArena *ua, void *ptr);
 typedef void *(*realloc_fn_t)(UArena *ua, void *ptr, size_t old_sz, size_t sz);
+
+void provide_timing_collection_arr(uint64_t cap, uint64_t *arr);
+void clear_wrapper_timing_collection(void);
+struct timing_collection *get_wrapper_timings(void);
 
 void *ua_alloc_wrapper_timed(UArena *ua, size_t sz);
 void *ua_zalloc_wrapper_timed(UArena *ua, size_t sz);

@@ -13,7 +13,7 @@
 #define UA_CONTIGUOUS true
 #define UA_NON_CONTIGUOUS false
 #define UA_MALLOCD true
-#define UA_NOT_MALLOCD false
+#define UA_MMAPD false
 
 #define UA_CONTIGUOUS_BIT 0
 #define UA_MALLOCD_BIT 1
@@ -110,8 +110,6 @@ void *ua_zalloc(UArena *ua, size_t size);
 void *ua_falloc(UArena *ua, size_t size);
 
 void *ua_fzalloc(UArena *ua, size_t size);
-
-void ua_release(UArena *ua, size_t pos, size_t size);
 
 void ua_free(UArena *ua);
 

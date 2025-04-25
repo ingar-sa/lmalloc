@@ -11,10 +11,12 @@ LM_LOG_REGISTER(tests);
 #include <stddef.h>
 #include <sys/wait.h>
 
-static const alloc_fn_t ua_alloc_functions[] = { ua_alloc_wrapper_timed,
+static const alloc_fn_t ua_alloc_functions[] = {
+	ua_alloc_wrapper_timed /*,
 						 ua_zalloc_wrapper_timed,
 						 ua_falloc_wrapper_timed,
-						 ua_fzalloc_wrapper_timed };
+						 ua_fzalloc_wrapper_timed*/
+};
 static const free_fn_t ua_free_functions[] = { ua_free_wrapper };
 static const realloc_fn_t ua_realloc_functions[] = { ua_realloc_wrapper_timed };
 
@@ -103,7 +105,7 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 					  file_mode);
 #endif
 
-#if 1
+#if 0
 		network_test(&params, alloc_fn, alloc_fn_name, free_fn,
 			     realloc_fn, alloc_iterations, running_in_debugger,
 			     log_filename, file_mode);

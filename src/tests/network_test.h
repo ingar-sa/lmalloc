@@ -14,7 +14,7 @@ typedef struct {
 	uint32_t ack_number;
 	uint8_t data[32];
 	uint8_t data_sz;
-	uint8_t padding[3]; // Explicit padding for alignment
+	//uint8_t padding[3]; // Explicit padding for alignment
 } NetworkPacket;
 
 // 72 bytes
