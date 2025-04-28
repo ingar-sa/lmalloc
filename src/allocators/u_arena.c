@@ -13,6 +13,7 @@ LM_LOG_REGISTER(u_arena);
 #include <stdlib.h>
 #include <string.h>
 
+
 static size_t arena_cache_aligned_sz(void)
 {
 	size_t cacheln_sz = get_l1d_cacheln_sz();

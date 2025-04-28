@@ -59,6 +59,7 @@ struct ua__thread_arenas__ {
 	static __thread struct ua__thread_arenas__                          \
 		*ua__thread_arenas_instance__ __attribute__((used))
 
+
 #define UA_THREAD_ARENAS_EXTERN(thread_name)                   \
 	extern __thread struct ua__thread_arenas__ LM_CONCAT3( \
 		ua__thread_arenas_, thread_name, __);          \

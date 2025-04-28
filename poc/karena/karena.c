@@ -1,4 +1,5 @@
-#define pr_fmt(fmt) "%s:%s(): " fmt, KBUILD_MODNAME, __func__
+static char *case_id = "";
+#define pr_fmt(fmt) "%s:%s: " fmt, KBUILD_MODNAME, case_id
 
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -19,6 +20,8 @@ struct karena_device_data {
 	struct cdev cdev;
 	struct mmap_info *mmap_info;
 };
+
+struct thread_arenas {};
 
 struct mmap_info {
 	size_t size;
@@ -86,16 +89,36 @@ static void __exit karena_exit(void)
 module_init(karena_init);
 module_exit(karena_exit);
 
+static struct vm_area_struct *get_alloc_and_find_vma(struct karena_alloc *alloc,
+						     unsigned long arg)
+{
+	struct vm_area_struct *vma;
+
+	if (copy_from_user(alloc, (void __user *)arg,
+			   sizeof(struct karena_alloc))) {
+		pr_err("Could not copy alloc from user\n");
+		return NULL;
+	}
+
+	vma = find_vma(current->mm, alloc->addr);
+	if (!vma) {
+		pr_err("No vma for the address %lu\n", alloc->addr);
+		return NULL;
+	}
+
+	return vma;
+}
+
 static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	size_t size;
 	struct mmap_info *info;
 	struct karena_alloc alloc;
-	unsigned long addr;
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
 
 	switch (cmd) {
 	case KARENA_CREATE:
+		case_id = "CREATE";
 		pr_info("Creating arena\n");
 		info = kzalloc(sizeof(struct mmap_info), GFP_KERNEL);
 		if (!info)
@@ -139,20 +162,9 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		break;
 	case KARENA_ALLOC:
-		pr_info("Allocating to arena\n");
+		case_id = "ALLOC";
 
-		if (copy_from_user(&alloc, (void __user *)arg,
-				   sizeof(struct karena_alloc))) {
-			pr_err("Could not copy alloc from user\n");
-			return -EFAULT;
-		}
-
-		vma = find_vma(current->mm, alloc.addr);
-		if (!vma) {
-			pr_err("No vma for the address %lu\n", alloc.addr);
-			return -EFAULT;
-		}
-		pr_info("Alloc found vma @ %lx\n", vma->vm_start);
+		vma = get_alloc_and_find_vma(&alloc, arg);
 
 		info = vma->vm_private_data;
 		pr_info("cur at before: %lu\n", info->cur);
@@ -169,28 +181,93 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 
 		break;
-	case KARENA_FREE:
-		pr_info("Top of free\n");
-		if (copy_from_user(&addr, (void __user *)arg, sizeof(addr))) {
-			pr_err("Could not copy address to free\n");
+	case KARENA_SEEK:
+		case_id = "SEEK";
+		vma = get_alloc_and_find_vma(&alloc, arg);
+
+		((struct mmap_info *)vma->vm_private_data)->cur = alloc.size;
+		alloc.addr += alloc.size;
+
+		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
+			pr_err("Could not copy alloc back to user\n");
 			return -EFAULT;
 		}
 
-		pr_info("Looking for vma @ %lx", addr);
+		break;
+	case KARENA_POP:
+		case_id = "POP";
+		vma = get_alloc_and_find_vma(&alloc, arg);
 
-		vma = 0;
-		vma = find_vma(current->mm, addr);
-		if (!vma) {
-			pr_err("No vma for the address %lx\n", addr);
+		info = vma->vm_private_data;
+		if (info->cur < alloc.size) {
+			pr_err("Pop too big\n");
 			return -EFAULT;
 		}
-		pr_info("Found vma @ %lx\n", vma->vm_start);
 
-		((struct mmap_info *)vma->vm_private_data)->cur = 0;
+		((struct mmap_info *)vma->vm_private_data)->cur -= alloc.size;
+
+		break;
+	case KARENA_POS:
+		case_id = "POS";
+		vma = get_alloc_and_find_vma(&alloc, arg);
+
+		alloc.size = ((struct mmap_info *)vma->vm_private_data)->cur;
+
+		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
+			pr_err("Could not copy pos back to user");
+			return -EFAULT;
+		}
+
+		break;
+
+	case KARENA_RESERVE:
+		case_id = "RESERVE";
+
+		vma = get_alloc_and_find_vma(&alloc, arg);
+		info = (struct mmap_info *)vma->vm_private_data;
+
+		if (info->size < info->cur + alloc.size) {
+			alloc.size = info->size - info->cur;
+		} else {
+			((struct mmap_info *)vma->vm_private_data)->cur +=
+				alloc.size;
+		}
+
+		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
+			pr_err("Could not copy to user");
+			return -EFAULT;
+		}
+
+		break;
+	case KARENA_DESTROY:
+		case_id = "DESTROY";
+
+		vma = get_alloc_and_find_vma(&alloc, arg);
+
+		vfree(((struct mmap_info *)vma->vm_private_data)->data);
+		kfree((struct mmap_info *)vma->vm_private_data);
+		vma->vm_private_data = NULL;
+
+		break;
+
+	case KARENA_SIZE:
+		case_id = "SIZE";
+
+		vma = get_alloc_and_find_vma(&alloc, arg);
+
+		alloc.size = ((struct mmap_info *)vma->vm_private_data)->size;
+
+		pr_info("Alloc size: %lu\n", alloc.size);
+
+		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
+			pr_err("Could not copy to user");
+			return -EFAULT;
+		}
 
 		break;
 
 	default:
+		case_id = "DEFAULT";
 		pr_info("Unknown ioctl command: %u\n", cmd);
 		return -ENOTTY;
 	}
@@ -200,6 +277,8 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 static vm_fault_t karena_vm_fault(struct vm_fault *vmf)
 {
+	might_sleep();
+
 	struct vm_area_struct *vma = vmf->vma;
 	struct mmap_info *info;
 	unsigned long offset;
@@ -236,6 +315,8 @@ static const struct vm_operations_struct vm_ops = {
 
 static int karena_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	case_id = "MMAP";
+
 	if (!karena.mmap_info) {
 		pr_err("No memory allocated for mapping\n");
 		return -EINVAL;

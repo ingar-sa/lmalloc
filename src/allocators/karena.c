@@ -70,26 +70,16 @@ void *karena_alloc(void *arena, size_t size)
 	return (void *)alloc.addr;
 }
 
-// int main(void)
-// {
-// 	int *memory = karena_create(1024);
-//
-// 	unsigned long *first = karena_alloc(memory, sizeof(unsigned long));
-// 	unsigned long *second = karena_alloc(memory, sizeof(unsigned long));
-//
-// 	if (!first) {
-// 		perror("first null pointer");
-// 		return 1;
-// 	}
-// 	if (!second) {
-// 		perror("second null pointer");
-// 		return 1;
-// 	}
-//
-// 	*first = 42L;
-// 	*second = 44L;
-// 	printf("First: %lu @ %p\n", *first, first);
-// 	printf("Second: %lu @ %p\n", *second, second);
-//
-// 	return 0;
-// }
+void *karena_seek(void *arena, size_t pos)
+{
+	struct karena_alloc alloc;
+	alloc.addr = (unsigned long)arena;
+	alloc.size = pos;
+	if (ioctl(fd, KARENA_SEEK, &alloc)) {
+		perror("Arena seek failed!");
+		return NULL;
+	}
+
+	return (void *)alloc.addr;
+}
+
