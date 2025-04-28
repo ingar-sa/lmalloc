@@ -21,6 +21,43 @@ bool cpu_has_invariant_tsc(void)
 	return !!(edx & (1 << 8));
 }
 
+// NOTE: (isa): Written by Claude
+double get_tsc_freq(void)
+{
+	if (!cpu_has_invariant_tsc())
+		LmLogWarning(
+			"The CPU does not have an invariant TSC. This means that "
+			"it will increase variably with changes in clock frequency, "
+			"and comparisons between readings during execution with different "
+			"frequencies are meaningless. Consider using lm_get_time_stamp "
+			"instead.");
+
+	static double tsc_freq = 0.0;
+	static bool tsc_has_been_calibrated = false;
+	if (!tsc_has_been_calibrated) {
+		struct timespec start_ts, end_ts;
+		uint64_t start_tsc, end_tsc;
+		double elapsed_sec, cycles_per_sec;
+
+		clock_gettime(CLOCK_MONOTONIC, &start_ts);
+		start_tsc = rdtsc();
+
+		usleep(100000);
+
+		end_tsc = rdtscp();
+		clock_gettime(CLOCK_MONOTONIC, &end_ts);
+
+		elapsed_sec = (double)(end_ts.tv_sec - start_ts.tv_sec) +
+			      (double)(end_ts.tv_nsec - start_ts.tv_nsec) / 1e9;
+
+		cycles_per_sec = (double)(end_tsc - start_tsc) / elapsed_sec;
+		tsc_freq = cycles_per_sec;
+		tsc_has_been_calibrated = true;
+	}
+
+	return tsc_freq;
+}
+
 // NOTE: Original written by claude
 size_t get_page_size(void)
 {

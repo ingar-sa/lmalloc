@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 bool cpu_has_invariant_tsc(void);
+double get_tsc_freq(void);
 double get_cpu_freq_ghz(void);
 size_t get_page_size(void);
 size_t get_l1d_cacheln_sz(void);

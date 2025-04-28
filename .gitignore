@@ -139,7 +139,6 @@ glibc*
 **/Build
 **/tests/build
 **/tests/Build
-**/logs
 data/testdata
 compile_commands.json
 .cache

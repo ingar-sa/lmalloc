@@ -13,7 +13,7 @@
 #include "allocator_wrappers.h"
 
 typedef UArena SdhsArena;
-typedef UArenaScratch SdhsArenaScratch;
+typedef UAScratch SdhsArenaScratch;
 
 #define SDHS_ARENA_TEST_IS_CONTIGUOUS true
 #define SDHS_ARENA_TEST_IS_MALLOCD false

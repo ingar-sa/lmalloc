@@ -6,6 +6,35 @@ LM_LOG_REGISTER(allocator_wrappers);
 #include "u_arena.h"
 #include "allocator_wrappers.h"
 
+static uint64_t timings_zii[1];
+
+static struct timing_collection timings = { 0, 0, timings_zii };
+
+void provide_timing_collection_arr(uint64_t cap, uint64_t *arr)
+{
+	timings.cap = cap;
+	timings.arr = arr;
+}
+
+void clear_wrapper_timing_collection(void)
+{
+	timings.cap = 0;
+	timings.idx = 0;
+	timings.arr = timings_zii;
+}
+
+struct timing_collection *get_wrapper_timings(void)
+{
+	return &timings;
+}
+
+static void add_timing(uint64_t t)
+{
+	if (LM_LIKELY(timings.arr != timings_zii)) {
+		timings.arr[timings.idx++] = t;
+	}
+}
+
 static uint64_t ua_alloc_total_time, ua_alloc_total_iter;
 void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 {
@@ -14,8 +43,10 @@ void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 	void *ptr = ua_alloc(ua, sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
-	ua_alloc_total_time += alloc_end - alloc_start;
+	uint64_t alloc_time = alloc_end - alloc_start;
+	ua_alloc_total_time += alloc_time;
 	ua_alloc_total_iter += 1;
+	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
@@ -28,8 +59,10 @@ void *ua_zalloc_wrapper_timed(UArena *ua, size_t sz)
 	void *ptr = ua_zalloc(ua, sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
-	ua_zalloc_total_time += alloc_end - alloc_start;
+	uint64_t alloc_time = alloc_end - alloc_start;
+	ua_zalloc_total_time += alloc_time;
 	ua_zalloc_total_iter += 1;
+	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
@@ -42,8 +75,10 @@ void *ua_falloc_wrapper_timed(UArena *ua, size_t sz)
 	void *ptr = ua_falloc(ua, sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
-	ua_falloc_total_time += alloc_end - alloc_start;
+	uint64_t alloc_time = alloc_end - alloc_start;
+	ua_falloc_total_time += alloc_time;
 	ua_falloc_total_iter += 1;
+	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
@@ -56,8 +91,10 @@ void *ua_fzalloc_wrapper_timed(UArena *ua, size_t sz)
 	void *ptr = ua_fzalloc(ua, sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
-	ua_fzalloc_total_time += alloc_end - alloc_start;
+	uint64_t alloc_time = alloc_end - alloc_start;
+	ua_fzalloc_total_time += alloc_time;
 	ua_fzalloc_total_iter += 1;
+	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
@@ -72,8 +109,10 @@ void *ua_realloc_wrapper_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
 	memcpy(new, ptr, old_sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
-	ua_realloc_total_time += alloc_end - alloc_start;
+	uint64_t alloc_time = alloc_end - alloc_start;
+	ua_realloc_total_time += alloc_time;
 	ua_realloc_total_iter += 1;
+	add_timing(alloc_time);
 	//--------------------------------------
 	return new;
 }
@@ -104,8 +143,11 @@ void *malloc_wrapper_timed(UArena *ua, size_t sz)
 	void *ptr = malloc(sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
-	malloc_total_time += alloc_end - alloc_start;
+	uint64_t alloc_time = alloc_end - alloc_start;
+	malloc_total_time += alloc_time;
 	malloc_total_iter += 1;
+	add_timing(alloc_time);
+	timings.arr[timings.idx++] = alloc_time;
 	//--------------------------------------
 	return ptr;
 }
@@ -119,8 +161,10 @@ void *calloc_wrapper_timed(UArena *ua, size_t sz)
 	void *ptr = calloc(1, sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
-	calloc_total_time += alloc_end - alloc_start;
+	uint64_t alloc_time = alloc_end - alloc_start;
+	calloc_total_time += alloc_time;
 	calloc_total_iter += 1;
+	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
@@ -148,8 +192,10 @@ void *realloc_wrapper_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
 	void *new = realloc(ptr, sz);
 	//--------------------------------------
 	END_TSC_TIMING(realloc);
-	realloc_total_time += realloc_end - realloc_start;
+	uint64_t alloc_time = realloc_end - realloc_start;
+	realloc_total_time += alloc_time;
 	realloc_total_iter += 1;
+	add_timing(alloc_time);
 	//--------------------------------------
 	return new;
 }

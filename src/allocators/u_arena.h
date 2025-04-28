@@ -10,10 +10,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define U_ARENA_CONTIGUOUS true
-#define U_ARENA_NON_CONTIGUOUS false
-#define U_ARENA_MALLOCD true
-#define U_ARENA_NOT_MALLOCD false
+#define UA_CONTIGUOUS true
+#define UA_NON_CONTIGUOUS false
+#define UA_MALLOCD true
+#define UA_MMAPD false
 
 #define UA_CONTIGUOUS_BIT 0
 #define UA_MALLOCD_BIT 1
@@ -39,7 +39,7 @@ typedef struct {
 typedef struct {
 	UArena *ua;
 	size_t f5;
-} UArenaScratch;
+} UAScratch;
 
 struct ua__thread_arenas__ {
 	UArena **uas;
@@ -112,8 +112,6 @@ void *ua_falloc(UArena *ua, size_t size);
 
 void *ua_fzalloc(UArena *ua, size_t size);
 
-void ua_release(UArena *ua, size_t pos, size_t size);
-
 void ua_free(UArena *ua);
 
 void ua_pop(UArena *ua, size_t size);
@@ -124,6 +122,9 @@ void *ua_seek(UArena *ua, size_t pos);
 
 size_t ua_reserve(UArena *ua, size_t sz);
 
+typedef char *LmString;
+LmString ua_info_string(UArena *ua, UArena *string_allocator);
+
 void ua__thread_arenas_init__(UArena *ta_buf[], struct ua__thread_arenas__ *tas,
 			      struct ua__thread_arenas__ **ta_instance);
 
@@ -133,11 +134,11 @@ void ua__thread_arenas_init_extern__(struct ua__thread_arenas__ *tas,
 int ua__thread_arenas_add__(UArena *ua,
 			    struct ua__thread_arenas__ *ta_instance);
 
-UArenaScratch ua_scratch_begin(UArena *ua);
+UAScratch ua_scratch_begin(UArena *ua);
 
-UArenaScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
-				struct ua__thread_arenas__ *tas);
+UAScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
+			    struct ua__thread_arenas__ *tas);
 
-void ua__scratch_release__(UArenaScratch uas);
+void ua__scratch_release__(UAScratch uas);
 
 #endif /* u_arena_H */

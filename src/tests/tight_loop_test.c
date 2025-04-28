@@ -11,23 +11,37 @@ LM_LOG_REGISTER(tight_loop_test);
 #include <stdlib.h>
 #include <sys/wait.h>
 
-static void all_sizes_repeatedly(UArena *ua, uint64_t alloc_iterations,
+static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 				 alloc_fn_t alloc_fn, const char *alloc_fn_name,
 				 size_t *alloc_sizes, size_t alloc_sizes_len,
 				 const char *size_name)
 {
-	LmLogDebugR("\n\n\n%s'ing all %s sizes repeatedly %lu times: ",
-		    alloc_fn_name, size_name, alloc_iterations);
-
+	LmLogInfoR("\n\n%s'ing all %s sizes repeatedly %lu times: \n",
+		   alloc_fn_name, size_name, alloc_iterations);
+	uint64_t total_iterations = alloc_iterations * alloc_sizes_len;
+	size_t timing_vals_sz = total_iterations * sizeof(uint64_t);
+	UArena *timings_ua = ua_create(timing_vals_sz, UA_CONTIGUOUS, UA_MMAPD,
+				       sizeof(uint64_t));
+	uint64_t *timing_arr =
+		UaPushArray(timings_ua, uint64_t, total_iterations);
+	provide_timing_collection_arr(total_iterations, timing_arr);
+	struct timing_collection *timings = get_wrapper_timings();
 	for (size_t i = 0; i < alloc_iterations; ++i) {
 		for (uint j = 0; j < alloc_sizes_len; ++j) {
-			uint8_t *ptr = alloc_fn(ua, alloc_sizes[j]);
+			uint8_t *ptr = alloc_fn(test_ua, alloc_sizes[j]);
+			if (LM_UNLIKELY(!ptr)) {
+				printf("AAAAAAAHHHHHHH ENOMEM FREEEEE\n");
+				ua_free(test_ua);
+				timings->idx -=
+					1; // Overwrite failed allocation timing
+				ptr = alloc_fn(test_ua, alloc_sizes[j]);
+			}
 			*ptr = 1;
 		}
 	}
 
-	if (ua)
-		ua_free(ua);
+	if (test_ua)
+		ua_free(test_ua);
 
 	uint64_t alloc_timing = 0;
 	uint64_t alloc_iter = 0;
@@ -51,33 +65,52 @@ static void all_sizes_repeatedly(UArena *ua, uint64_t alloc_iterations,
 		alloc_iter = get_and_clear_calloc_iterations();
 	}
 
-	lm_log_tsc_timing_avg(alloc_timing, alloc_iter, "", NS, true, DBG,
+	lm_log_tsc_timing_avg(alloc_timing, alloc_iter, "", NS, true, INF,
 			      LM_LOG_MODULE_LOCAL);
+	LmLogInfoR("\n");
+
+	ua_destroy(&timings_ua);
+	clear_wrapper_timing_collection();
 }
 
 // NOTE: (isa): If the memory is freed, then malloc will
 // use just as little time as the arena for all allocations,
 // likely due to it simply reusing the same slot in the free list.
 // It could be interesting to have this as its own test.
-static void each_size_by_itself(UArena *ua, uint64_t alloc_iterations,
+static void each_size_by_itself(UArena *test_ua, uint64_t alloc_iterations,
 				alloc_fn_t alloc_fn, const char *alloc_fn_name,
 				size_t *alloc_sizes, size_t alloc_sizes_len,
 				const char *size_name)
 {
-	LmLogDebugR("\n%s'ing each %s size %lu times", alloc_fn_name, size_name,
-		    alloc_iterations);
+	LmLogInfoR("\n%s'ing each %s size %lu times\n", alloc_fn_name,
+		   size_name, alloc_iterations);
+
+	size_t timing_vals_sz = alloc_iterations * sizeof(uint64_t);
+	UArena *timings_ua = ua_create(timing_vals_sz, UA_CONTIGUOUS, UA_MMAPD,
+				       sizeof(uint64_t));
+	uint64_t *timing_arr =
+		UaPushArray(timings_ua, uint64_t, alloc_iterations);
+	provide_timing_collection_arr(alloc_iterations, timing_arr);
+	struct timing_collection *timings = get_wrapper_timings();
 
 	for (size_t j = 0; j < alloc_sizes_len; ++j) {
-		LmLogDebugR("\n\n%zd bytes: ", alloc_sizes[j]);
+		LmLogInfoR("\n%zd bytes: \n", alloc_sizes[j]);
 
 		for (uint64_t i = 0; i < alloc_iterations; ++i) {
-			uint8_t *ptr = alloc_fn(ua, alloc_sizes[j]);
+			uint8_t *ptr = alloc_fn(test_ua, alloc_sizes[j]);
+			if (LM_UNLIKELY(!ptr)) {
+				printf("AAAAAAAHHHHHHH ENOMEM FREEEEE\n");
+				ua_free(test_ua);
+				timings->idx -=
+					1; // Overwrite failed allocation timing
+				ptr = alloc_fn(test_ua, alloc_sizes[j]);
+			}
 			*ptr = 1;
 			// See note above function for info on freeing
 		}
 
-		if (ua)
-			ua_free(ua);
+		if (test_ua)
+			ua_free(test_ua);
 
 		uint64_t alloc_timing = 0;
 		uint64_t alloc_iter = 0;
@@ -102,8 +135,13 @@ static void each_size_by_itself(UArena *ua, uint64_t alloc_iterations,
 		}
 
 		lm_log_tsc_timing_avg(alloc_timing, alloc_iter, "", NS, true,
-				      DBG, LM_LOG_MODULE_LOCAL);
+				      INF, LM_LOG_MODULE_LOCAL);
+		LmLogInfoR("\n");
+		timings->idx = 0;
 	}
+
+	ua_destroy(&timings_ua);
+	clear_wrapper_timing_collection();
 }
 
 void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
@@ -132,8 +170,8 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 			FILE *log_file =
 				lm_open_file_by_name(log_filename, file_mode);
 			LmSetLogFileLocal(log_file);
-			LmLogDebugR("\n\n------------------------------\n");
-			LmLogDebug("%s -- %s", alloc_fn_name, size_name);
+			LmLogInfoR("\n\n------------------------------\n");
+			LmLogInfo("%s -- %s", alloc_fn_name, size_name);
 
 			UArena *ua = NULL;
 			if (ua_params)
@@ -182,11 +220,11 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 	} else {
 		FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
 		LmSetLogFileLocal(log_file);
-		LmLogDebugR("\n\n------------------------------\n");
-		LmLogDebug("%s -- %s", alloc_fn_name, size_name);
+		LmLogInfoR("\n\n------------------------------\n");
+		LmLogInfo("%s -- %s", alloc_fn_name, size_name);
 
-		UArena *ua = NULL;
-		if (ua_params)
+		static UArena *ua = NULL;
+		if (!ua && ua_params)
 			ua = ua_create(ua_params->arena_sz,
 				       ua_params->contiguous,
 				       ua_params->mallocd,
@@ -195,11 +233,13 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 		each_size_by_itself(ua, alloc_iterations, alloc_fn,
 				    alloc_fn_name, alloc_sizes, alloc_sizes_len,
 				    size_name);
+
 		all_sizes_repeatedly(ua, alloc_iterations, alloc_fn,
 				     alloc_fn_name, alloc_sizes,
 				     alloc_sizes_len, size_name);
 		if (ua)
 			ua_destroy(&ua);
+
 		LmRemoveLogFileLocal();
 		lm_close_file(log_file);
 	}

@@ -39,6 +39,9 @@ RELEASE_FLAGS = -std=gnu11 -O3 -march=native $(WARNING_FLAGS) $(DISABLED_DEBUG_W
 
 PROGRAM_NAME = validation
 
+TASKSET_C = 0
+PROGRAM_ARGS = -core=$(TASKSET_C)
+
 .PHONY: all debug relwdb release run docs lint static_analysis format compile_commands.json clean
 
 all: debug
@@ -53,7 +56,7 @@ release: CFLAGS = $(RELEASE_FLAGS) $(LM_RELEASE_FLAGS) $(SDHS_RELEASE_FLAGS)
 release: build_suite
 
 run:
-	taskset -c 0 ./build/$(PROGRAM_NAME)
+	taskset -c $(TASKSET_C) ./build/$(PROGRAM_NAME) $(PROGRAM_ARGS)
 
 docs:
 	@echo "Generating documentation..."
