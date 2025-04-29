@@ -9,89 +9,76 @@
 
 static int fd = 0;
 
-void *karena_create(size_t size)
+KArena karena_create(size_t size)
 {
-	void *memory;
+	struct ka_data alloc = {
+		.size = size,
+	};
 
 	if (!fd) {
 		fd = open("/dev/karena", O_RDWR);
 		if (fd < 0) {
 			perror("Failed to open device");
-			return 0;
+			return -1;
 		}
 	}
 
-	if (ioctl(fd, KARENA_CREATE, &size) < 0) {
+	if (ioctl(fd, KARENA_CREATE, &alloc) < 0) {
 		perror("Memory allocation failed");
 		close(fd);
-		return 0;
+		return -1;
 	}
 
 	// printf("Memory size allocated: %lu bytes\n", size);
 
-	memory = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (memory == MAP_FAILED) {
+	if (mmap(NULL, alloc.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0) ==
+	    MAP_FAILED) {
 		perror("mmap failed");
 		close(fd);
-		return 0;
+		return -1;
 	}
 
-	if (!memory) {
-		perror("Memory is null pointer\n");
-		close(fd);
-		return 0;
-	}
-
-	// printf("Memory mapped at address: %p\n", memory);
-
-	// close(fd);
-
-	return memory;
+	return alloc.arena;
 }
 
-void *karena_alloc(void *arena, size_t size)
+void *karena_alloc(KArena arena, size_t size)
 {
-	struct karena_alloc alloc;
-	alloc.addr = (unsigned long)arena;
+	struct ka_data alloc;
+	alloc.arena = arena;
 	alloc.size = size;
-
-	// int fd;
-	// fd = open("/dev/karena", O_RDWR);
-	// if (fd < 0) {
-	// 	perror("Failed to open device");
-	// 	return 0;
-	// }
 
 	if (ioctl(fd, KARENA_ALLOC, &alloc)) {
 		perror("Arena allocation failed");
 		return 0;
 	}
 
-	return (void *)alloc.addr;
+	return (void *)alloc.arena;
 }
 
-void *karena_seek(void *arena, size_t pos)
+void *karena_seek(KArena arena, size_t pos)
 {
-	struct karena_alloc alloc;
-	alloc.addr = (unsigned long)arena;
-	alloc.size = pos;
+	struct ka_data alloc = {
+		.arena = arena,
+		.size = pos,
+	};
+
 	if (ioctl(fd, KARENA_SEEK, &alloc)) {
 		perror("Arena seek failed!");
 		return NULL;
 	}
 
-	return (void *)alloc.addr;
+	return (void *)alloc.arena;
 }
 
-void *karena_free(void *arena)
+void *karena_free(KArena arena)
 {
 	return karena_seek(arena, 0);
 }
 
-void karena_pop(void *arena, size_t size)
+void karena_pop(KArena arena, size_t size)
 {
-	struct karena_alloc alloc = {
-		.addr = (unsigned long)arena,
+	struct ka_data alloc = {
+		.arena = arena,
 		.size = size,
 	};
 
@@ -100,11 +87,11 @@ void karena_pop(void *arena, size_t size)
 	}
 }
 
-size_t karena_pos(void *arena)
+size_t karena_pos(KArena arena)
 {
-	struct karena_alloc alloc = {
-		.addr = (unsigned long)arena,
-		.size = -1,
+	struct ka_data alloc = {
+		.arena = arena,
+		.size = 0,
 	};
 
 	if (ioctl(fd, KARENA_POS, &alloc)) {
@@ -114,10 +101,10 @@ size_t karena_pos(void *arena)
 	return alloc.size;
 }
 
-size_t karena_reserve(void *arena, size_t sz)
+size_t karena_reserve(KArena arena, size_t sz)
 {
-	struct karena_alloc alloc = {
-		.addr = (unsigned long)arena,
+	struct ka_data alloc = {
+		.arena = arena,
 		.size = sz,
 	};
 
@@ -129,10 +116,10 @@ size_t karena_reserve(void *arena, size_t sz)
 	return alloc.size;
 }
 
-size_t karena_size(void *arena)
+size_t karena_size(KArena arena)
 {
-	struct karena_alloc alloc = {
-		.addr = (unsigned long)arena,
+	struct ka_data alloc = {
+		.arena = arena,
 	};
 
 	if (ioctl(fd, KARENA_SIZE, &alloc)) {
@@ -143,10 +130,10 @@ size_t karena_size(void *arena)
 	return alloc.size;
 }
 
-void karena_destroy(void *arena)
+void karena_destroy(KArena arena)
 {
-	struct karena_alloc alloc = {
-		.addr = (unsigned long)arena,
+	struct ka_data alloc = {
+		.arena = arena,
 	};
 
 	size_t size = karena_size(arena);
@@ -155,12 +142,33 @@ void karena_destroy(void *arena)
 		perror("Destroy failed");
 	}
 
-	munmap(arena, size);
+	munmap((void *)arena, size);
+}
+
+KArena karena_bootstrap(KArena arena, size_t size)
+{
+	struct ka_data alloc = {
+		.arena = arena,
+		.size = size,
+	};
+
+	if (ioctl(fd, KARENA_BOOTSTRAP, &alloc)) {
+		perror("Destroy failed");
+		return -1;
+	}
+
+	return alloc.arena;
 }
 
 int main(void)
 {
-	void *arena = karena_create(1024);
+	KArena arena = karena_create(1024);
+	if (arena == -1) {
+		perror("Arena allocation failed");
+		return 1;
+	}
+	printf("KArena: %lu\n", arena);
+	fflush(stdout);
 
 	unsigned long *first = karena_alloc(arena, sizeof(unsigned long));
 	unsigned long *second = karena_alloc(arena, sizeof(unsigned long));
@@ -189,24 +197,37 @@ int main(void)
 	printf("Second: %lu @ %p\n", *second, second);
 	printf("Forth: %lu @ %p\n", *forth, forth);
 
-	printf("Trying to free %lx\n", (unsigned long)arena);
+	// printf("Trying to free %lx\n", (unsigned long)arena);
+	//
+	// fflush(stdout);
+	//
+	// karena_free(arena);
 
-	fflush(stdout);
+	printf("Current pos: %lu\n", karena_pos(arena));
 
-	karena_free(arena);
+	KArena arena3 = karena_bootstrap(arena, 128);
+	printf("KArena3: %lu\n", arena3);
+	printf("Current pos: %lu\n", karena_pos(arena3));
+	unsigned long *foo = karena_alloc(arena3, sizeof(unsigned long));
+	printf("foo: %lu @ %p\n", *foo, foo);
 
-	if (!arena) {
-		printf("Arena is null pointer after free\n");
-		exit(1);
-	}
+	KArena arena2 = karena_create(2048);
+	unsigned long *blah = karena_alloc(arena2, sizeof(unsigned long));
+	*blah = 55;
+	printf("blah from second arena: %lu\n", *blah);
+	printf("KArena2: %lu\n", arena2);
+
 	unsigned long *third = karena_alloc(arena, sizeof(unsigned long));
 	*third = 69L;
 
 	printf("Third: %lu @ %p\n", *third, third);
 
 	karena_destroy(arena);
+	karena_destroy(arena2);
+	karena_destroy(arena3);
 
 	// printf("Third: %lu @ %p\n", *third, third);
 
+	printf("DONE!\n");
 	return 0;
 }

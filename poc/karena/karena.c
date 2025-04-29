@@ -21,11 +21,19 @@ struct karena_device_data {
 	struct mmap_info *mmap_info;
 };
 
+struct KArena {
+	size_t size;
+	size_t cur;
+	unsigned long addr;
+};
+
+static struct KArena karenas[100];
+
 struct thread_arenas {};
 
 struct mmap_info {
 	size_t size;
-	size_t cur;
+	unsigned long index;
 	void *data;
 };
 
@@ -73,6 +81,8 @@ static int __init karena_init(void)
 		return -1;
 	}
 
+	karena.mmap_info = vzalloc(sizeof(struct mmap_info));
+
 	pr_info("Device has been inserted!\n");
 
 	return 0;
@@ -89,72 +99,81 @@ static void __exit karena_exit(void)
 module_init(karena_init);
 module_exit(karena_exit);
 
-static struct vm_area_struct *get_alloc_and_find_vma(struct karena_alloc *alloc,
-						     unsigned long arg)
+static unsigned int find_open_slot(void)
 {
-	struct vm_area_struct *vma;
+	struct KArena *info;
+	unsigned int index = 0;
 
-	if (copy_from_user(alloc, (void __user *)arg,
-			   sizeof(struct karena_alloc))) {
-		pr_err("Could not copy alloc from user\n");
-		return NULL;
+	info = karenas;
+	while (info->addr != 0) {
+		index++;
+		info = &karenas[index];
+		if (index > 99)
+			return -1;
 	}
 
-	vma = find_vma(current->mm, alloc->addr);
-	if (!vma) {
-		pr_err("No vma for the address %lu\n", alloc->addr);
-		return NULL;
-	}
-
-	return vma;
+	return index;
 }
 
 static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	size_t size;
-	struct mmap_info *info;
-	struct karena_alloc alloc;
-	struct vm_area_struct *vma = NULL;
+	struct KArena *info;
+	struct ka_data alloc;
+	unsigned int index = 0;
+
+	if (copy_from_user(&alloc, (void __user *)arg, sizeof(alloc))) {
+		pr_err("Could not copy data from user\n");
+		return -EFAULT;
+	}
+
+	if (cmd != KARENA_CREATE) {
+		info = &karenas[alloc.arena];
+	}
 
 	switch (cmd) {
 	case KARENA_CREATE:
 		case_id = "CREATE";
 		pr_info("Creating arena\n");
-		info = kzalloc(sizeof(struct mmap_info), GFP_KERNEL);
+
+		index = find_open_slot();
+		pr_info("index: %u", index);
+
+		if (index == -1) {
+			pr_err("Did not find open slot");
+			return -EFAULT;
+		}
+
+		info = &karenas[index];
+
+		pr_info("Found slot for arena @ index %u\n", index);
+		karena.mmap_info->index = index;
+		alloc.arena = index;
+		pr_info("here\n");
+
 		if (!info)
 			return -ENOMEM;
 		info->cur = 0;
 
-		if (copy_from_user(&size, (void __user *)arg, sizeof(size))) {
-			pr_err("Could not copy data from user\n");
-			return -EFAULT;
-		}
-		pr_info("Reqested arena size: %lu\n", size);
+		pr_info("Reqested arena size: %lu\n", alloc.size);
 
-		info->size = PAGE_ALIGN(size);
+		info->size = PAGE_ALIGN(alloc.size);
 		if (info->size == 0) {
 			kfree(info);
 			return -EINVAL;
 		}
 		pr_info("Aligned size: %lu\n", info->size);
 
-		info->data = vzalloc(info->size);
-		if (!info->data) {
+		karena.mmap_info->data = vzalloc(info->size);
+		if (!karena.mmap_info->data) {
 			kfree(info);
 			info = NULL;
 			return -ENOMEM;
 		}
 
-		pr_info("Memory allocated at: %p\n", info->data);
+		karena.mmap_info->size = info->size;
 
-		karena.mmap_info = info;
-
-		pr_info("Allocated kernel memory at %p, size: %lu\n",
-			info->data, info->size);
-
-		if (copy_to_user((void __user *)arg, &info->size,
-				 sizeof(info->size))) {
-			vfree(info->data);
+		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
+			vfree((void *)info->addr);
 			kfree(info);
 			karena.mmap_info = NULL;
 			return -EFAULT;
@@ -164,15 +183,11 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case KARENA_ALLOC:
 		case_id = "ALLOC";
 
-		vma = get_alloc_and_find_vma(&alloc, arg);
-
-		info = vma->vm_private_data;
-		pr_info("cur at before: %lu\n", info->cur);
-		alloc.addr = info->cur + alloc.addr;
+		pr_info("Arena %lu, pos %lu\n", alloc.arena, info->cur);
+		alloc.arena = info->cur + (unsigned long)info->addr;
 		info->cur += alloc.size;
-		vma->vm_private_data = info;
 
-		pr_info("addr at: %lx\n", alloc.addr);
+		pr_info("addr at: %lx\n", alloc.arena);
 		pr_info("cur at after: %lu\n", info->cur);
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
@@ -183,10 +198,9 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case KARENA_SEEK:
 		case_id = "SEEK";
-		vma = get_alloc_and_find_vma(&alloc, arg);
 
-		((struct mmap_info *)vma->vm_private_data)->cur = alloc.size;
-		alloc.addr += alloc.size;
+		info->cur = alloc.size;
+		alloc.arena = info->addr + info->cur;
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
 			pr_err("Could not copy alloc back to user\n");
@@ -196,22 +210,23 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case KARENA_POP:
 		case_id = "POP";
-		vma = get_alloc_and_find_vma(&alloc, arg);
 
-		info = vma->vm_private_data;
 		if (info->cur < alloc.size) {
 			pr_err("Pop too big\n");
 			return -EFAULT;
 		}
 
-		((struct mmap_info *)vma->vm_private_data)->cur -= alloc.size;
+		info->cur -= alloc.size;
 
 		break;
 	case KARENA_POS:
 		case_id = "POS";
-		vma = get_alloc_and_find_vma(&alloc, arg);
 
-		alloc.size = ((struct mmap_info *)vma->vm_private_data)->cur;
+		pr_info();
+
+		alloc.size = info->cur;
+
+		pr_info("Current pos: %lu\n", alloc.size);
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
 			pr_err("Could not copy pos back to user");
@@ -223,14 +238,10 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case KARENA_RESERVE:
 		case_id = "RESERVE";
 
-		vma = get_alloc_and_find_vma(&alloc, arg);
-		info = (struct mmap_info *)vma->vm_private_data;
-
 		if (info->size < info->cur + alloc.size) {
 			alloc.size = info->size - info->cur;
 		} else {
-			((struct mmap_info *)vma->vm_private_data)->cur +=
-				alloc.size;
+			info->cur += alloc.size;
 		}
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
@@ -242,22 +253,55 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case KARENA_DESTROY:
 		case_id = "DESTROY";
 
-		vma = get_alloc_and_find_vma(&alloc, arg);
+		pr_info();
 
-		vfree(((struct mmap_info *)vma->vm_private_data)->data);
-		kfree((struct mmap_info *)vma->vm_private_data);
-		vma->vm_private_data = NULL;
+		info->addr = 0;
+		// vfree(((struct mmap_info *)vma->vm_private_data)->data);
+		// kfree((struct mmap_info *)vma->vm_private_data);
+		// vma->vm_private_data = NULL;
 
 		break;
 
 	case KARENA_SIZE:
 		case_id = "SIZE";
 
-		vma = get_alloc_and_find_vma(&alloc, arg);
-
-		alloc.size = ((struct mmap_info *)vma->vm_private_data)->size;
+		alloc.size = info->size;
 
 		pr_info("Alloc size: %lu\n", alloc.size);
+
+		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
+			pr_err("Could not copy to user");
+			return -EFAULT;
+		}
+
+		break;
+
+	case KARENA_BOOTSTRAP:
+		case_id = "BOOT";
+
+		if (info->size - info->cur < alloc.size) {
+			pr_err("Not enough space in backing arena");
+			return -EFAULT;
+		}
+
+		unsigned long addr;
+
+		addr = info->addr + info->cur;
+		info->cur += alloc.size;
+
+		index = find_open_slot();
+		if (index == -1) {
+			pr_err("Could not find open slot for arena");
+			return -EFAULT;
+		}
+
+		pr_info("Found slot for arena @ index %u\n", index);
+
+		karenas[index].addr = addr;
+		karenas[index].cur = 0;
+		karenas[index].size = alloc.size;
+
+		alloc.arena = index;
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
 			pr_err("Could not copy to user");
@@ -332,11 +376,13 @@ static int karena_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
+	karenas[karena.mmap_info->index].addr = vma->vm_start;
 	vma->vm_ops = &vm_ops;
 	vma->vm_private_data = karena.mmap_info;
 	vm_flags_set(vma, VM_DONTEXPAND);
 
-	pr_info("Memory mapped with size %lu\n", karena.mmap_info->size);
+	pr_info("Memory mapped @ %lx with size %lu\n", vma->vm_start,
+		karena.mmap_info->size);
 
 	return 0;
 }

@@ -51,8 +51,8 @@ void *karena_create(size_t size)
 
 void *karena_alloc(void *arena, size_t size)
 {
-	struct karena_alloc alloc;
-	alloc.addr = (unsigned long)arena;
+	struct ka_data alloc;
+	alloc.arena = (unsigned long)arena;
 	alloc.size = size;
 
 	// int fd;
@@ -67,19 +67,18 @@ void *karena_alloc(void *arena, size_t size)
 		return 0;
 	}
 
-	return (void *)alloc.addr;
+	return (void *)alloc.arena;
 }
 
 void *karena_seek(void *arena, size_t pos)
 {
-	struct karena_alloc alloc;
-	alloc.addr = (unsigned long)arena;
+	struct ka_data alloc;
+	alloc.arena = (unsigned long)arena;
 	alloc.size = pos;
 	if (ioctl(fd, KARENA_SEEK, &alloc)) {
 		perror("Arena seek failed!");
 		return NULL;
 	}
 
-	return (void *)alloc.addr;
+	return (void *)alloc.arena;
 }
-
