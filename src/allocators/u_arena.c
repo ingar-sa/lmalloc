@@ -39,7 +39,6 @@ void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
 	if (bootstrapped)
 		UaSetIsBootstrapped(ua->flags);
 	ua->alignment = alignment;
-	ua->page_sz = page_sz;
 	ua->cur = 0;
 	ua->cap = cap;
 	ua->mem = mem;
@@ -64,16 +63,6 @@ UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment)
 			mem = malloc(cap);
 		}
 	} else {
-		if (cap % page_sz != 0) {
-			size_t padding = LmPaddingToAlign(cap, page_sz);
-			LmLogWarning(
-				"Creating an mmap'd arena of a size that is "
-				"not a multiple of page size is disallowed. "
-				"Padding %zd bytes with %zd to align to page size",
-				cap, padding);
-			cap += padding;
-			//return NULL;
-		}
 		if (contiguous) {
 			size_t allocation_sz = arena_cache_aligned_sz + cap;
 			mem = mmap(NULL, allocation_sz, PROT_READ | PROT_WRITE,
@@ -135,7 +124,8 @@ UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap,
 		return NULL;
 	}
 
-	ua_init(new, false, false, true, alignment, ua->page_sz, cap, mem);
+	size_t page_sz = get_page_size();
+	ua_init(new, false, false, true, alignment, page_sz, cap, mem);
 	return new;
 }
 
@@ -185,7 +175,8 @@ inline void *ua_fzalloc(UArena *ua, size_t size)
 
 inline void ua_free(UArena *ua)
 {
-	ua->cur = 0;
+	if (ua)
+		ua->cur = 0;
 }
 
 inline void ua_pop(UArena *ua, size_t size)
@@ -264,10 +255,17 @@ int ua__thread_arenas_add__(UArena *a, struct ua__thread_arenas__ *ta_instance)
 
 UAScratch ua_scratch_begin(UArena *ua)
 {
-	UAScratch uas;
-	uas.ua = ua;
-	uas.f5 = ua->cur;
+	UAScratch uas = { 0 };
+	if (ua) {
+		uas.ua = ua;
+		uas.f5 = ua->cur;
+	}
 	return uas;
+}
+
+void ua_scratch_release(UAScratch uas)
+{
+	ua_seek(uas.ua, uas.f5);
 }
 
 UAScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
@@ -288,9 +286,4 @@ UAScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
 	}
 exit:
 	return (ua == NULL) ? (UAScratch){ 0 } : ua_scratch_begin(ua);
-}
-
-void ua__scratch_release__(UAScratch uas)
-{
-	ua_seek(uas.ua, uas.f5);
 }

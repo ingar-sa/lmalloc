@@ -6,24 +6,31 @@ LM_LOG_REGISTER(allocator_wrappers);
 #include "u_arena.h"
 #include "allocator_wrappers.h"
 
+#include <string.h>
+
+static struct alloc_timing_stats timing_stats;
+struct alloc_timing_stats *get_alloc_stats(void)
+{
+	return &timing_stats;
+}
+
 static uint64_t timings_zii[1];
+static struct alloc_timing_collection timings = { 0, 0, timings_zii };
 
-static struct timing_collection timings = { 0, 0, timings_zii };
-
-void provide_timing_collection_arr(uint64_t cap, uint64_t *arr)
+void provide_alloc_timing_collection_arr(uint64_t cap, uint64_t *arr)
 {
 	timings.cap = cap;
 	timings.arr = arr;
 }
 
-void clear_wrapper_timing_collection(void)
+void clear_wrapper_alloc_timing_collection(void)
 {
 	timings.cap = 0;
 	timings.idx = 0;
 	timings.arr = timings_zii;
 }
 
-struct timing_collection *get_wrapper_timings(void)
+struct alloc_timing_collection *get_wrapper_timings(void)
 {
 	return &timings;
 }
@@ -35,7 +42,50 @@ static void add_timing(uint64_t t)
 	}
 }
 
-static uint64_t ua_alloc_total_time, ua_alloc_total_iter;
+void write_timing_data_to_file(const char *filename)
+{
+	FILE *file = lm_open_file_by_name(filename, "w");
+	int res = lm_write_bytes_to_file((const uint8_t *)(&timing_stats),
+					 sizeof(timing_stats), file);
+	if (res != 0)
+		return;
+
+	lm_write_bytes_to_file((const uint8_t *)&timings.idx,
+			       sizeof(timings.idx), file);
+	lm_write_bytes_to_file((const uint8_t *)timings.arr,
+			       timings.idx * sizeof(uint64_t), file);
+	LmLogInfo("Wrote timing stats and collection to %s", filename);
+}
+
+void read_timing_data_from_file(const char *filename,
+				struct alloc_timing_data *tdata, UArena *ua)
+{
+	size_t file_sz;
+	uint8_t *data = lm_load_file_into_memory(filename, &file_sz, NULL);
+	if (!data)
+		return;
+
+	struct alloc_timing_stats *at_stats =
+		UaPushStruct(ua, struct alloc_timing_stats);
+	struct alloc_timing_collection *tcoll =
+		UaPushStruct(ua, struct alloc_timing_collection);
+
+	uintptr_t ptr = (uintptr_t)data;
+	tcoll->cap = *((uint64_t *)(ptr + sizeof(struct alloc_timing_stats)));
+	tcoll->idx = tcoll->cap;
+	tcoll->arr = UaPushArray(ua, uint64_t, tcoll->cap);
+
+	memcpy(at_stats, data, sizeof(*at_stats));
+	uint8_t *tcoll_data =
+		(uint8_t *)(data + sizeof(*at_stats) + sizeof(uint64_t));
+	memcpy(tcoll, tcoll_data, tcoll->cap);
+
+	tdata->stats = at_stats;
+	tdata->tcoll = tcoll;
+
+	free(data);
+}
+
 void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	START_TSC_TIMING(alloc);
@@ -44,14 +94,13 @@ void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
-	ua_alloc_total_time += alloc_time;
-	ua_alloc_total_iter += 1;
+	timing_stats.ua_alloc_total_time += alloc_time;
+	timing_stats.ua_alloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
 
-static uint64_t ua_zalloc_total_time, ua_zalloc_total_iter;
 void *ua_zalloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	START_TSC_TIMING(alloc);
@@ -60,14 +109,13 @@ void *ua_zalloc_wrapper_timed(UArena *ua, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
-	ua_zalloc_total_time += alloc_time;
-	ua_zalloc_total_iter += 1;
+	timing_stats.ua_zalloc_total_time += alloc_time;
+	timing_stats.ua_zalloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
 
-static uint64_t ua_falloc_total_time, ua_falloc_total_iter;
 void *ua_falloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	START_TSC_TIMING(alloc);
@@ -76,14 +124,13 @@ void *ua_falloc_wrapper_timed(UArena *ua, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
-	ua_falloc_total_time += alloc_time;
-	ua_falloc_total_iter += 1;
+	timing_stats.ua_falloc_total_time += alloc_time;
+	timing_stats.ua_falloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
 
-static uint64_t ua_fzalloc_total_time, ua_fzalloc_total_iter;
 void *ua_fzalloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	START_TSC_TIMING(alloc);
@@ -92,14 +139,13 @@ void *ua_fzalloc_wrapper_timed(UArena *ua, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
-	ua_fzalloc_total_time += alloc_time;
-	ua_fzalloc_total_iter += 1;
+	timing_stats.ua_fzalloc_total_time += alloc_time;
+	timing_stats.ua_fzalloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
 
-static uint64_t ua_realloc_total_time, ua_realloc_total_iter;
 void *ua_realloc_wrapper_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
 {
 	(void)ptr;
@@ -110,8 +156,8 @@ void *ua_realloc_wrapper_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
-	ua_realloc_total_time += alloc_time;
-	ua_realloc_total_iter += 1;
+	timing_stats.ua_realloc_total_time += alloc_time;
+	timing_stats.ua_realloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
 	return new;
@@ -134,7 +180,6 @@ void ua_free_wrapper(UArena *ua, void *ptr)
 	(void)ua;
 }
 
-static uint64_t malloc_total_time, malloc_total_iter;
 void *malloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	(void)ua;
@@ -144,15 +189,14 @@ void *malloc_wrapper_timed(UArena *ua, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
-	malloc_total_time += alloc_time;
-	malloc_total_iter += 1;
+	timing_stats.malloc_total_time += alloc_time;
+	timing_stats.malloc_total_iter += 1;
 	add_timing(alloc_time);
 	timings.arr[timings.idx++] = alloc_time;
 	//--------------------------------------
 	return ptr;
 }
 
-static uint64_t calloc_total_time, calloc_total_iter;
 void *calloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	(void)ua;
@@ -162,14 +206,13 @@ void *calloc_wrapper_timed(UArena *ua, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
-	calloc_total_time += alloc_time;
-	calloc_total_iter += 1;
+	timing_stats.calloc_total_time += alloc_time;
+	timing_stats.calloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
 	return ptr;
 }
 
-static uint64_t free_total_time, free_total_iter;
 void free_wrapper_timed(UArena *ua, void *ptr)
 {
 	(void)ua;
@@ -178,11 +221,10 @@ void free_wrapper_timed(UArena *ua, void *ptr)
 	free(ptr);
 	//--------------------------------------
 	END_TSC_TIMING(free);
-	free_total_time += free_end - free_start;
-	free_total_iter += 1;
+	timing_stats.free_total_time += free_end - free_start;
+	timing_stats.free_total_iter += 1;
 }
 
-static uint64_t realloc_total_time, realloc_total_iter;
 void *realloc_wrapper_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
 {
 	(void)ua;
@@ -193,8 +235,8 @@ void *realloc_wrapper_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
 	//--------------------------------------
 	END_TSC_TIMING(realloc);
 	uint64_t alloc_time = realloc_end - realloc_start;
-	realloc_total_time += alloc_time;
-	realloc_total_iter += 1;
+	timing_stats.realloc_total_time += alloc_time;
+	timing_stats.realloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
 	return new;
@@ -225,128 +267,129 @@ void *realloc_wrapper(UArena *ua, void *ptr, size_t old_sz, size_t sz)
 	return realloc(ptr, sz);
 }
 
-uint64_t get_and_clear_malloc_timing(void)
+// NOTE: (isa): (ingar): Written by Claude
+void log_allocation_timing(enum allocation_type type,
+			   struct alloc_timing_stats *stats,
+			   const char *description, enum time_stamp_fmt fmt,
+			   bool log_raw, enum lm_log_level lvl,
+			   lm_log_module *module)
 {
-	uint64_t total = malloc_total_time;
-	malloc_total_time = 0;
-	return total;
+	switch (type) {
+	case MALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case CALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case REALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case FREE:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case UA_ALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case UA_ZALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case UA_FALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case UA_FZALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	case UA_REALLOC:
+		lm_log_tsc_timing(stats->malloc_total_time, description, fmt,
+				  log_raw, lvl, module);
+		break;
+
+	default:
+		LmLogWarning("Unknown allocation type");
+		break;
+	}
 }
 
-uint64_t get_and_clear_malloc_iterations(void)
+// NOTE: (isa): (ingar): Written by Claude
+void log_allocation_timing_avg(enum allocation_type type,
+			       struct alloc_timing_stats *stats,
+			       const char *description, enum time_stamp_fmt fmt,
+			       bool log_raw, enum lm_log_level lvl,
+			       lm_log_module *module)
 {
-	uint64_t total = malloc_total_iter;
-	malloc_total_iter = 0;
-	return total;
-}
+	switch (type) {
+	case MALLOC:
+		lm_log_tsc_timing_avg(stats->malloc_total_time,
+				      stats->malloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_calloc_timing(void)
-{
-	uint64_t total = calloc_total_time;
-	calloc_total_time = 0;
-	return total;
-}
+	case CALLOC:
+		lm_log_tsc_timing_avg(stats->calloc_total_time,
+				      stats->calloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_calloc_iterations(void)
-{
-	uint64_t total = calloc_total_iter;
-	calloc_total_iter = 0;
-	return total;
-}
+	case REALLOC:
+		lm_log_tsc_timing_avg(stats->realloc_total_time,
+				      stats->realloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_realloc_timing(void)
-{
-	uint64_t total = realloc_total_time;
-	realloc_total_time = 0;
-	return total;
-}
+	case FREE:
+		lm_log_tsc_timing_avg(stats->free_total_time,
+				      stats->free_total_iter, description, fmt,
+				      log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_realloc_iterations(void)
-{
-	uint64_t total = realloc_total_iter;
-	realloc_total_iter = 0;
-	return total;
-}
+	case UA_ALLOC:
+		lm_log_tsc_timing_avg(stats->ua_alloc_total_time,
+				      stats->ua_alloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_free_timing(void)
-{
-	uint64_t total = free_total_time;
-	free_total_time = 0;
-	return total;
-}
+	case UA_ZALLOC:
+		lm_log_tsc_timing_avg(stats->ua_zalloc_total_time,
+				      stats->ua_zalloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_free_iterations(void)
-{
-	uint64_t total = free_total_iter;
-	free_total_iter = 0;
-	return total;
-}
+	case UA_FALLOC:
+		lm_log_tsc_timing_avg(stats->ua_falloc_total_time,
+				      stats->ua_falloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_ua_alloc_timing(void)
-{
-	uint64_t total = ua_alloc_total_time;
-	ua_alloc_total_time = 0;
-	return total;
-}
+	case UA_FZALLOC:
+		lm_log_tsc_timing_avg(stats->ua_fzalloc_total_time,
+				      stats->ua_fzalloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_ua_alloc_iterations(void)
-{
-	uint64_t total = ua_alloc_total_iter;
-	ua_alloc_total_iter = 0;
-	return total;
-}
+	case UA_REALLOC:
+		lm_log_tsc_timing_avg(stats->ua_realloc_total_time,
+				      stats->ua_realloc_total_iter, description,
+				      fmt, log_raw, lvl, module);
+		break;
 
-uint64_t get_and_clear_ua_zalloc_timing(void)
-{
-	uint64_t total = ua_zalloc_total_time;
-	ua_zalloc_total_time = 0;
-	return total;
-}
-
-uint64_t get_and_clear_ua_zalloc_iterations(void)
-{
-	uint64_t total = ua_zalloc_total_iter;
-	ua_zalloc_total_iter = 0;
-	return total;
-}
-
-uint64_t get_and_clear_ua_falloc_timing(void)
-{
-	uint64_t total = ua_falloc_total_time;
-	ua_falloc_total_time = 0;
-	return total;
-}
-
-uint64_t get_and_clear_ua_falloc_iterations(void)
-{
-	uint64_t total = ua_falloc_total_iter;
-	ua_falloc_total_iter = 0;
-	return total;
-}
-
-uint64_t get_and_clear_ua_fzalloc_timing(void)
-{
-	uint64_t total = ua_fzalloc_total_time;
-	ua_fzalloc_total_time = 0;
-	return total;
-}
-
-uint64_t get_and_clear_ua_fzalloc_iterations(void)
-{
-	uint64_t total = ua_fzalloc_total_iter;
-	ua_fzalloc_total_iter = 0;
-	return total;
-}
-
-uint64_t get_and_clear_ua_realloc_timing(void)
-{
-	uint64_t total = ua_realloc_total_time;
-	ua_realloc_total_time = 0;
-	return total;
-}
-
-uint64_t get_and_clear_ua_realloc_iterations(void)
-{
-	uint64_t total = ua_realloc_total_iter;
-	ua_realloc_total_iter = 0;
-	return total;
+	default:
+		LmLogWarning("Unknown allocation type\n");
+		break;
+	}
 }

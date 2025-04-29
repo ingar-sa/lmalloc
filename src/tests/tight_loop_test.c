@@ -24,13 +24,13 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 				       sizeof(uint64_t));
 	uint64_t *timing_arr =
 		UaPushArray(timings_ua, uint64_t, total_iterations);
-	provide_timing_collection_arr(total_iterations, timing_arr);
-	struct timing_collection *timings = get_wrapper_timings();
+	provide_alloc_timing_collection_arr(total_iterations, timing_arr);
+	struct alloc_timing_collection *timings = get_wrapper_timings();
 	for (size_t i = 0; i < alloc_iterations; ++i) {
 		for (uint j = 0; j < alloc_sizes_len; ++j) {
 			uint8_t *ptr = alloc_fn(test_ua, alloc_sizes[j]);
-			if (LM_UNLIKELY(!ptr)) {
-				printf("AAAAAAAHHHHHHH ENOMEM FREEEEE\n");
+			if (!!0 && LM_UNLIKELY(!ptr)) {
+				LmLogDebug("Arena ran out of memory! Freeing");
 				ua_free(test_ua);
 				timings->idx -=
 					1; // Overwrite failed allocation timing
@@ -43,34 +43,27 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 	if (test_ua)
 		ua_free(test_ua);
 
-	uint64_t alloc_timing = 0;
-	uint64_t alloc_iter = 0;
-	if (alloc_fn == ua_alloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_alloc_timing();
-		alloc_iter = get_and_clear_ua_alloc_iterations();
-	} else if (alloc_fn == ua_zalloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_zalloc_timing();
-		alloc_iter = get_and_clear_ua_zalloc_iterations();
-	} else if (alloc_fn == ua_falloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_falloc_timing();
-		alloc_iter = get_and_clear_ua_falloc_iterations();
-	} else if (alloc_fn == ua_fzalloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_fzalloc_timing();
-		alloc_iter = get_and_clear_ua_fzalloc_iterations();
-	} else if (alloc_fn == malloc_wrapper_timed) {
-		alloc_timing = get_and_clear_malloc_timing();
-		alloc_iter = get_and_clear_malloc_iterations();
-	} else if (alloc_fn == calloc_wrapper_timed) {
-		alloc_timing = get_and_clear_calloc_timing();
-		alloc_iter = get_and_clear_calloc_iterations();
-	}
+	enum allocation_type type = UA_ALLOC;
+	if (alloc_fn == ua_alloc_wrapper_timed)
+		type = UA_ALLOC;
+	else if (alloc_fn == ua_zalloc_wrapper_timed)
+		type = UA_ZALLOC;
+	else if (alloc_fn == ua_falloc_wrapper_timed)
+		type = UA_FALLOC;
+	else if (alloc_fn == ua_fzalloc_wrapper_timed)
+		type = UA_FZALLOC;
+	else if (alloc_fn == malloc_wrapper_timed)
+		type = MALLOC;
+	else if (alloc_fn == calloc_wrapper_timed)
+		type = CALLOC;
 
-	lm_log_tsc_timing_avg(alloc_timing, alloc_iter, "", NS, true, INF,
-			      LM_LOG_MODULE_LOCAL);
+	log_allocation_timing_avg(type, get_alloc_stats(), "", NS, true, INF,
+				  LM_LOG_MODULE_LOCAL);
+
 	LmLogInfoR("\n");
 
 	ua_destroy(&timings_ua);
-	clear_wrapper_timing_collection();
+	clear_wrapper_alloc_timing_collection();
 }
 
 // NOTE: (isa): If the memory is freed, then malloc will
@@ -90,58 +83,50 @@ static void each_size_by_itself(UArena *test_ua, uint64_t alloc_iterations,
 				       sizeof(uint64_t));
 	uint64_t *timing_arr =
 		UaPushArray(timings_ua, uint64_t, alloc_iterations);
-	provide_timing_collection_arr(alloc_iterations, timing_arr);
-	struct timing_collection *timings = get_wrapper_timings();
+	provide_alloc_timing_collection_arr(alloc_iterations, timing_arr);
+	struct alloc_timing_collection *timings = get_wrapper_timings();
 
 	for (size_t j = 0; j < alloc_sizes_len; ++j) {
 		LmLogInfoR("\n%zd bytes: \n", alloc_sizes[j]);
 
 		for (uint64_t i = 0; i < alloc_iterations; ++i) {
 			uint8_t *ptr = alloc_fn(test_ua, alloc_sizes[j]);
-			if (LM_UNLIKELY(!ptr)) {
-				printf("AAAAAAAHHHHHHH ENOMEM FREEEEE\n");
+			if (!!0 && LM_UNLIKELY(!ptr)) {
+				LmLogDebug("Arena ran out of memory! Freeing");
 				ua_free(test_ua);
 				timings->idx -=
 					1; // Overwrite failed allocation timing
 				ptr = alloc_fn(test_ua, alloc_sizes[j]);
 			}
 			*ptr = 1;
-			// See note above function for info on freeing
 		}
 
-		if (test_ua)
-			ua_free(test_ua);
+		ua_free(test_ua);
 
-		uint64_t alloc_timing = 0;
-		uint64_t alloc_iter = 0;
-		if (alloc_fn == ua_alloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_alloc_timing();
-			alloc_iter = get_and_clear_ua_alloc_iterations();
-		} else if (alloc_fn == ua_zalloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_zalloc_timing();
-			alloc_iter = get_and_clear_ua_zalloc_iterations();
-		} else if (alloc_fn == ua_falloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_falloc_timing();
-			alloc_iter = get_and_clear_ua_falloc_iterations();
-		} else if (alloc_fn == ua_fzalloc_wrapper_timed) {
-			alloc_timing = get_and_clear_ua_fzalloc_timing();
-			alloc_iter = get_and_clear_ua_fzalloc_iterations();
-		} else if (alloc_fn == malloc_wrapper_timed) {
-			alloc_timing = get_and_clear_malloc_timing();
-			alloc_iter = get_and_clear_malloc_iterations();
-		} else if (alloc_fn == calloc_wrapper_timed) {
-			alloc_timing = get_and_clear_calloc_timing();
-			alloc_iter = get_and_clear_calloc_iterations();
-		}
+		enum allocation_type type = UA_ALLOC;
+		if (alloc_fn == ua_alloc_wrapper_timed)
+			type = UA_ALLOC;
+		else if (alloc_fn == ua_zalloc_wrapper_timed)
+			type = UA_ZALLOC;
+		else if (alloc_fn == ua_falloc_wrapper_timed)
+			type = UA_FALLOC;
+		else if (alloc_fn == ua_fzalloc_wrapper_timed)
+			type = UA_FZALLOC;
+		else if (alloc_fn == malloc_wrapper_timed)
+			type = MALLOC;
+		else if (alloc_fn == calloc_wrapper_timed)
+			type = CALLOC;
 
-		lm_log_tsc_timing_avg(alloc_timing, alloc_iter, "", NS, true,
-				      INF, LM_LOG_MODULE_LOCAL);
+		log_allocation_timing_avg(type, get_alloc_stats(), "", NS, true,
+					  INF, LM_LOG_MODULE_LOCAL);
+
 		LmLogInfoR("\n");
+
 		timings->idx = 0;
 	}
 
 	ua_destroy(&timings_ua);
-	clear_wrapper_timing_collection();
+	clear_wrapper_alloc_timing_collection();
 }
 
 void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,

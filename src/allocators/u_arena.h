@@ -30,7 +30,6 @@
 typedef struct {
 	uint_least64_t flags;
 	size_t alignment;
-	size_t page_sz;
 	size_t cap;
 	size_t cur;
 	uint8_t *mem;
@@ -86,8 +85,6 @@ struct ua__thread_arenas__ {
 	ua__scratch_get__(conflicts, conflict_count, \
 			  ua__thread_arenas_instance__)
 
-#define UaScratchRelease(scratch) ua__scratch_release__(scratch)
-
 #define UaPushArray(a, type, count) ua_alloc(a, sizeof(type) * count)
 #define UaPushArrayZero(a, type, count) ua_zalloc(a, sizeof(type) * count)
 
@@ -136,9 +133,9 @@ int ua__thread_arenas_add__(UArena *ua,
 
 UAScratch ua_scratch_begin(UArena *ua);
 
+void ua_scratch_release(UAScratch uas);
+
 UAScratch ua__scratch_get__(UArena **conflicts, int conflict_count,
 			    struct ua__thread_arenas__ *tas);
-
-void ua__scratch_release__(UAScratch uas);
 
 #endif /* u_arena_H */
