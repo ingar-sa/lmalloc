@@ -65,19 +65,25 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 	if (test_ua)
 		ua_free(test_ua);
 
-	enum allocation_type type = get_allocation_type(alloc_fn);
-	log_allocation_timing_avg(type, get_alloc_stats(), "", NS, true, INF,
-				  LM_LOG_MODULE_LOCAL);
+	enum allocation_type alloc_type = get_allocation_type(alloc_fn);
+	log_allocation_timing_avg(alloc_type, get_alloc_stats(), "", NS, true,
+				  INF, LM_LOG_MODULE_LOCAL);
 	LmLogInfoR("\n");
 
 	UAScratch uas = ua_scratch_begin(main_ua);
-	LmString data_dump_filename = lm_string_make(log_directory, uas.ua);
-	lm_string_append_fmt(data_dump_filename, "%s_%s.bin",
-			     alloct_string(type), size_name);
-	write_timing_data_to_file(data_dump_filename);
-	ua_scratch_release(uas);
 
+	LmString data_dump_filename = lm_string_make(log_directory, uas.ua);
+	lm_string_append_fmt(data_dump_filename, "%s-%s.bin",
+			     alloct_string(alloc_type), size_name);
+	if (write_timing_data_to_file(data_dump_filename, alloc_type) != 0) {
+		LmLogError("Failed to write data to file %s",
+			   data_dump_filename);
+		return;
+	}
+
+	ua_scratch_release(uas);
 	ua_destroy(&timings_ua);
+	clear_alloc_timing_stats(alloc_type);
 	clear_wrapper_alloc_timing_collection();
 }
 
@@ -119,21 +125,28 @@ static void each_size_by_itself(UArena *test_ua, uint64_t alloc_iterations,
 
 		ua_free(test_ua);
 
-		enum allocation_type type = get_allocation_type(alloc_fn);
-		log_allocation_timing_avg(type, get_alloc_stats(), "", NS, true,
-					  INF, LM_LOG_MODULE_LOCAL);
-
+		struct alloc_timing_stats *stats = get_alloc_stats();
+		enum allocation_type alloc_type = get_allocation_type(alloc_fn);
+		log_allocation_timing_avg(alloc_type, stats, "", NS, true, INF,
+					  LM_LOG_MODULE_LOCAL);
 		LmLogInfoR("\n");
 
 		UAScratch uas = ua_scratch_begin(main_ua);
+
 		LmString data_dump_filename =
 			lm_string_make(log_directory, uas.ua);
-		lm_string_append_fmt(data_dump_filename, "%s_%zdB.bin",
-				     alloct_string(type), alloc_sizes[j]);
-		write_timing_data_to_file(data_dump_filename);
+		lm_string_append_fmt(data_dump_filename, "%s-%zdB.bin",
+				     alloct_string(alloc_type), alloc_sizes[j]);
+		if (write_timing_data_to_file(data_dump_filename, alloc_type) !=
+		    0) {
+			LmLogError("Failed to write data to file %s",
+				   data_dump_filename);
+			return;
+		}
 
-		timings->idx = 0;
 		ua_scratch_release(uas);
+		clear_alloc_timing_stats(alloc_type);
+		timings->idx = 0;
 	}
 
 	ua_destroy(&timings_ua);
@@ -158,6 +171,7 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 			mem_needed_for_largest_sz);
 	}
 
+	UAScratch uas = ua_scratch_begin(main_ua);
 	if (!running_in_debugger) {
 		pid_t pid;
 		int status;
@@ -167,9 +181,6 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 			FILE *log_file =
 				lm_open_file_by_name(log_filename, file_mode);
 			LmSetLogFileLocal(log_file);
-			LmLogInfoR("%s\n\n", 
-			LmLogInfoR("\n\n------------------------------\n");
-			LmLogInfo("%s -- %s", alloc_fn_name, size_name);
 
 			UArena *ua = NULL;
 			if (ua_params)
@@ -177,6 +188,9 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 					       ua_params->contiguous,
 					       ua_params->mallocd,
 					       ua_params->alignment);
+
+			LmLogInfoR("\n\n------------------------------\n");
+			LmLogInfo("%s -- %s", alloc_fn_name, size_name);
 
 			each_size_by_itself(ua, alloc_iterations, alloc_fn,
 					    alloc_fn_name, alloc_sizes,
@@ -220,15 +234,15 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 	} else {
 		FILE *log_file = lm_open_file_by_name(log_filename, file_mode);
 		LmSetLogFileLocal(log_file);
-		LmLogInfoR("\n\n------------------------------\n");
-		LmLogInfo("%s -- %s", alloc_fn_name, size_name);
-
 		static UArena *ua = NULL;
 		if (!ua && ua_params)
 			ua = ua_create(ua_params->arena_sz,
 				       ua_params->contiguous,
 				       ua_params->mallocd,
 				       ua_params->alignment);
+
+		LmLogInfoR("\n\n------------------------------\n");
+		LmLogInfo("%s -- %s", alloc_fn_name, size_name);
 
 		each_size_by_itself(ua, alloc_iterations, alloc_fn,
 				    alloc_fn_name, alloc_sizes, alloc_sizes_len,
@@ -243,4 +257,6 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 		LmRemoveLogFileLocal();
 		lm_close_file(log_file);
 	}
+
+	ua_scratch_release(uas);
 }

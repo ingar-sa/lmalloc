@@ -364,8 +364,8 @@ uint8_t *lm_load_file_into_memory(const char *filename, size_t *sz_out,
 FILE *lm_open_file_by_name(const char *filename, const char *mode);
 int lm_close_file(FILE *file);
 
-int lm_write_bytes_to_file(const uint8_t *buf, size_t size, FILE *file);
-int lm_write_bytes_to_file_by_name(const uint8_t *buf, size_t size,
+int lm_write_bytes_to_file(uint8_t *buf, size_t size, FILE *file);
+int lm_write_bytes_to_file_by_name(uint8_t *buf, size_t size,
 				   const char *filename);
 
 ////////////////////////////////////////
@@ -938,7 +938,7 @@ int lm_close_file(FILE *file)
 	return 0;
 }
 
-int lm_write_bytes_to_file(const uint8_t *buf, size_t size, FILE *file)
+int lm_write_bytes_to_file(uint8_t *buf, size_t size, FILE *file)
 {
 	if (!(fwrite(buf, size, 1, file) == (size_t)1)) {
 		LmLogErrorG("Failed to write buffer to file %p: %s",
@@ -949,7 +949,7 @@ int lm_write_bytes_to_file(const uint8_t *buf, size_t size, FILE *file)
 	return 0;
 }
 
-int lm_write_bytes_to_file_by_name(const uint8_t *buf, size_t size,
+int lm_write_bytes_to_file_by_name(uint8_t *buf, size_t size,
 				   const char *filename)
 {
 	FILE *file = fopen(filename, "wb");

@@ -92,6 +92,7 @@ typedef void *(*alloc_fn_t)(UArena *ua, size_t sz);
 typedef void (*free_fn_t)(UArena *ua, void *ptr);
 typedef void *(*realloc_fn_t)(UArena *ua, void *ptr, size_t old_sz, size_t sz);
 
+void clear_alloc_timing_stats(enum allocation_type type);
 struct alloc_timing_stats *get_alloc_stats(void);
 void provide_alloc_timing_collection_arr(uint64_t cap, uint64_t *arr);
 void clear_wrapper_alloc_timing_collection(void);
@@ -100,7 +101,7 @@ void get_allocation_stats(struct alloc_timing_stats *stats,
 			  enum allocation_type type, uint64_t *timing,
 			  uint64_t *iterations);
 
-void write_timing_data_to_file(LmString filename);
+int write_timing_data_to_file(LmString filename, enum allocation_type type);
 void read_timing_data_from_file(const char *filename,
 				struct alloc_timing_data *tdata, UArena *ua);
 
