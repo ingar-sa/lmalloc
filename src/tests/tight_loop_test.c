@@ -11,10 +11,32 @@ LM_LOG_REGISTER(tight_loop_test);
 #include <stdlib.h>
 #include <sys/wait.h>
 
+extern UArena *main_ua;
+
+static enum allocation_type get_allocation_type(alloc_fn_t alloc_fn)
+{
+	enum allocation_type type = -1;
+	if (alloc_fn == ua_alloc_wrapper_timed)
+		type = UA_ALLOC;
+	else if (alloc_fn == ua_zalloc_wrapper_timed)
+		type = UA_ZALLOC;
+	else if (alloc_fn == ua_falloc_wrapper_timed)
+		type = UA_FALLOC;
+	else if (alloc_fn == ua_fzalloc_wrapper_timed)
+		type = UA_FZALLOC;
+	else if (alloc_fn == malloc_wrapper_timed)
+		type = MALLOC;
+	else if (alloc_fn == calloc_wrapper_timed)
+		type = CALLOC;
+
+	return type;
+}
+
 static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 				 alloc_fn_t alloc_fn, const char *alloc_fn_name,
 				 size_t *alloc_sizes, size_t alloc_sizes_len,
-				 const char *size_name)
+				 const char *size_name,
+				 const char *log_directory)
 {
 	LmLogInfoR("\n\n%s'ing all %s sizes repeatedly %lu times: \n",
 		   alloc_fn_name, size_name, alloc_iterations);
@@ -43,24 +65,17 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 	if (test_ua)
 		ua_free(test_ua);
 
-	enum allocation_type type = UA_ALLOC;
-	if (alloc_fn == ua_alloc_wrapper_timed)
-		type = UA_ALLOC;
-	else if (alloc_fn == ua_zalloc_wrapper_timed)
-		type = UA_ZALLOC;
-	else if (alloc_fn == ua_falloc_wrapper_timed)
-		type = UA_FALLOC;
-	else if (alloc_fn == ua_fzalloc_wrapper_timed)
-		type = UA_FZALLOC;
-	else if (alloc_fn == malloc_wrapper_timed)
-		type = MALLOC;
-	else if (alloc_fn == calloc_wrapper_timed)
-		type = CALLOC;
-
+	enum allocation_type type = get_allocation_type(alloc_fn);
 	log_allocation_timing_avg(type, get_alloc_stats(), "", NS, true, INF,
 				  LM_LOG_MODULE_LOCAL);
-
 	LmLogInfoR("\n");
+
+	UAScratch uas = ua_scratch_begin(main_ua);
+	LmString data_dump_filename = lm_string_make(log_directory, uas.ua);
+	lm_string_append_fmt(data_dump_filename, "%s_%s.bin",
+			     alloct_string(type), size_name);
+	write_timing_data_to_file(data_dump_filename);
+	ua_scratch_release(uas);
 
 	ua_destroy(&timings_ua);
 	clear_wrapper_alloc_timing_collection();
@@ -73,7 +88,8 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 static void each_size_by_itself(UArena *test_ua, uint64_t alloc_iterations,
 				alloc_fn_t alloc_fn, const char *alloc_fn_name,
 				size_t *alloc_sizes, size_t alloc_sizes_len,
-				const char *size_name)
+				const char *size_name,
+				const char *log_directory)
 {
 	LmLogInfoR("\n%s'ing each %s size %lu times\n", alloc_fn_name,
 		   size_name, alloc_iterations);
@@ -103,26 +119,21 @@ static void each_size_by_itself(UArena *test_ua, uint64_t alloc_iterations,
 
 		ua_free(test_ua);
 
-		enum allocation_type type = UA_ALLOC;
-		if (alloc_fn == ua_alloc_wrapper_timed)
-			type = UA_ALLOC;
-		else if (alloc_fn == ua_zalloc_wrapper_timed)
-			type = UA_ZALLOC;
-		else if (alloc_fn == ua_falloc_wrapper_timed)
-			type = UA_FALLOC;
-		else if (alloc_fn == ua_fzalloc_wrapper_timed)
-			type = UA_FZALLOC;
-		else if (alloc_fn == malloc_wrapper_timed)
-			type = MALLOC;
-		else if (alloc_fn == calloc_wrapper_timed)
-			type = CALLOC;
-
+		enum allocation_type type = get_allocation_type(alloc_fn);
 		log_allocation_timing_avg(type, get_alloc_stats(), "", NS, true,
 					  INF, LM_LOG_MODULE_LOCAL);
 
 		LmLogInfoR("\n");
 
+		UAScratch uas = ua_scratch_begin(main_ua);
+		LmString data_dump_filename =
+			lm_string_make(log_directory, uas.ua);
+		lm_string_append_fmt(data_dump_filename, "%s_%zdB.bin",
+				     alloct_string(type), alloc_sizes[j]);
+		write_timing_data_to_file(data_dump_filename);
+
 		timings->idx = 0;
+		ua_scratch_release(uas);
 	}
 
 	ua_destroy(&timings_ua);
@@ -133,7 +144,8 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 		     uint64_t alloc_iterations, alloc_fn_t alloc_fn,
 		     const char *alloc_fn_name, size_t *alloc_sizes,
 		     size_t alloc_sizes_len, const char *size_name,
-		     const char *log_filename, const char *file_mode)
+		     LmString log_filename, const char *file_mode,
+		     const char *log_directory)
 {
 	if (ua_params) {
 		size_t largest_sz = alloc_sizes[alloc_sizes_len - 1];
@@ -155,6 +167,7 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 			FILE *log_file =
 				lm_open_file_by_name(log_filename, file_mode);
 			LmSetLogFileLocal(log_file);
+			LmLogInfoR("%s\n\n", 
 			LmLogInfoR("\n\n------------------------------\n");
 			LmLogInfo("%s -- %s", alloc_fn_name, size_name);
 
@@ -167,7 +180,8 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 
 			each_size_by_itself(ua, alloc_iterations, alloc_fn,
 					    alloc_fn_name, alloc_sizes,
-					    alloc_sizes_len, size_name);
+					    alloc_sizes_len, size_name,
+					    log_directory);
 			if (ua)
 				ua_destroy(&ua);
 			LmRemoveLogFileLocal();
@@ -193,7 +207,8 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 
 			all_sizes_repeatedly(ua, alloc_iterations, alloc_fn,
 					     alloc_fn_name, alloc_sizes,
-					     alloc_sizes_len, size_name);
+					     alloc_sizes_len, size_name,
+					     log_directory);
 			if (ua)
 				ua_destroy(&ua);
 			LmRemoveLogFileLocal();
@@ -217,11 +232,11 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 
 		each_size_by_itself(ua, alloc_iterations, alloc_fn,
 				    alloc_fn_name, alloc_sizes, alloc_sizes_len,
-				    size_name);
+				    size_name, log_directory);
 
 		all_sizes_repeatedly(ua, alloc_iterations, alloc_fn,
 				     alloc_fn_name, alloc_sizes,
-				     alloc_sizes_len, size_name);
+				     alloc_sizes_len, size_name, log_directory);
 		if (ua)
 			ua_destroy(&ua);
 

@@ -33,12 +33,12 @@
                 "enabled": true,
                 "ctx": 
                 {
-                    "arena_sz": "64gB",
+                    "arena_sz": "4gB",
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": true,
                     "alloc_iterations": 10000,
-                    "log_filename": "./logs/u_arena_nm_c.txt"
+                    "log_directory": "./logs/ua_nmc/"
                 }
             },
             {
