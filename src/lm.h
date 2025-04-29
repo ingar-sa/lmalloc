@@ -358,13 +358,8 @@ void lm__free_trace__(void *ptr, int line, const char *func,
 //              FILE IO                //
 /////////////////////////////////////////
 
-typedef struct lm_file_data {
-	size_t size;
-	uint8_t *data;
-} lm_file_data;
-
-lm_file_data *lm_load_file_into_memory(const char *filename, UArena *ua);
-void lm_free_file_data(lm_file_data **file_data);
+uint8_t *lm_load_file_into_memory(const char *filename, size_t *sz_out,
+				  UArena *ua);
 
 FILE *lm_open_file_by_name(const char *filename, const char *mode);
 int lm_close_file(FILE *file);
@@ -873,7 +868,8 @@ void lm__free_trace__(void *ptr, int line, const char *func,
 	}
 }
 
-lm_file_data *lm_load_file_into_memory(const char *filename, UArena *ua)
+uint8_t *lm_load_file_into_memory(const char *filename, size_t *sz_out,
+				  UArena *ua)
 {
 	FILE *file = fopen(filename, "rb");
 	if (!file) {
@@ -888,14 +884,12 @@ lm_file_data *lm_load_file_into_memory(const char *filename, UArena *ua)
 	}
 
 	size_t file_size = (size_t)ftell(file);
-	rewind(file);
-
-	lm_file_data *file_data;
-	size_t file_data_size = sizeof(lm_file_data) + file_size + 1;
+	uint8_t *file_data;
+	UAScratch uas = ua_scratch_begin(ua);
 	if (ua)
-		file_data = ua_zalloc(ua, file_data_size);
+		file_data = ua_alloc(ua, file_size);
 	else
-		file_data = calloc(1, file_data_size);
+		file_data = malloc(file_size);
 
 	if (!file_data) {
 		LmLogErrorG(
@@ -905,30 +899,21 @@ lm_file_data *lm_load_file_into_memory(const char *filename, UArena *ua)
 		return NULL;
 	}
 
-	file_data->size = file_size;
-	file_data->data = (uint8_t *)file_data + sizeof(lm_file_data);
-
-	if (fread(file_data->data, file_size, 1, file) != 1) {
+	rewind(file);
+	if (fread(file_data, file_size, 1, file) != 1) {
 		LmLogErrorG("Failed to read data from file %s: %s", filename,
 			    strerror(errno));
 		fclose(file);
-		free(file_data);
+		if (ua)
+			ua_scratch_release(uas);
+		else
+			free(file_data);
 		return NULL;
 	}
 
 	fclose(file);
+	*sz_out = file_size;
 	return file_data;
-}
-
-void lm_free_file_data(lm_file_data **file_data)
-{
-	if (file_data && *file_data) {
-		free(*file_data);
-		*file_data = NULL;
-	} else {
-		LmLogWarningG(
-			" Pointer to file data pointer or file data pointer was NULL");
-	}
 }
 
 FILE *lm_open_file_by_name(const char *filename, const char *mode)

@@ -208,9 +208,9 @@ TgManagerWaitForAll(tg_manager *Manager)
         Manager->CompletedCount = Manager->GroupCount;
     }
 
-    uint64_t alloc_time = get_and_clear_ua_alloc_timing();
-    uint64_t alloc_iter = get_and_clear_ua_alloc_iterations();
-    lm_print_tsc_timing_avg(alloc_time, alloc_iter, "Average time spent in alloc: ", NS);
+    struct alloc_timing_stats *stats = get_alloc_stats();
+    lm_print_tsc_timing_avg(stats->ua_alloc_total_time, stats->ua_alloc_total_iter,
+                            "Average time spent in alloc: ", NS);
 
 
     SdbLogInfo("All groups have completed or shutdown requested");

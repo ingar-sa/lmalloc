@@ -19,12 +19,14 @@ typedef UAScratch SdhsArenaScratch;
 #define SDHS_ARENA_TEST_IS_MALLOCD false
 #define SDHS_ARENA_TEST_ALIGNMENT 16
 
+#define UA_ALLOC_FN(ua, size) ua_alloc_wrapper_timed(ua, size)
+
 #define ArenaCreate(cap, contiguous, mallocd, alignment) \
 	ua_create(cap, contiguous, mallocd, alignment)
 #define ArenaDestroy(uap) ua_destroy(uap)
 #define ArenaBootstrap(ua, new_existing, cap, alignment) \
 	ua_bootstrap(ua, new_existing, cap, alignment)
-#define ArenaAlloc(ua, size) ua_alloc_wrapper_timed(ua, size)
+#define ArenaAlloc(ua, size) UA_ALLOC_FN(ua, size)
 #define ArenaFree(ua) ua_free(ua)
 #define ArenaPop(ua, size) ua_pop(ua, size)
 #define ArenaPos(ua) ua_pos(ua)
@@ -44,7 +46,7 @@ typedef UAScratch SdhsArenaScratch;
 #define ScratchBegin(arena) ua_scratch_begin(arena)
 #define ScratchGet(conflicts, conflict_count) \
 	UaScratchGet(conflicts, conflict_count)
-#define ScratchRelease(scratch) UaScratchRelease(scratch)
+#define ScratchRelease(scratch) ua_scratch_release(scratch)
 
 #endif // SDHS_TEST_U_ARENA
 

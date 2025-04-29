@@ -1,6 +1,6 @@
 {
         "enabled": true,
-        "debugger": false,
+        "debugger": true,
         "tests": [
             {
                 "name": "u_arena_m_c",
@@ -30,14 +30,14 @@
             },
             {
                 "name": "u_arena_nm_c",
-                "enabled": false,
+                "enabled": true,
                 "ctx": 
                 {
-                    "arena_sz": "4gB",
+                    "arena_sz": "64gB",
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": true,
-                    "alloc_iterations": 1000,
+                    "alloc_iterations": 10000,
                     "log_filename": "./logs/u_arena_nm_c.txt"
                 }
             },
@@ -46,11 +46,11 @@
                 "enabled": false,
                 "ctx": 
                 {
-                    "arena_sz": "4gB",
+                    "arena_sz": "64gB",
                     "alignment": 16,
                     "mallocd": false,
                     "contiguous": false,
-                    "alloc_iterations": 1000,
+                    "alloc_iterations": 10000,
                     "log_filename": "./logs/u_arena_nm_nc.txt"
                 }
             },

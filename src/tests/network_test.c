@@ -273,32 +273,19 @@ static void run_network_test(UArena *ua, uint64_t iterations,
 
 	LM_END_TIMING(network_test, PROC_CPUTIME);
 
-	uint64_t alloc_timing = 0;
-	uint64_t realloc_timing = 0;
-	uint64_t free_timing = 0;
-	if (alloc_fn == ua_alloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_alloc_timing();
-	} else if (alloc_fn == ua_zalloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_zalloc_timing();
-	} else if (alloc_fn == ua_falloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_falloc_timing();
-	} else if (alloc_fn == ua_fzalloc_wrapper_timed) {
-		alloc_timing = get_and_clear_ua_fzalloc_timing();
-	} else if (alloc_fn == malloc_wrapper_timed)
-		alloc_timing = get_and_clear_malloc_timing();
+	enum allocation_type type = UA_ALLOC;
+	if (alloc_fn == ua_alloc_wrapper_timed)
+		type = UA_ALLOC;
+	else if (alloc_fn == ua_zalloc_wrapper_timed)
+		type = UA_ZALLOC;
+	else if (alloc_fn == ua_falloc_wrapper_timed)
+		type = UA_FALLOC;
+	else if (alloc_fn == ua_fzalloc_wrapper_timed)
+		type = UA_FZALLOC;
+	else if (alloc_fn == malloc_wrapper_timed)
+		type = MALLOC;
 	else if (alloc_fn == calloc_wrapper_timed)
-		alloc_timing = get_and_clear_calloc_timing();
-	else
-		alloc_timing = 0;
-
-	if (ua) {
-		LmLogDebugR("Arena memory use: %zd\n", ua->cur);
-		realloc_timing = get_and_clear_ua_realloc_timing();
-		ua_free(ua);
-	} else {
-		realloc_timing = get_and_clear_realloc_timing();
-		free_timing = get_and_clear_free_timing();
-	}
+		type = CALLOC;
 
 	LM_LOG_TIMING(network_test, "Timing for network test: ", MS, true, INF,
 		      LM_LOG_MODULE_LOCAL);
@@ -320,14 +307,25 @@ static void run_network_test(UArena *ua, uint64_t iterations,
 		      LM_LOG_MODULE_LOCAL);
 	LmLogInfoR("\n");
 
-	lm_log_tsc_timing(alloc_timing, "Total time spent in alloc: ", MS, true,
-			  DBG, LM_LOG_MODULE_LOCAL);
+	log_allocation_timing(type, get_alloc_stats(),
+			      "Total time spent in alloc: ", MS, true, DBG,
+			      LM_LOG_MODULE_LOCAL);
+	if (ua) {
+		LmLogDebugR("Arena memory use: %zd\n", ua->cur);
+		log_allocation_timing(UA_REALLOC, get_alloc_stats(),
+				      "Total time spent in realloc: ", MS, true,
+				      DBG, LM_LOG_MODULE_LOCAL);
+		ua_free(ua);
+	} else {
+		log_allocation_timing(REALLOC, get_alloc_stats(),
+				      "Total time spent in realloc: ", MS, true,
+				      DBG, LM_LOG_MODULE_LOCAL);
+		log_allocation_timing(FREE, get_alloc_stats(),
+				      "Total time spent in free: ", MS, true,
+				      DBG, LM_LOG_MODULE_LOCAL);
+	}
+
 	LmLogInfoR("\n");
-	lm_log_tsc_timing(realloc_timing, "Total time spent in realloc: ", MS,
-			  true, DBG, LM_LOG_MODULE_LOCAL);
-	LmLogInfoR("\n");
-	lm_log_tsc_timing(free_timing, "Total time spent in free: ", MS, true,
-			  DBG, LM_LOG_MODULE_LOCAL);
 	LmLogInfoR("\n");
 }
 
