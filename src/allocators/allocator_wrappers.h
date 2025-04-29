@@ -26,6 +26,33 @@ enum allocation_type {
 	UA_REALLOC
 };
 
+// NOTE: (isa): Mayde by Claude
+static inline const char *alloct_string(enum allocation_type type)
+{
+	switch (type) {
+	case MALLOC:
+		return "malloc";
+	case CALLOC:
+		return "calloc";
+	case REALLOC:
+		return "realloc";
+	case FREE:
+		return "free";
+	case UA_ALLOC:
+		return "ua_alloc";
+	case UA_ZALLOC:
+		return "ua_zalloc";
+	case UA_FALLOC:
+		return "ua_falloc";
+	case UA_FZALLOC:
+		return "ua_fzalloc";
+	case UA_REALLOC:
+		return "ua_realloc";
+	default:
+		return "unknown";
+	}
+}
+
 // NOTE: (isa): (ingar): Struct made by Claude
 struct alloc_timing_stats {
 	uint64_t malloc_total_time;
@@ -73,8 +100,7 @@ void get_allocation_stats(struct alloc_timing_stats *stats,
 			  enum allocation_type type, uint64_t *timing,
 			  uint64_t *iterations);
 
-void write_timing_data_to_file(const char *filename);
-
+void write_timing_data_to_file(LmString filename);
 void read_timing_data_from_file(const char *filename,
 				struct alloc_timing_data *tdata, UArena *ua);
 

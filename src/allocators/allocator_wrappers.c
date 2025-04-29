@@ -42,18 +42,29 @@ static void add_timing(uint64_t t)
 	}
 }
 
-void write_timing_data_to_file(const char *filename)
+void write_timing_data_to_file(LmString filename)
 {
 	FILE *file = lm_open_file_by_name(filename, "w");
-	int res = lm_write_bytes_to_file((const uint8_t *)(&timing_stats),
-					 sizeof(timing_stats), file);
-	if (res != 0)
+
+	int res;
+	size_t tstats_sz = sizeof(timing_stats);
+	if ((res = lm_write_bytes_to_file((const uint8_t *)&tstats_sz,
+					  sizeof(tstats_sz), file)) != 0)
 		return;
 
-	lm_write_bytes_to_file((const uint8_t *)&timings.idx,
-			       sizeof(timings.idx), file);
-	lm_write_bytes_to_file((const uint8_t *)timings.arr,
-			       timings.idx * sizeof(uint64_t), file);
+	if ((res = lm_write_bytes_to_file((const uint8_t *)(&timing_stats),
+					  sizeof(timing_stats), file)) != 0)
+		return;
+
+	if ((res = lm_write_bytes_to_file((const uint8_t *)&timings.idx,
+					  sizeof(timings.idx), file)) != 0)
+		return;
+
+	if ((res = lm_write_bytes_to_file((const uint8_t *)timings.arr,
+					  timings.idx * sizeof(uint64_t),
+					  file)) != 0)
+		return;
+
 	LmLogInfo("Wrote timing stats and collection to %s", filename);
 }
 

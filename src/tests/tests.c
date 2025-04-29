@@ -10,6 +10,10 @@ LM_LOG_REGISTER(tests);
 
 #include <stddef.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
+extern UArena *main_ua;
 
 static const alloc_fn_t ua_alloc_functions[] = {
 	ua_alloc_wrapper_timed /*,
@@ -29,33 +33,60 @@ static const char *ua_alloc_function_names[] = { "alloc", "zalloc", "falloc",
 						 "fzalloc" };
 static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
 
-static void tight_loop_test_all_sizes(struct ua_params *params,
-				      bool running_in_debugger,
-				      uint64_t iterations, alloc_fn_t alloc_fn,
-				      const char *alloc_fn_name,
-				      const char *log_filename,
-				      const char *file_mode)
+// NOTE: (isa): Made by Claude
+static int get_next_dir_num(LmString directory)
 {
-#if 0
-			if (iterations > 1000) {
-				LmLogWarning(
-					"%u iterations will allocate a lot of memory. Setting 'iterations'"
-					" to 1000 instead (override must be disabled in the code)",
-					iterations);
-				iterations = 1000;
+	DIR *dir;
+	struct dirent *entry;
+	int largest_num = 0;
+	int current_num;
+
+	dir = opendir(directory);
+	if (dir == NULL) {
+		LmLogError("Unable to open directory: %s", strerror(errno));
+		return -errno;
+	}
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (strcmp(entry->d_name, ".") == 0 ||
+		    strcmp(entry->d_name, "..") == 0) {
+			continue;
+		}
+
+		if (entry->d_type == DT_DIR) {
+			current_num = atoi(entry->d_name);
+
+			if (current_num > 0 ||
+			    (current_num == 0 &&
+			     strcmp(entry->d_name, "0") == 0)) {
+				if (current_num > largest_num) {
+					largest_num = current_num;
+				}
 			}
-#endif
+		}
+	}
+
+	closedir(dir);
+	return largest_num + 1;
+}
+
+static void
+tight_loop_test_all_sizes(struct ua_params *params, bool running_in_debugger,
+			  uint64_t iterations, alloc_fn_t alloc_fn,
+			  const char *alloc_fn_name, LmString log_filename,
+			  const char *file_mode, const char *log_filename_base)
+{
 	tight_loop_test(params, running_in_debugger, iterations, alloc_fn,
 			alloc_fn_name, small_sizes, LmArrayLen(small_sizes),
-			"small", log_filename, file_mode);
+			"small", log_filename, file_mode, log_filename_base);
 
 	tight_loop_test(params, running_in_debugger, iterations, alloc_fn,
 			alloc_fn_name, medium_sizes, LmArrayLen(medium_sizes),
-			"medium", log_filename, file_mode);
+			"medium", log_filename, file_mode, log_filename_base);
 
 	tight_loop_test(params, running_in_debugger, iterations, alloc_fn,
 			alloc_fn_name, large_sizes, LmArrayLen(large_sizes),
-			"large", log_filename, file_mode);
+			"large", log_filename, file_mode, log_filename_base);
 }
 
 static int u_arena_test(void *ctx, bool running_in_debugger)
@@ -67,11 +98,11 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 	cJSON *contiguous_json = cJSON_GetObjectItem(ctx_json, "contiguous");
 	cJSON *alloc_iterations_json =
 		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
-	cJSON *log_filename_json =
-		cJSON_GetObjectItem(ctx_json, "log_filename");
+	cJSON *log_directory_json =
+		cJSON_GetObjectItem(ctx_json, "log_directory");
 	LmAssert(arena_sz_json && alignment_json && mallocd_json &&
 			 contiguous_json && alloc_iterations_json &&
-			 log_filename_json,
+			 log_directory_json,
 		 "u_arena_test's context JSON is malformed");
 
 	struct ua_params params = { 0 };
@@ -83,10 +114,35 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 	params.contiguous = cJSON_IsTrue(contiguous_json);
 	uint64_t alloc_iterations =
 		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
-	char *log_filename = cJSON_GetStringValue(log_filename_json);
+
+	LmString log_directory = lm_string_make(
+		cJSON_GetStringValue(log_directory_json), main_ua);
+	int ret = mkdir(log_directory, S_IRWXU);
+	if (ret != 0) {
+		if (errno != EEXIST) {
+			LmLogError("Unable to create directory %s: %s",
+				   log_directory, strerror(errno));
+			return -errno;
+		}
+
+		int next_dirn = get_next_dir_num(log_directory);
+		if (next_dirn < 0)
+			return next_dirn;
+
+		lm_string_append_fmt(log_directory, "%d/", next_dirn);
+
+		ret = mkdir(log_directory, S_IRWXU);
+		if (ret != 0) {
+			LmLogError("Unable to create directory %s: %s",
+				   log_directory, strerror(errno));
+			return -errno;
+		}
+	}
+
+	LmString log_filename = lm_string_make(log_directory, main_ua);
+	lm_string_append_fmt(log_filename, "%s", "log.txt");
 
 	LmAssert(alloc_iterations > 0, "u_arena_test's alloc_iterations is 0");
-
 	LmLogDebug("test_params: %zd, %zd, %s, %s", params.arena_sz,
 		   params.alignment, LmBoolToString(params.mallocd),
 		   LmBoolToString(params.contiguous));
@@ -102,7 +158,7 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 		tight_loop_test_all_sizes(&params, running_in_debugger,
 					  alloc_iterations, alloc_fn,
 					  alloc_fn_name, log_filename,
-					  file_mode);
+					  file_mode, log_directory);
 #endif
 
 #if 0
@@ -181,14 +237,23 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 	cJSON *ctx_json = ctx;
 	cJSON *alloc_iterations_json =
 		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
-	cJSON *log_filename_json =
-		cJSON_GetObjectItem(ctx_json, "log_filename");
-	LmAssert(alloc_iterations_json && log_filename_json,
+	cJSON *log_directory_json =
+		cJSON_GetObjectItem(ctx_json, "log_directory");
+	LmAssert(alloc_iterations_json && log_directory_json,
 		 "malloc_test's context JSON is malformed");
 
 	uint64_t alloc_iterations =
 		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
-	char *log_filename = cJSON_GetStringValue(log_filename_json);
+	char *log_directory = cJSON_GetStringValue(log_directory_json);
+	int ret = mkdir(log_directory, S_IRWXU);
+	if (ret != 0 && errno != EEXIST) {
+		LmLogError("Failed to create directory %s: %s", log_directory,
+			   strerror(errno));
+		return -errno;
+	}
+
+	LmString log_filename = lm_string_make(log_directory, main_ua);
+	lm_string_append_fmt(log_filename, "%s", "log.txt");
 
 	LmAssert(alloc_iterations > 0, "malloc_test's alloc_iterations is 0");
 
@@ -203,7 +268,7 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 		tight_loop_test_all_sizes(NULL, running_in_debugger,
 					  alloc_iterations, alloc_fn,
 					  alloc_fn_name, log_filename,
-					  file_mode);
+					  file_mode, log_directory);
 #endif
 
 #if 1

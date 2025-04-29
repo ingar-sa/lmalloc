@@ -65,8 +65,13 @@ UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment)
 	} else {
 		if (contiguous) {
 			size_t allocation_sz = arena_cache_aligned_sz + cap;
-			mem = mmap(NULL, allocation_sz, PROT_READ | PROT_WRITE,
-				   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+			if ((mem = mmap(NULL, allocation_sz,
+					PROT_READ | PROT_WRITE,
+					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) ==
+			    (void *)-1) {
+				LmLogError("mmap failed: %s", strerror(errno));
+				return NULL;
+			}
 			ua = (UArena *)((uintptr_t)mem);
 			mem += arena_cache_aligned_sz;
 		} else {

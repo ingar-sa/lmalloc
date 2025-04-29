@@ -2,6 +2,7 @@ Ask Donn:
         Which parts of the report and code would he like to review?
         Are we missing anything?
         Specify final deliverables.
+        Do blank pages count toward page count?
         Where does benchmarking and testing belong in the report?
                 - How is it done in the theory section
                 - Do we write specifically about timing methods in theory or methods?
