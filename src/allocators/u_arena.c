@@ -13,6 +13,8 @@ LM_LOG_REGISTER(u_arena);
 #include <stdlib.h>
 #include <string.h>
 
+#define FastAlignPadding(value, alignment) \
+	(size_t)(((intptr_t)alignment - 1) & (-(intptr_t)(value)))
 
 static size_t arena_cache_aligned_sz(void)
 {
@@ -137,7 +139,11 @@ UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap,
 inline void *ua_alloc(UArena *ua, size_t size)
 {
 	void *ptr = NULL;
-	size_t aligned_sz = size + LmPaddingToAlign(size, ua->alignment);
+	size_t aligned_sz =
+		size +
+		FastAlignPadding(
+			size,
+			ua->alignment); //LmPaddingToAlign(size, ua->alignment);
 	if (LM_LIKELY(ua->cur + aligned_sz <= ua->cap)) {
 		ptr = ua->mem + ua->cur;
 		ua->cur += aligned_sz;
@@ -152,7 +158,11 @@ inline void *ua_alloc(UArena *ua, size_t size)
 inline void *ua_zalloc(UArena *ua, size_t size)
 {
 	void *ptr = NULL;
-	size_t aligned_sz = size + LmPaddingToAlign(size, ua->alignment);
+	size_t aligned_sz =
+		size +
+		FastAlignPadding(
+			size,
+			ua->alignment); // LmPaddingToAlign(size, ua->alignment);
 	if (LM_LIKELY(ua->cur + aligned_sz <= ua->cap)) {
 		ptr = ua->mem + ua->cur;
 		ua->cur += aligned_sz;
@@ -163,7 +173,11 @@ inline void *ua_zalloc(UArena *ua, size_t size)
 
 inline void *ua_falloc(UArena *ua, size_t size)
 {
-	size_t aligned_sz = size + LmPaddingToAlign(size, ua->alignment);
+	size_t aligned_sz =
+		size +
+		FastAlignPadding(
+			size,
+			ua->alignment); //LmPaddingToAlign(size, ua->alignment);
 	void *ptr = ua->mem + ua->cur;
 	ua->cur += aligned_sz;
 	return ptr;
@@ -171,7 +185,11 @@ inline void *ua_falloc(UArena *ua, size_t size)
 
 inline void *ua_fzalloc(UArena *ua, size_t size)
 {
-	size_t aligned_sz = size + LmPaddingToAlign(size, ua->alignment);
+	size_t aligned_sz =
+		size +
+		FastAlignPadding(
+			size,
+			ua->alignment); //LmPaddingToAlign(size, ua->alignment);
 	void *ptr = ua->mem + ua->cur;
 	ua->cur += aligned_sz;
 	explicit_bzero(ptr, aligned_sz);

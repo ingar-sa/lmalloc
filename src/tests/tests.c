@@ -4,8 +4,11 @@ LM_LOG_REGISTER(tests);
 #include <src/cJSON/cJSON.h>
 #include <src/allocators/allocator_wrappers.h>
 #include <src/sdhs/Sdhs.h>
+#include <src/utils/system_info.h>
 
-#include "network_test.h"
+// NOTE: (isa): Network test has been moved to "poc" for now,
+// since it's not that interesting for an arena example
+//#include "network_test.h"
 #include "tight_loop_test.h"
 
 #include <stddef.h>
@@ -16,11 +19,12 @@ LM_LOG_REGISTER(tests);
 extern UArena *main_ua;
 
 static const alloc_fn_t ua_alloc_functions[] = {
-	ua_alloc_wrapper_timed /*,
-						 ua_zalloc_wrapper_timed,
-						 ua_falloc_wrapper_timed,
-						 ua_fzalloc_wrapper_timed*/
+	ua_alloc_wrapper_timed
+	//ua_zalloc_wrapper_timed,
+	//ua_falloc_wrapper_timed
+	//ua_fzalloc_wrapper_timed
 };
+
 static const free_fn_t ua_free_functions[] = { ua_free_wrapper };
 static const realloc_fn_t ua_realloc_functions[] = { ua_realloc_wrapper_timed };
 
@@ -70,6 +74,33 @@ static int get_next_dir_num(LmString directory)
 	return largest_num + 1;
 }
 
+static int make_and_update_log_dir(LmString log_directory)
+{
+	int ret = mkdir(log_directory, S_IRWXU);
+	if (ret != 0) {
+		if (errno != EEXIST) {
+			LmLogError("Unable to create directory %s: %s",
+				   log_directory, strerror(errno));
+			return -errno;
+		}
+
+		int next_dirn = get_next_dir_num(log_directory);
+		if (next_dirn < 1)
+			return next_dirn;
+
+		lm_string_append_fmt(log_directory, "%d/", next_dirn);
+
+		ret = mkdir(log_directory, S_IRWXU);
+		if (ret != 0) {
+			LmLogError("Unable to create directory %s: %s",
+				   log_directory, strerror(errno));
+			return -errno;
+		}
+	}
+
+	return 0;
+}
+
 static void
 tight_loop_test_all_sizes(struct ua_params *params, bool running_in_debugger,
 			  uint64_t iterations, alloc_fn_t alloc_fn,
@@ -114,38 +145,38 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 	params.contiguous = cJSON_IsTrue(contiguous_json);
 	uint64_t alloc_iterations =
 		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
+	LmAssert(alloc_iterations > 0, "u_arena_test's alloc_iterations is 0");
 
 	LmString log_directory = lm_string_make(
 		cJSON_GetStringValue(log_directory_json), main_ua);
-	int ret = mkdir(log_directory, S_IRWXU);
-	if (ret != 0) {
-		if (errno != EEXIST) {
-			LmLogError("Unable to create directory %s: %s",
-				   log_directory, strerror(errno));
-			return -errno;
-		}
-
-		int next_dirn = get_next_dir_num(log_directory);
-		if (next_dirn < 0)
-			return next_dirn;
-
-		lm_string_append_fmt(log_directory, "%d/", next_dirn);
-
-		ret = mkdir(log_directory, S_IRWXU);
-		if (ret != 0) {
-			LmLogError("Unable to create directory %s: %s",
-				   log_directory, strerror(errno));
-			return -errno;
-		}
-	}
+	make_and_update_log_dir(log_directory);
 
 	LmString log_filename = lm_string_make(log_directory, main_ua);
 	lm_string_append_fmt(log_filename, "%s", "log.txt");
 
-	LmAssert(alloc_iterations > 0, "u_arena_test's alloc_iterations is 0");
-	LmLogDebug("test_params: %zd, %zd, %s, %s", params.arena_sz,
-		   params.alignment, LmBoolToString(params.mallocd),
-		   LmBoolToString(params.contiguous));
+	FILE *log_file = lm_open_file_by_name(log_filename, "w");
+	LmSetLogFileLocal(log_file);
+	LmLogInfoR("UArena info:\n"
+		   "\tContiguous:   %s\n"
+		   "\tMallocd:      %s\n"
+		   "\tAlignment:    %zd\n"
+		   "\tCap:          %zd\n",
+		   LmBoolToString(params.contiguous),
+		   LmBoolToString(params.mallocd), params.alignment,
+		   params.arena_sz);
+	LmLogInfoR("\nTSC freq: %.0f\n", get_tsc_freq());
+	LmRemoveLogFileLocal();
+	lm_close_file(log_file);
+
+	UAScratch uas = ua_scratch_begin(main_ua);
+	LmString tsc_freq_filename = lm_string_make(log_directory, uas.ua);
+	lm_string_append_fmt(tsc_freq_filename, "tsc_freq.bin");
+	double tsc_freq = get_tsc_freq();
+	if (lm_write_bytes_to_file_by_name((uint8_t *)&tsc_freq,
+					   sizeof(tsc_freq),
+					   tsc_freq_filename) != 0)
+		return -1;
+	ua_scratch_release(uas);
 
 	const char *file_mode = "a";
 	for (int i = 0; i < (int)LmArrayLen(ua_alloc_functions); ++i) {
@@ -153,7 +184,6 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 		const char *alloc_fn_name = ua_alloc_function_names[i];
 		free_fn_t free_fn = ua_free_functions[0];
 		realloc_fn_t realloc_fn = ua_realloc_functions[0];
-
 #if 1
 		tight_loop_test_all_sizes(&params, running_in_debugger,
 					  alloc_iterations, alloc_fn,
@@ -162,6 +192,7 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 #endif
 
 #if 0
+                // NOTE: (isa): Network test has been moved to "poc" for now
 		network_test(&params, alloc_fn, alloc_fn_name, free_fn,
 			     realloc_fn, alloc_iterations, running_in_debugger,
 			     log_filename, file_mode);
@@ -244,13 +275,10 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 
 	uint64_t alloc_iterations =
 		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
-	char *log_directory = cJSON_GetStringValue(log_directory_json);
-	int ret = mkdir(log_directory, S_IRWXU);
-	if (ret != 0 && errno != EEXIST) {
-		LmLogError("Failed to create directory %s: %s", log_directory,
-			   strerror(errno));
-		return -errno;
-	}
+
+	LmString log_directory = lm_string_make(
+		cJSON_GetStringValue(log_directory_json), main_ua);
+	make_and_update_log_dir(log_directory);
 
 	LmString log_filename = lm_string_make(log_directory, main_ua);
 	lm_string_append_fmt(log_filename, "%s", "log.txt");
@@ -263,7 +291,6 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 		const char *alloc_fn_name = malloc_and_fam_names[i];
 		free_fn_t free_fn = free_functions[0];
 		realloc_fn_t realloc_fn = realloc_functions[0];
-
 #if 1
 		tight_loop_test_all_sizes(NULL, running_in_debugger,
 					  alloc_iterations, alloc_fn,
@@ -271,7 +298,8 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 					  file_mode, log_directory);
 #endif
 
-#if 1
+#if 0
+                // NOTE: (isa): Network test has been moved to "poc" for now
 		network_test(NULL, alloc_fn, alloc_fn_name, free_fn, realloc_fn,
 			     alloc_iterations, running_in_debugger,
 			     log_filename, file_mode);

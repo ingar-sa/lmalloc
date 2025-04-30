@@ -14,6 +14,50 @@ struct alloc_timing_stats *get_alloc_stats(void)
 	return &timing_stats;
 }
 
+void clear_alloc_timing_stats(enum allocation_type type)
+{
+	switch (type) {
+	case MALLOC:
+		timing_stats.malloc_total_time = 0;
+		timing_stats.malloc_total_iter = 0;
+		break;
+	case CALLOC:
+		timing_stats.calloc_total_time = 0;
+		timing_stats.calloc_total_iter = 0;
+		break;
+	case REALLOC:
+		timing_stats.realloc_total_time = 0;
+		timing_stats.realloc_total_iter = 0;
+		break;
+	case FREE:
+		timing_stats.free_total_time = 0;
+		timing_stats.free_total_iter = 0;
+		break;
+	case UA_ALLOC:
+		timing_stats.ua_alloc_total_time = 0;
+		timing_stats.ua_alloc_total_iter = 0;
+		break;
+	case UA_ZALLOC:
+		timing_stats.ua_zalloc_total_time = 0;
+		timing_stats.ua_zalloc_total_iter = 0;
+		break;
+	case UA_FALLOC:
+		timing_stats.ua_falloc_total_time = 0;
+		timing_stats.ua_falloc_total_iter = 0;
+		break;
+	case UA_FZALLOC:
+		timing_stats.ua_fzalloc_total_time = 0;
+		timing_stats.ua_fzalloc_total_iter = 0;
+		break;
+	case UA_REALLOC:
+		timing_stats.ua_realloc_total_time = 0;
+		timing_stats.ua_realloc_total_iter = 0;
+		break;
+	default:
+		break;
+	}
+}
+
 static uint64_t timings_zii[1];
 static struct alloc_timing_collection timings = { 0, 0, timings_zii };
 
@@ -42,30 +86,78 @@ static void add_timing(uint64_t t)
 	}
 }
 
-void write_timing_data_to_file(LmString filename)
+static int write_timing_by_type(enum allocation_type type, FILE *file)
 {
-	FILE *file = lm_open_file_by_name(filename, "w");
+	int res = 0;
+	uint64_t time, iter;
+	switch (type) {
+	case MALLOC:
+		time = timing_stats.malloc_total_time;
+		iter = timing_stats.malloc_total_iter;
+		break;
+	case CALLOC:
+		time = timing_stats.calloc_total_time;
+		iter = timing_stats.calloc_total_iter;
+		break;
+	case REALLOC:
+		time = timing_stats.realloc_total_time;
+		iter = timing_stats.realloc_total_iter;
+		break;
+	case FREE:
+		time = timing_stats.free_total_time;
+		iter = timing_stats.free_total_iter;
+		break;
+	case UA_ALLOC:
+		time = timing_stats.ua_alloc_total_time;
+		iter = timing_stats.ua_alloc_total_iter;
+		break;
+	case UA_ZALLOC:
+		time = timing_stats.ua_zalloc_total_time;
+		iter = timing_stats.ua_zalloc_total_iter;
+		break;
+	case UA_FALLOC:
+		time = timing_stats.ua_falloc_total_time;
+		iter = timing_stats.ua_falloc_total_iter;
+		break;
+	case UA_FZALLOC:
+		time = timing_stats.ua_fzalloc_total_time;
+		iter = timing_stats.ua_fzalloc_total_iter;
+		break;
+	case UA_REALLOC:
+		time = timing_stats.ua_realloc_total_time;
+		iter = timing_stats.ua_realloc_total_iter;
+		break;
+	default:
+		return -1;
+		break;
+	}
+
+	if ((res = lm_write_bytes_to_file((uint8_t *)(&time), sizeof(time),
+					  file)) != 0)
+		return res;
+	res = lm_write_bytes_to_file((uint8_t *)(&iter), sizeof(iter), file);
+	return res;
+}
+
+int write_timing_data_to_file(LmString filename, enum allocation_type type)
+{
+	FILE *file = lm_open_file_by_name(filename, "wb");
 
 	int res;
-	size_t tstats_sz = sizeof(timing_stats);
-	if ((res = lm_write_bytes_to_file((const uint8_t *)&tstats_sz,
-					  sizeof(tstats_sz), file)) != 0)
-		return;
-
-	if ((res = lm_write_bytes_to_file((const uint8_t *)(&timing_stats),
-					  sizeof(timing_stats), file)) != 0)
-		return;
+	if ((res = write_timing_by_type(type, file)) != 0)
+		return res;
 
 	if ((res = lm_write_bytes_to_file((const uint8_t *)&timings.idx,
 					  sizeof(timings.idx), file)) != 0)
-		return;
+		return res;
 
 	if ((res = lm_write_bytes_to_file((const uint8_t *)timings.arr,
 					  timings.idx * sizeof(uint64_t),
 					  file)) != 0)
-		return;
+		return res;
 
 	LmLogInfo("Wrote timing stats and collection to %s", filename);
+	return 0;
 }
 
 void read_timing_data_from_file(const char *filename,
@@ -101,14 +193,21 @@ void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	START_TSC_TIMING(alloc);
 	//--------------------------------------
-	void *ptr = ua_alloc(ua, sz);
+	//void *ptr = ua_alloc(ua, sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
+#if 1
+	static int nl = 0;
+	printf("%lu ", alloc_time);
+	if ((nl++ % 100) == 0)
+		printf("\n");
+#endif
 	timing_stats.ua_alloc_total_time += alloc_time;
 	timing_stats.ua_alloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
+	void *ptr = ua_alloc(ua, sz);
 	return ptr;
 }
 
