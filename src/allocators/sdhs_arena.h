@@ -15,6 +15,7 @@
 typedef UArena SdhsArena;
 typedef UAScratch SdhsArenaScratch;
 
+// TODO: (isa): Move to JSON
 #define SDHS_ARENA_TEST_IS_CONTIGUOUS true
 #define SDHS_ARENA_TEST_IS_MALLOCD false
 #define SDHS_ARENA_TEST_ALIGNMENT 16

@@ -25,7 +25,12 @@ void cjson_free(void *ptr);
 static UArena *cjson_arena;
 void *cjson_alloc(size_t sz)
 {
-	return ua_alloc(cjson_arena, sz);
+	void *ptr = ua_alloc(cjson_arena, sz);
+	if (!ptr) {
+		LmLogError("Insufficient memory for cJSON allocation");
+		exit(EXIT_FAILURE);
+	}
+	return ptr;
 }
 
 // NOTE: (isa): This is only called in functions that change/add things to JSON objects,
