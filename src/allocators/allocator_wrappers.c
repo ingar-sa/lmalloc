@@ -4,6 +4,7 @@ LM_LOG_REGISTER(allocator_wrappers);
 #include <src/metrics/timing.h>
 
 #include "u_arena.h"
+#include "karena.h"
 #include "allocator_wrappers.h"
 
 #include <string.h>
@@ -189,11 +190,33 @@ void read_timing_data_from_file(const char *filename,
 	free(data);
 }
 
+void *ka_alloc_wrapper_timed(KArena *ka, size_t sz)
+{
+	START_TSC_TIMING(alloc);
+	//--------------------------------------
+	void *ptr = ka_alloc(ka, sz);
+	//--------------------------------------
+	END_TSC_TIMING(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+#if 1
+	static int nl = 0;
+	printf("%lu ", alloc_time);
+	if ((nl++ % 100) == 0)
+		printf("\n");
+#endif
+	timing_stats.ka_alloc_total_time += alloc_time;
+	timing_stats.ka_alloc_total_iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	// void *ptr = ka_alloc(ka, sz);
+	return ptr;
+}
+
 void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 {
 	START_TSC_TIMING(alloc);
 	//--------------------------------------
-	//void *ptr = ua_alloc(ua, sz);
+	void *ptr = ua_alloc(ua, sz);
 	//--------------------------------------
 	END_TSC_TIMING(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
@@ -207,7 +230,7 @@ void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 	timing_stats.ua_alloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
-	void *ptr = ua_alloc(ua, sz);
+	// void *ptr = ua_alloc(ua, sz);
 	return ptr;
 }
 

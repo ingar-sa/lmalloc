@@ -6,6 +6,7 @@
 #include <src/metrics/timing.h>
 
 #include "u_arena.h"
+#include "karena.h"
 
 struct alloc_timing_collection {
 	uint64_t cap;
@@ -67,6 +68,9 @@ struct alloc_timing_stats {
 	uint64_t free_total_time;
 	uint64_t free_total_iter;
 
+	uint64_t ka_alloc_total_time;
+	uint64_t ka_alloc_total_iter;
+
 	uint64_t ua_alloc_total_time;
 	uint64_t ua_alloc_total_iter;
 
@@ -104,6 +108,8 @@ void get_allocation_stats(struct alloc_timing_stats *stats,
 int write_timing_data_to_file(LmString filename, enum allocation_type type);
 void read_timing_data_from_file(const char *filename,
 				struct alloc_timing_data *tdata, UArena *ua);
+
+void *ka_alloc_wrapper_timed(KArena *ka, size_t sz);
 
 void *ua_alloc_wrapper_timed(UArena *ua, size_t sz);
 void *ua_zalloc_wrapper_timed(UArena *ua, size_t sz);

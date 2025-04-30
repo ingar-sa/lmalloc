@@ -3,8 +3,56 @@
 
 #include <src/lm.h>
 
+#ifndef SDHS_TEST_K_ARENA
+#define SDHS_TEST_K_ARENA 1
+#endif
+
+#if SDHS_TEST_K_ARENA == 1
+
+#include "karena.h"
+#include "allocator_wrappers.h"
+
+typedef KArena SdhsArena;
+typedef KAScratch SdhsArenaScratch;
+
+// TODO: (isa): Move to JSON
+#define SDHS_ARENA_TEST_IS_CONTIGUOUS true
+#define SDHS_ARENA_TEST_IS_MALLOCD false
+#define SDHS_ARENA_TEST_ALIGNMENT 16
+
+#define KA_ALLOC_FN(ka, size) ka_alloc_wrapper_timed(ka, size)
+
+#define ArenaCreate(cap, contiguous, mallocd, alignment) ka_create(cap)
+#define ArenaDestroy(kap) ka_destroy(*kap)
+#define ArenaBootstrap(ka, new_existing, cap, alignment) ka_bootstrap(ka, cap)
+#define ArenaAlloc(ka, size) KA_ALLOC_FN(ka, size)
+#define ArenaFree(ka) ka_free(ka)
+#define ArenaPop(ka, size) ka_pop(ka, size)
+#define ArenaPos(ka) ka_pos(ka)
+#define ArenaSeek(ka, pos) ka_seek(ka, pos)
+#define ArenaCap(ka) ka_size(ka)
+#define ArenaBase(ka) ka_base(ka)
+#define ArenaReserve(ka, sz) ka_reserve(ka, sz)
+#define ArenaPushArray(a, type, count) KaPushArray(a, type, count)
+#define ArenaPushArrayZero(a, type, count) KaPushArrayZero(a, type, count)
+#define ArenaPushStruct(a, type) KaPushStruct(a, type)
+#define ArenaPushStructZero(a, type) KaPushStruct(a, type)
+#define THREAD_ARENAS_REGISTER(thread_name, count) \
+	KA_THREAD_ARENAS_REGISTER(thread_name, count)
+#define THREAD_ARENAS_EXTERN(thread_name) KA_THREAD_ARENAS_EXTERN(thread_name)
+#define ThreadArenasInit(thread_name) KaThreadArenasInit(thread_name)
+#define ThreadArenasInitExtern(thread_name) \
+	KaThreadArenasInitExtern(thread_name)
+#define ThreadArenasAdd(arena) KaThreadArenasAdd(arena)
+#define ScratchBegin(arena) ka_scratch_begin(arena)
+#define ScratchGet(conflicts, conflict_count) \
+	KaScratchGet(conflicts, conflict_count)
+#define ScratchRelease(scratch) ka_scratch_release(scratch)
+
+#endif
+
 #ifndef SDHS_TEST_U_ARENA
-#define SDHS_TEST_U_ARENA 1
+#define SDHS_TEST_U_ARENA 0
 #endif
 
 #if SDHS_TEST_U_ARENA == 1
@@ -50,5 +98,3 @@ typedef UAScratch SdhsArenaScratch;
 #define ScratchRelease(scratch) ua_scratch_release(scratch)
 
 #endif // SDHS_TEST_U_ARENA
-
-#endif

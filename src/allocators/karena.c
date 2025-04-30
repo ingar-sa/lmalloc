@@ -119,6 +119,20 @@ size_t ka_reserve(KArena *arena, size_t sz)
 	return alloc.size;
 }
 
+void *ka_base(KArena *arena)
+{
+	struct ka_data alloc = {
+		.arena = (unsigned long)arena,
+	};
+
+	if (ioctl(fd, KARENA_BASE, &alloc)) {
+		perror("Base failed");
+		return NULL;
+	}
+
+	return (void*)alloc.arena;
+}
+
 size_t ka_size(KArena *arena)
 {
 	struct ka_data alloc = {
@@ -191,10 +205,15 @@ KAScratch ka_scratch_begin(KArena *ka)
 {
 	KAScratch kas = { 0 };
 	if (ka) {
-		kas.ka = ka;
+		kas.ua = ka;
 		kas.f5 = ka_pos(ka);
 	}
 	return kas;
+}
+
+void ka_scratch_release(KAScratch kas)
+{
+	ka_seek(kas.ua, kas.f5);
 }
 
 KAScratch ka__scratch_get__(KArena **conflicts, int conflict_count,

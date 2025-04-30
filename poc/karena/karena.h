@@ -16,6 +16,7 @@
 #define KARENA_DESTROY _IOWR(KARENA_MAGIC, 8, struct ka_data)
 #define KARENA_SIZE _IOWR(KARENA_MAGIC, 9, struct ka_data)
 #define KARENA_BOOTSTRAP _IOWR(KARENA_MAGIC, 10, struct ka_data)
+#define KARENA_BASE _IOWR(KARENA_MAGIC, 11, struct ka_data)
 
 typedef unsigned long KArena;
 

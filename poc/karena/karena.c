@@ -310,6 +310,18 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		break;
 
+	case KARENA_BASE:
+		case_id = "BASE";
+
+		alloc.arena = info->addr;
+
+		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
+			pr_err("Could not copy to user");
+			return -EFAULT;
+		}
+
+		break;
+
 	default:
 		case_id = "DEFAULT";
 		pr_info("Unknown ioctl command: %u\n", cmd);
