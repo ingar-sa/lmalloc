@@ -149,7 +149,7 @@ int
 SdhsMain(int ArgCount, char **ArgV)
 {
     tg_manager *Manager = NULL;
-    SetUpFromConf("./configs/sdb_conf.json", &Manager);
+    SetUpFromConf("./configs/validation.json", &Manager);
     if(Manager == NULL) {
         SdbLogError("Failed to set up from config file");
         exit(EXIT_FAILURE);
