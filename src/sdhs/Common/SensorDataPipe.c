@@ -11,6 +11,7 @@
  */
 
 #include <src/allocators/sdhs_arena.h>
+#include <src/lm.h>
 
 #include <src/sdhs/Sdb.h>
 SDB_LOG_REGISTER(SensorDataPipe);
@@ -37,8 +38,13 @@ SdpCreate(u64 BufCount, u64 BufSize, SdhsArena *Arena)
 {
     bool UsingArena = Arena != NULL;
     if(!UsingArena) {
-        u64 PipeSize = sizeof(sensor_data_pipe) + BufCount * sizeof(SdhsArena *)
-                     + BufCount * sizeof(SdhsArena) + BufCount * BufSize;
+        size_t al     = SDHS_ARENA_TEST_ALIGNMENT;
+        u64    SdpSz  = sizeof(sensor_data_pipe) + LmPow2AlignUp(sizeof(sensor_data_pipe), al);
+        u64 ArenaPsSz = BufCount * (sizeof(SdhsArena *) + LmPow2AlignUp(sizeof(SdhsArena *), al));
+        u64 ArenasSz  = BufCount * (sizeof(SdhsArena) + LmPow2AlignUp(sizeof(SdhsArena), al));
+        u64 BufsSz    = BufCount * (BufSize + LmPow2AlignUp(BufSize, al));
+        u64 PipeSize  = SdpSz + ArenaPsSz + ArenasSz + BufsSz;
+
         Arena = ArenaCreate(PipeSize, SDHS_ARENA_TEST_IS_CONTIGUOUS, SDHS_ARENA_TEST_IS_MALLOCD,
                             SDHS_ARENA_TEST_ALIGNMENT);
     }

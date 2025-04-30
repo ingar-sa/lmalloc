@@ -79,6 +79,9 @@ typedef unsigned int uint;
 
 #define LmIsAligned(val, alignment) ((val % alignment) == 0)
 
+#define LmPow2AlignUp(value, alignment) \
+	(size_t)((ssize_t)(alignment - 1) & (-(ssize_t)(value)))
+
 #define LmPaddingToAlign(value, alignment) \
 	((alignment - (value % alignment)) % alignment)
 
