@@ -9,7 +9,9 @@
 
 static int fd = 0;
 
-KArena karena_create(size_t size)
+KA_THREAD_ARENAS_REGISTER(threadkas, 2);
+
+KArena *ka_create(size_t size)
 {
 	struct ka_data alloc = {
 		.size = size,
@@ -19,14 +21,14 @@ KArena karena_create(size_t size)
 		fd = open("/dev/karena", O_RDWR);
 		if (fd < 0) {
 			perror("Failed to open device");
-			return -1;
+			return NULL;
 		}
 	}
 
 	if (ioctl(fd, KARENA_CREATE, &alloc) < 0) {
 		perror("Memory allocation failed");
 		close(fd);
-		return -1;
+		return NULL;
 	}
 
 	// printf("Memory size allocated: %lu bytes\n", size);
@@ -35,17 +37,18 @@ KArena karena_create(size_t size)
 	    MAP_FAILED) {
 		perror("mmap failed");
 		close(fd);
-		return -1;
+		return NULL;
 	}
 
-	return alloc.arena;
+	return (KArena *)alloc.arena;
 }
 
-void *karena_alloc(KArena arena, size_t size)
+void *ka_alloc(KArena *arena, size_t size)
 {
-	struct ka_data alloc;
-	alloc.arena = arena;
-	alloc.size = size;
+	struct ka_data alloc = {
+		.arena = (unsigned long)arena,
+		.size = size,
+	};
 
 	if (ioctl(fd, KARENA_ALLOC, &alloc)) {
 		perror("Arena allocation failed");
@@ -55,10 +58,10 @@ void *karena_alloc(KArena arena, size_t size)
 	return (void *)alloc.arena;
 }
 
-void *karena_seek(KArena arena, size_t pos)
+void *ka_seek(KArena *arena, size_t pos)
 {
 	struct ka_data alloc = {
-		.arena = arena,
+		.arena = (unsigned long)arena,
 		.size = pos,
 	};
 
@@ -70,15 +73,15 @@ void *karena_seek(KArena arena, size_t pos)
 	return (void *)alloc.arena;
 }
 
-void *karena_free(KArena arena)
+void *ka_free(KArena *arena)
 {
-	return karena_seek(arena, 0);
+	return ka_seek(arena, 0);
 }
 
-void karena_pop(KArena arena, size_t size)
+void ka_pop(KArena *arena, size_t size)
 {
 	struct ka_data alloc = {
-		.arena = arena,
+		.arena = (unsigned long)arena,
 		.size = size,
 	};
 
@@ -87,10 +90,10 @@ void karena_pop(KArena arena, size_t size)
 	}
 }
 
-size_t karena_pos(KArena arena)
+size_t ka_pos(KArena *arena)
 {
 	struct ka_data alloc = {
-		.arena = arena,
+		.arena = (unsigned long)arena,
 		.size = 0,
 	};
 
@@ -101,10 +104,10 @@ size_t karena_pos(KArena arena)
 	return alloc.size;
 }
 
-size_t karena_reserve(KArena arena, size_t sz)
+size_t ka_reserve(KArena *arena, size_t sz)
 {
 	struct ka_data alloc = {
-		.arena = arena,
+		.arena = (unsigned long)arena,
 		.size = sz,
 	};
 
@@ -116,10 +119,10 @@ size_t karena_reserve(KArena arena, size_t sz)
 	return alloc.size;
 }
 
-size_t karena_size(KArena arena)
+size_t ka_size(KArena *arena)
 {
 	struct ka_data alloc = {
-		.arena = arena,
+		.arena = (unsigned long)arena,
 	};
 
 	if (ioctl(fd, KARENA_SIZE, &alloc)) {
@@ -130,13 +133,13 @@ size_t karena_size(KArena arena)
 	return alloc.size;
 }
 
-void karena_destroy(KArena arena)
+void ka_destroy(KArena *arena)
 {
 	struct ka_data alloc = {
-		.arena = arena,
+		.arena = (unsigned long)arena,
 	};
 
-	size_t size = karena_size(arena);
+	size_t size = ka_size(arena);
 
 	if (ioctl(fd, KARENA_DESTROY, &alloc)) {
 		perror("Destroy failed");
@@ -145,33 +148,92 @@ void karena_destroy(KArena arena)
 	munmap((void *)arena, size);
 }
 
-KArena karena_bootstrap(KArena arena, size_t size)
+KArena *ka_bootstrap(KArena *arena, size_t size)
 {
+	KArena *ka;
 	struct ka_data alloc = {
-		.arena = arena,
+		.arena = (unsigned long)arena,
 		.size = size,
 	};
 
 	if (ioctl(fd, KARENA_BOOTSTRAP, &alloc)) {
 		perror("Destroy failed");
-		return -1;
+		return NULL;
 	}
 
-	return alloc.arena;
+	return (KArena *)alloc.arena;
+}
+
+void ka__thread_arenas_init__(KArena *ta_buf[], struct ka__thread_arenas__ *tas,
+			      struct ka__thread_arenas__ **ta_instance)
+{
+	tas->kas = ta_buf;
+	*ta_instance = tas;
+}
+
+void ka__thread_arenas_init_extern__(struct ka__thread_arenas__ *tas,
+				     struct ka__thread_arenas__ **ta_instance)
+{
+	*ta_instance = tas;
+}
+
+int ka__thread_arenas_add__(KArena *a, struct ka__thread_arenas__ *ta_instance)
+{
+	if (ta_instance->count + 1 <= ta_instance->max_count) {
+		ta_instance->kas[ta_instance->count++] = a;
+		return 0;
+	}
+
+	return 1;
+}
+
+KAScratch ka_scratch_begin(KArena *ka)
+{
+	KAScratch kas = { 0 };
+	if (ka) {
+		kas.ka = ka;
+		kas.f5 = ka_pos(ka);
+	}
+	return kas;
+}
+
+KAScratch ka__scratch_get__(KArena **conflicts, int conflict_count,
+			    struct ka__thread_arenas__ *tas)
+{
+	KArena *ka = NULL;
+	if (conflict_count > 0) {
+		for (int i = 0; i < tas->count; ++i) {
+			for (int j = 0; j < conflict_count; ++j) {
+				if (tas->kas[i] != conflicts[j]) {
+					ka = tas->kas[i];
+					goto exit;
+				}
+			}
+		}
+	} else {
+		ka = tas->kas[0];
+	}
+exit:
+	return (ka == NULL) ? (KAScratch){ 0 } : ka_scratch_begin(ka);
 }
 
 int main(void)
 {
-	KArena arena = karena_create(1024);
-	if (arena == -1) {
+	KaThreadArenasInit(threadkas);
+	KArena *thread = ka_create(1024);
+	KaThreadArenasAdd(thread);
+
+	KArena *arena = ka_create(1024);
+	if ((unsigned long)arena == -1) {
 		perror("Arena allocation failed");
+		fflush(stdout);
 		return 1;
 	}
-	printf("KArena: %lu\n", arena);
+	printf("KArena: %lu\n", (unsigned long)arena);
 	fflush(stdout);
 
-	unsigned long *first = karena_alloc(arena, sizeof(unsigned long));
-	unsigned long *second = karena_alloc(arena, sizeof(unsigned long));
+	unsigned long *first = ka_alloc(arena, sizeof(unsigned long));
+	unsigned long *second = ka_alloc(arena, sizeof(unsigned long));
 
 	if (!first) {
 		perror("first null pointer");
@@ -187,11 +249,11 @@ int main(void)
 	printf("First: %lu @ %p\n", *first, first);
 	printf("Second: %lu @ %p\n", *second, second);
 
-	printf("Current pos: %lu\n", karena_pos(arena));
+	printf("Current pos: %lu\n", ka_pos(arena));
 
-	karena_pop(arena, sizeof(unsigned long));
+	ka_pop(arena, sizeof(unsigned long));
 
-	unsigned long *forth = karena_alloc(arena, sizeof(unsigned long));
+	unsigned long *forth = ka_alloc(arena, sizeof(unsigned long));
 
 	*forth = 12L;
 	printf("Second: %lu @ %p\n", *second, second);
@@ -201,30 +263,30 @@ int main(void)
 	//
 	// fflush(stdout);
 	//
-	// karena_free(arena);
+	// ka_free(arena);
 
-	printf("Current pos: %lu\n", karena_pos(arena));
+	printf("Current pos: %lu\n", ka_pos(arena));
 
-	KArena arena3 = karena_bootstrap(arena, 128);
-	printf("KArena3: %lu\n", arena3);
-	printf("Current pos: %lu\n", karena_pos(arena3));
-	unsigned long *foo = karena_alloc(arena3, sizeof(unsigned long));
+	KArena *arena3 = ka_bootstrap(arena, 128);
+	printf("KArena3: %lu\n", (unsigned long)arena3);
+	printf("Current pos: %lu\n", ka_pos(arena3));
+	unsigned long *foo = ka_alloc(arena3, sizeof(unsigned long));
 	printf("foo: %lu @ %p\n", *foo, foo);
 
-	KArena arena2 = karena_create(2048);
-	unsigned long *blah = karena_alloc(arena2, sizeof(unsigned long));
+	KArena *arena2 = ka_create(2048);
+	unsigned long *blah = ka_alloc(arena2, sizeof(unsigned long));
 	*blah = 55;
 	printf("blah from second arena: %lu\n", *blah);
-	printf("KArena2: %lu\n", arena2);
+	printf("KArena2: %lu\n", (unsigned long)arena2);
 
-	unsigned long *third = karena_alloc(arena, sizeof(unsigned long));
+	unsigned long *third = ka_alloc(arena, sizeof(unsigned long));
 	*third = 69L;
 
 	printf("Third: %lu @ %p\n", *third, third);
 
-	karena_destroy(arena);
-	karena_destroy(arena2);
-	karena_destroy(arena3);
+	ka_destroy(arena);
+	ka_destroy(arena2);
+	ka_destroy(arena3);
 
 	// printf("Third: %lu @ %p\n", *third, third);
 

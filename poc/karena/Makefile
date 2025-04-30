@@ -2,6 +2,9 @@ PWD := $(shell pwd)
 KDIR := /lib/modules/$(shell uname -r)/build
 BUILD_DIR := $(PWD)/build
 
+LIBS =  -lpthread -lpq -lm
+INCLUDES = -I. 
+
 obj-m += karena.o
 
 all: build-dir kernel-module userspace
@@ -16,7 +19,7 @@ kernel-module:
 	make -C $(KDIR) M=$(PWD) modules
 
 userspace:
-	gcc main.c -o $(BUILD_DIR)/main
+	gcc main.c $(INCLUDES) -o $(BUILD_DIR)/main $(LIBS)
 
 clean:
 	make -C $(KDIR) M=$(PWD) clean
