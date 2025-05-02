@@ -200,7 +200,7 @@ void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 #if 1
 	static int nl = 0;
 	printf("%lu ", alloc_time);
-	if ((nl++ % 100) == 0)
+	if ((nl++ % 50) == 0)
 		printf("\n");
 #endif
 	timing_stats.ua_alloc_total_time += alloc_time;

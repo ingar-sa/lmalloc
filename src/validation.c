@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 	size_t main_ua_sz = LmGibiByte(4);
 	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD, 16);
 
-	size_t cjson_ua_sz = LmKibiByte(16);
+	size_t cjson_ua_sz = LmKibiByte(512);
 	cjson_arena =
 		ua_bootstrap(main_ua, NULL, cjson_ua_sz, main_ua->alignment);
 	cJSON_Hooks cjson_hooks = { 0 };
@@ -101,9 +101,7 @@ int main(int argc, char **argv)
 
 #if 0
 	// NOTE: (isa): This #if/else is just a quick way to run debug stuff instead of the main code
-
 	LmLogDebugR("%s", ua_info_string(cjson_arena, main_ua));
-
 #else
 	size_t config_file_sz = 0;
 	uint8_t *test_config_file = lm_load_file_into_memory(

@@ -46,7 +46,7 @@
                         "enabled": false,
                         "ctx": 
                         {
-                                "arena_sz": "64gB",
+                                "arena_sz": "4gB",
                                 "alignment": 16,
                                 "mallocd": false,
                                 "contiguous": false,
@@ -93,5 +93,4 @@
                         }
                 }
         ]
-
 }
