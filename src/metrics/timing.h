@@ -163,6 +163,24 @@ static inline uint64_t end_tsc_timing(void)
 		__asm__ volatile("mfence");                                    \
 	} while (0)
 
+#define START_TSC_TIMING_LFENCE(name)                              \
+	uint64_t name##_start;                                     \
+	do {                                                       \
+		uint32_t low, high;                                \
+		__asm__ volatile("lfence");                        \
+		__asm__ volatile("rdtsc" : "=a"(low), "=d"(high)); \
+		name##_start = ((uint64_t)high << 32) | low;       \
+	} while (0)
+
+#define END_TSC_TIMING_LFENCE(name)                                            \
+	uint64_t name##_end;                                                   \
+	do {                                                                   \
+		uint32_t low, high, aux;                                       \
+		__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux)); \
+		name##_end = ((uint64_t)high << 32) | low;                     \
+		__asm__ volatile("lfence");                                    \
+	} while (0)
+
 #define START_TSC_TIMING_NOSERIAL(name)                            \
 	uint64_t name##_start;                                     \
 	do {                                                       \
@@ -178,6 +196,9 @@ static inline uint64_t end_tsc_timing(void)
 		__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux)); \
 		name##_end = ((uint64_t)high << 32) | low;                     \
 	} while (0)
+
+#define TscToNs(tsc, freq) ((uint64_t)((double)(tsc) * 1e9 / (freq)))
+#define TscToS(tsc, freq) ((uint64_t)((double)(tsc) / (freq)))
 
 double calibrate_tsc(void);
 
