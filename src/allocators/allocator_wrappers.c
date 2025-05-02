@@ -148,11 +148,11 @@ int write_timing_data_to_file(LmString filename, enum allocation_type type)
 	if ((res = write_timing_by_type(type, file)) != 0)
 		return res;
 
-	if ((res = lm_write_bytes_to_file((const uint8_t *)&timings.idx,
+	if ((res = lm_write_bytes_to_file((uint8_t *)&timings.idx,
 					  sizeof(timings.idx), file)) != 0)
 		return res;
 
-	if ((res = lm_write_bytes_to_file((const uint8_t *)timings.arr,
+	if ((res = lm_write_bytes_to_file((uint8_t *)timings.arr,
 					  timings.idx * sizeof(uint64_t),
 					  file)) != 0)
 		return res;
@@ -214,23 +214,23 @@ void *ka_alloc_wrapper_timed(KArena *ka, size_t sz)
 
 void *ua_alloc_wrapper_timed(UArena *ua, size_t sz)
 {
-	START_TSC_TIMING(alloc);
+	START_TSC_TIMING_LFENCE(alloc);
 	//--------------------------------------
 	void *ptr = ua_alloc(ua, sz);
 	//--------------------------------------
-	END_TSC_TIMING(alloc);
+	END_TSC_TIMING_LFENCE(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
 #if 1
 	static int nl = 0;
 	printf("%lu ", alloc_time);
-	if ((nl++ % 100) == 0)
+	if ((nl++ % 50) == 0)
 		printf("\n");
 #endif
 	timing_stats.ua_alloc_total_time += alloc_time;
 	timing_stats.ua_alloc_total_iter += 1;
 	add_timing(alloc_time);
 	//--------------------------------------
-	// void *ptr = ua_alloc(ua, sz);
+	//void *ptr = ua_alloc(ua, sz);
 	return ptr;
 }
 

@@ -23,9 +23,9 @@
 #define UaIsMallocd(flags) (!!((flags >> 1) & 1))
 #define UaIsBootstrapped(flags) (!!((flags >> 2) & 1))
 
-#define UaSetIsContiguous(flags) flags |= 1
-#define UaSetIsMallocd(flags) flags |= (1 << 1)
-#define UaSetIsBootstrapped(flags) flags |= (1 << 2)
+#define UaSetIsContiguous(flags) (flags |= 1)
+#define UaSetIsMallocd(flags) (flags |= (1 << 1))
+#define UaSetIsBootstrapped(flags) (flags |= (1 << 2))
 
 typedef struct {
 	uint_least64_t flags;

@@ -121,6 +121,21 @@ static inline uint64_t end_tsc_timing(void)
 	return result;
 }
 
+// NOTE: (isa): There seems to be a consistent pattern that the smallest "unit"
+// of a TSC timing is 10^(-8) * TSC frequency. On my desktop PC, which has a
+// 3.8GHz base clock speed with an invariant TSC -- meaning the TSC will always
+// increase at a fixed rate regardless of the actual clock speed the CPU is running
+// at -- all TSC results will be multiples of 38 TSC. On my laptop, with a base
+// clock rate of 2.3GHz, it's multiples of 23. According to the AMD Architecture
+// Programmer's Manual Vol. 2 (p. 422),
+//      "In general, the TSC should not be used to take very short
+//      time measurements, because the resulting measurement is
+//      not guaranteed to be identical each time it is made."
+// So yeah... maybe using the TSC to time individual allocations is a no go.
+// I'll have to investigate further, and potentially look for other ways of
+// timing small sections of code. The uops.info people might have a way of doing
+// so.
+
 #define START_TSC_TIMING(name)                                                \
 	uint64_t name##_start;                                                \
 	do {                                                                  \
@@ -163,6 +178,24 @@ static inline uint64_t end_tsc_timing(void)
 		__asm__ volatile("mfence");                                    \
 	} while (0)
 
+#define START_TSC_TIMING_LFENCE(name)                              \
+	uint64_t name##_start;                                     \
+	do {                                                       \
+		uint32_t low, high;                                \
+		__asm__ volatile("lfence");                        \
+		__asm__ volatile("rdtsc" : "=a"(low), "=d"(high)); \
+		name##_start = ((uint64_t)high << 32) | low;       \
+	} while (0)
+
+#define END_TSC_TIMING_LFENCE(name)                                            \
+	uint64_t name##_end;                                                   \
+	do {                                                                   \
+		uint32_t low, high, aux;                                       \
+		__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux)); \
+		name##_end = ((uint64_t)high << 32) | low;                     \
+		__asm__ volatile("lfence");                                    \
+	} while (0)
+
 #define START_TSC_TIMING_NOSERIAL(name)                            \
 	uint64_t name##_start;                                     \
 	do {                                                       \
@@ -171,13 +204,16 @@ static inline uint64_t end_tsc_timing(void)
 		name##_start = ((uint64_t)high << 32) | low;       \
 	} while (0)
 
-#define END_TSC_TIMING_NOSERIAL(name)                                          \
+#define END_TSC_TIMING_RDTSCP(name)                                            \
 	uint64_t name##_end;                                                   \
 	do {                                                                   \
 		uint32_t low, high, aux;                                       \
 		__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux)); \
 		name##_end = ((uint64_t)high << 32) | low;                     \
 	} while (0)
+
+#define TscToNs(tsc, freq) ((uint64_t)((double)(tsc) * 1e9 / (freq)))
+#define TscToS(tsc, freq) ((uint64_t)((double)(tsc) / (freq)))
 
 double calibrate_tsc(void);
 

@@ -63,9 +63,6 @@ static void format_timing(long long timing, enum time_stamp_fmt stamp_fmt,
 	}
 }
 
-#define TscToNs(tsc, freq) ((uint64_t)((double)(tsc) * 1e9 / (freq)))
-#define TscToS(tsc, freq) ((uint64_t)((double)(tsc) / (freq)))
-
 static void format_tsc_timing(uint64_t tsc_timing,
 			      enum time_stamp_fmt stamp_fmt, char buf[64])
 {
