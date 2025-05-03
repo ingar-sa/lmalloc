@@ -347,6 +347,9 @@ void *lm__realloc_trace__(void *ptr, size_t size, int line, const char *func,
 void lm__free_trace__(void *ptr, int line, const char *func,
 		      lm__log_module__ *module);
 
+#ifndef LM_MEM_TRACE
+#define LM_MEM_TRACE 0
+#endif
 #if LM_MEM_TRACE == 1
 #define malloc(size) \
 	lm__malloc_trace__(size, __LINE__, __func__, lm__log_instance__)
@@ -972,5 +975,15 @@ int lm_write_bytes_to_file_by_name(uint8_t *buf, size_t size,
 }
 
 // NOLINTEND(misc-definitions-in-headers)
+
+#if LM_MEM_TRACE == 1
+#define malloc(size) \
+	lm__malloc_trace__(size, __LINE__, __func__, lm__log_instance__)
+#define calloc(count, size) \
+	lm__calloc_trace__(count, size, __LINE__, __func__, lm__log_instance__)
+#define realloc(ptr, size) \
+	lm__realloc_trace__(ptr, size, __LINE__, __func__, lm__log_instance__)
+#define free(ptr) lm__free_trace__(ptr, __LINE__, __func__, lm__log_instance__)
+#endif
 
 #endif // LM_H_IMPLEMENTATION
