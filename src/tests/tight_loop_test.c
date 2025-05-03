@@ -175,6 +175,9 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 					    log_directory);
 			if (ua)
 				ua_destroy(&ua);
+			if (ka)
+				ka_destroy(ka);
+
 			LmRemoveLogFileLocal();
 			lm_close_file(log_file);
 			exit(EXIT_SUCCESS);

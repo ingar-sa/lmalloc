@@ -177,7 +177,6 @@ void *malloc_timed(UArena *ua, KArena *ka, size_t sz)
 	tstats.total_tsc += alloc_time;
 	tstats.iter += 1;
 	add_timing(alloc_time);
-	tcoll.arr[tcoll.cur++] = alloc_time;
 	//--------------------------------------
 	return ptr;
 }
