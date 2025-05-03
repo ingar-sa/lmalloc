@@ -125,6 +125,20 @@ static void tight_loop_test_all_sizes(struct ua_params *params,
 			file_mode, log_filename_base);
 }
 
+static int write_tsc_freq_to_file(LmString log_dir)
+{
+	UAScratch uas = ua_scratch_begin(main_ua);
+	LmString tsc_freq_filename = lm_string_make(log_dir, uas.ua);
+	lm_string_append_fmt(tsc_freq_filename, "tsc_freq.bin");
+	double tsc_freq = get_tsc_freq();
+	if (lm_write_bytes_to_file_by_name((uint8_t *)&tsc_freq,
+					   sizeof(tsc_freq),
+					   tsc_freq_filename) != 0)
+		return -1;
+	ua_scratch_release(uas);
+	return 0;
+}
+
 static int arena_test(void *ctx, bool running_in_debugger)
 {
 	cJSON *ctx_json = ctx;
@@ -173,15 +187,7 @@ static int arena_test(void *ctx, bool running_in_debugger)
 	LmRemoveLogFileLocal();
 	lm_close_file(log_file);
 
-	UAScratch uas = ua_scratch_begin(main_ua);
-	LmString tsc_freq_filename = lm_string_make(log_directory, uas.ua);
-	lm_string_append_fmt(tsc_freq_filename, "tsc_freq.bin");
-	double tsc_freq = get_tsc_freq();
-	if (lm_write_bytes_to_file_by_name((uint8_t *)&tsc_freq,
-					   sizeof(tsc_freq),
-					   tsc_freq_filename) != 0)
-		return -1;
-	ua_scratch_release(uas);
+	write_tsc_freq_to_file(log_directory);
 
 	const char *file_mode = "a";
 	for (int i = 0; i < (int)LmArrayLen(a_alloc_functions); ++i) {
@@ -230,6 +236,7 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 
 	LmString log_filename = lm_string_make(log_directory, main_ua);
 	lm_string_append_fmt(log_filename, "%s", "log.txt");
+	write_tsc_freq_to_file(log_directory);
 
 	LmAssert(alloc_iterations > 0, "malloc_test's alloc_iterations is 0");
 
@@ -269,16 +276,7 @@ static int sdhs_test(void *ctx, bool running_in_debugger)
 	LmString log_directory = lm_string_make(
 		cJSON_GetStringValue(log_directory_json), main_ua);
 	make_and_update_log_dir(log_directory);
-
-	UAScratch uas = ua_scratch_begin(main_ua);
-	LmString tsc_freq_filename = lm_string_make(log_directory, uas.ua);
-	lm_string_append_fmt(tsc_freq_filename, "tsc_freq.bin");
-	double tsc_freq = get_tsc_freq();
-	if (lm_write_bytes_to_file_by_name((uint8_t *)&tsc_freq,
-					   sizeof(tsc_freq),
-					   tsc_freq_filename) != 0)
-		return -1;
-	ua_scratch_release(uas);
+	write_tsc_freq_to_file(log_directory);
 
 	SdhsMain(log_directory);
 	return 0;
