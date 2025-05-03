@@ -12,7 +12,7 @@
                                 "mallocd": true,
                                 "contiguous": true,
                                 "alloc_iterations": 1000,
-                                "log_filename": "./logs/u_arena_m_c.txt"
+                                "log_directory": "./logs/ua_mc/"
                         }
                 },
                 {
@@ -25,7 +25,7 @@
                                 "mallocd": true,
                                 "contiguous": false,
                                 "alloc_iterations": 1000,
-                                "log_filename": "./logs/u_arena_m_nc.txt"
+                                "log_directory": "./logs/ua_mnc/"
                         }
                 },
                 {
@@ -51,28 +51,16 @@
                                 "mallocd": false,
                                 "contiguous": false,
                                 "alloc_iterations": 10000,
-                                "log_filename": "./logs/u_arena_nm_nc.txt"
+                                "log_directory": "./logs/ua_nmnc/"
                         }
                 },
-            {
-                "name": "karena_test",
-                "enabled": false,
-                "options": "NONE",
-                "ctx":
                 {
-                    "alloc_iterations": 1000,
-                    "log_filename": "./logs/karena.txt",
-                    "arena_sz": "512kB"
-                }
-            },
-            {
-
                         "name": "malloc",
                         "enabled": false,
                         "ctx":
                         {
                                 "alloc_iterations": 1000,
-                                "log_filename": "./logs/malloc_fork.txt"
+                                "log_directory": "./logs/malloc/"
                         }
                 },
                 {

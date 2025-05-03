@@ -208,6 +208,7 @@ static int arena_test(void *ctx, bool running_in_debugger)
 	return 0;
 }
 
+#if 0
 // static void karena_tight_loop(uint64_t alloc_iterations, char *log_filename,
 // 			      const array_test *test)
 // {
@@ -233,7 +234,6 @@ static int arena_test(void *ctx, bool running_in_debugger)
 // 	lm_close_file(log_file);
 // }
 
-#if 0
 int karena_tests(void *ctx, bool running_in_debugger)
 {
 	(void)running_in_debugger;
