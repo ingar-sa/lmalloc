@@ -26,4 +26,7 @@ clean:
 	rm -f $(BUILD_DIR)/main
 	rm -rf $(BUILD_DIR)
 
+local:
+	make -C $(shell nix-build -E '(import <nixpkgs> {}).linux.dev' --no-out-link)/lib/modules/*/build M=$(pwd) modules
+
 .PHONY: all build-dir kernel-module userspace clean

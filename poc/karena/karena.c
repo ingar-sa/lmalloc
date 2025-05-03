@@ -18,6 +18,7 @@ MODULE_LICENSE("GPL");
 
 struct karena_device_data {
 	struct cdev cdev;
+	struct mutex lock;
 	struct mmap_info *mmap_info;
 };
 
@@ -27,6 +28,7 @@ struct KArena {
 	unsigned long addr;
 };
 
+static DEFINE_MUTEX(karenas_mutex);
 static struct KArena karenas[100];
 
 struct thread_arenas {};
@@ -104,13 +106,23 @@ static unsigned int find_open_slot(void)
 	struct KArena *info;
 	unsigned int index = 0;
 
+	mutex_lock(&karenas_mutex);
+	pr_info("have lock\n");
+
 	info = karenas;
 	while (info->addr != 0) {
 		index++;
 		info = &karenas[index];
-		if (index > 99)
+		if (index > 99) {
+			mutex_unlock(&karenas_mutex);
 			return -1;
+		}
 	}
+
+	info->addr = 1;
+
+	mutex_unlock(&karenas_mutex);
+	pr_info("released lock\n");
 
 	return index;
 }
