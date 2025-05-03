@@ -150,6 +150,8 @@ GetMemAndScratchSize(cJSON *Conf, u64 *MemSize, u64 *ScratchSize)
 sdb_errno
 MbPgCleanup(void *Arg)
 {
+    (void)Arg;
+#if 0
     mbpg_ctx *Ctx = Arg;
     if(Ctx) {
         if(Ctx->SdPipe) {
@@ -164,7 +166,7 @@ MbPgCleanup(void *Arg)
         SdbLogWarning("The context passed to cleanup function was NULL");
         return -SDBE_PTR_WAS_NULL;
     }
-
+#endif
     return 0;
 }
 

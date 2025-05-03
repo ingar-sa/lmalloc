@@ -13,25 +13,6 @@ LM_LOG_REGISTER(tight_loop_test);
 
 extern UArena *main_ua;
 
-static enum allocation_type get_allocation_type(alloc_fn_t alloc_fn)
-{
-	enum allocation_type type = -1;
-	if (alloc_fn == ua_alloc_timed)
-		type = UA_ALLOC;
-	else if (alloc_fn == ua_zalloc_timed)
-		type = UA_ZALLOC;
-	else if (alloc_fn == ua_falloc_timed)
-		type = UA_FALLOC;
-	else if (alloc_fn == ua_fzalloc_timed)
-		type = UA_FZALLOC;
-	else if (alloc_fn == malloc_timed)
-		type = MALLOC;
-	else if (alloc_fn == calloc_timed)
-		type = CALLOC;
-
-	return type;
-}
-
 static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 				 alloc_fn_t alloc_fn, const char *alloc_fn_name,
 				 size_t *alloc_sizes, size_t alloc_sizes_len,
@@ -65,17 +46,18 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 	if (test_ua)
 		ua_free(test_ua);
 
-	enum allocation_type alloc_type = get_allocation_type(alloc_fn);
-	log_allocation_timing_avg(alloc_type, get_alloc_stats(), "", NS, true,
-				  INF, LM_LOG_MODULE_LOCAL);
+	enum alloc_type atype = get_alloc_type(alloc_fn);
+	struct alloc_tstats *tstats = get_alloc_tstats();
+	lm_log_tsc_timing_avg(tstats->total_tsc, tstats->iter, "", NS, true,
+			      INF, LM_LOG_MODULE_LOCAL);
 	LmLogInfoR("\n");
 
 	UAScratch uas = ua_scratch_begin(main_ua);
 
 	LmString data_dump_filename = lm_string_make(log_directory, uas.ua);
 	lm_string_append_fmt(data_dump_filename, "%s-%s.bin",
-			     alloct_string(alloc_type), size_name);
-	if (write_timing_data_to_file(data_dump_filename, alloc_type) != 0) {
+			     alloct_string(atype), size_name);
+	if (write_alloc_timing_data_to_file(data_dump_filename, atype) != 0) {
 		LmLogError("Failed to write data to file %s",
 			   data_dump_filename);
 		return;
@@ -83,10 +65,7 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 
 	ua_scratch_release(uas);
 	ua_destroy(&timings_ua);
-	clear_alloc_timing_stats(alloc_type);
-	clear_wrapper_alloc_timing_collection();
 }
-
 // NOTE: (isa): If the memory is freed, then malloc will
 // use just as little time as the arena for all allocations,
 // likely due to it simply reusing the same slot in the free list.
@@ -105,18 +84,19 @@ static void each_size_by_itself(UArena *test_ua, uint64_t alloc_iterations,
 				       sizeof(uint64_t));
 	uint64_t *timing_arr =
 		UaPushArray(timings_ua, uint64_t, alloc_iterations);
-	provide_alloc_timing_collection_arr(alloc_iterations, timing_arr);
-	struct alloc_timing_collection *timings = get_wrapper_timings();
 
 	for (size_t j = 0; j < alloc_sizes_len; ++j) {
 		LmLogInfoR("\n%zd bytes: \n", alloc_sizes[j]);
+
+		struct alloc_tcoll *timings = get_alloc_tcoll();
+		init_alloc_tcoll(alloc_iterations, timing_arr);
 
 		for (uint64_t i = 0; i < alloc_iterations; ++i) {
 			uint8_t *ptr = alloc_fn(test_ua, alloc_sizes[j]);
 			if (!!0 && LM_UNLIKELY(!ptr)) {
 				LmLogDebug("Arena ran out of memory! Freeing");
 				ua_free(test_ua);
-				timings->idx -=
+				timings->cur -=
 					1; // Overwrite failed allocation timing
 				ptr = alloc_fn(test_ua, alloc_sizes[j]);
 			}
@@ -125,32 +105,27 @@ static void each_size_by_itself(UArena *test_ua, uint64_t alloc_iterations,
 
 		ua_free(test_ua);
 
-		struct alloc_timing_stats *stats = get_alloc_stats();
-		enum allocation_type alloc_type = get_allocation_type(alloc_fn);
-		log_allocation_timing_avg(alloc_type, stats, "", NS, true, INF,
-					  LM_LOG_MODULE_LOCAL);
+		struct alloc_tstats *tstats = get_alloc_tstats();
+		enum alloc_type atype = get_alloc_type(alloc_fn);
+		lm_log_tsc_timing_avg(tstats->total_tsc, tstats->iter, "", NS,
+				      true, INF, LM_LOG_MODULE_LOCAL);
 		LmLogInfoR("\n");
 
 		UAScratch uas = ua_scratch_begin(main_ua);
-
 		LmString data_dump_filename =
 			lm_string_make(log_directory, uas.ua);
 		lm_string_append_fmt(data_dump_filename, "%s-%zdB.bin",
-				     alloct_string(alloc_type), alloc_sizes[j]);
-		if (write_timing_data_to_file(data_dump_filename, alloc_type) !=
-		    0) {
+				     alloct_string(atype), alloc_sizes[j]);
+		if (write_alloc_timing_data_to_file(data_dump_filename,
+						    atype) != 0) {
 			LmLogError("Failed to write data to file %s",
 				   data_dump_filename);
 			return;
 		}
-
 		ua_scratch_release(uas);
-		clear_alloc_timing_stats(alloc_type);
-		timings->idx = 0;
 	}
 
 	ua_destroy(&timings_ua);
-	clear_wrapper_alloc_timing_collection();
 }
 
 void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
@@ -173,11 +148,15 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 
 	UAScratch uas = ua_scratch_begin(main_ua);
 	if (!running_in_debugger) {
+		LmLogInfo("Running tight loop tests in forked mode");
+
 		pid_t pid;
 		int status;
 		if ((pid = fork()) == -1) {
 			LmLogError("Fork failed: %s", strerror(errno));
 		} else if (pid == 0) {
+			LmLogDebugR(
+				"\n--- Successfully forked for each size by itself test");
 			FILE *log_file =
 				lm_open_file_by_name(log_filename, file_mode);
 			LmSetLogFileLocal(log_file);
@@ -208,6 +187,8 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 		if ((pid = fork()) == -1) {
 			LmLogError("Fork failed: %s", strerror(errno));
 		} else if (pid == 0) {
+			LmLogDebugR(
+				"\nSuccessfully forked for each size repeatedly test");
 			FILE *log_file =
 				lm_open_file_by_name(log_filename, file_mode);
 			LmSetLogFileLocal(log_file);

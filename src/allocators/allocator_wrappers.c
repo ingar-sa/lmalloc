@@ -16,7 +16,7 @@ struct alloc_tstats *get_alloc_tstats(void)
 	return &tstats;
 }
 
-void init_alloc_tstats(uint64_t cap, uint64_t *arr)
+void init_alloc_tcoll(uint64_t cap, uint64_t *arr)
 {
 	tcoll.cur = 0;
 	tcoll.cap = cap;
@@ -30,16 +30,25 @@ struct alloc_tcoll *get_alloc_tcoll(void)
 
 static inline void add_timing(uint64_t t)
 {
+	// Segfaulting is an OK way to discover that the array has run out
+	// of space in our case, since it's not production code
 	tcoll.arr[tcoll.cur++] = t;
 }
 
-int write_alloc_timing_data_to_file(LmString filename,
-				    enum allocation_type type)
+void init_alloc_tcoll_dynamic(size_t cap)
+{
+	UArena *ua = ua_create(cap, UA_CONTIGUOUS, UA_MMAPD, 8);
+	tcoll.cap = cap;
+	tcoll.arr = (uint64_t *)(uintptr_t)ua->mem;
+}
+
+int write_alloc_timing_data_to_file(LmString filename, enum alloc_type type)
 {
 	FILE *file = lm_open_file_by_name(filename, "wb");
 
 	int res;
-	if ((res = write_timing_by_type(type, file)) != 0)
+	if ((res = lm_write_bytes_to_file((uint8_t *)&tstats, sizeof(tstats),
+					  file)) != 0)
 		return res;
 
 	if ((res = lm_write_bytes_to_file((uint8_t *)&tcoll.cur,
@@ -55,6 +64,146 @@ int write_alloc_timing_data_to_file(LmString filename,
 	return 0;
 }
 
+void *ua_alloc_timed(UArena *ua, size_t sz)
+{
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *ptr = ua_alloc(ua, sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return ptr;
+}
+
+void *ua_zalloc_timed(UArena *ua, size_t sz)
+{
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *ptr = ua_zalloc(ua, sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return ptr;
+}
+
+void *ua_falloc_timed(UArena *ua, size_t sz)
+{
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *ptr = ua_falloc(ua, sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return ptr;
+}
+
+void *ua_fzalloc_timed(UArena *ua, size_t sz)
+{
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *ptr = ua_fzalloc(ua, sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return ptr;
+}
+
+void *ua_realloc_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
+{
+	(void)ptr;
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *new = ua_alloc(ua, sz);
+	memcpy(new, ptr, old_sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return new;
+}
+
+void *malloc_timed(UArena *ua, size_t sz)
+{
+	(void)ua;
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *ptr = malloc(sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	tcoll.arr[tcoll.cur++] = alloc_time;
+	//--------------------------------------
+	return ptr;
+}
+
+void *calloc_timed(UArena *ua, size_t sz)
+{
+	(void)ua;
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *ptr = calloc(1, sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return ptr;
+}
+
+void free_timed(UArena *ua, void *ptr)
+{
+	(void)ua;
+	START_TSC_TIMING_LFENCE(free);
+	//--------------------------------------
+	free(ptr);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(free);
+	tstats.total_tsc += free_end - free_start;
+	tstats.iter += 1;
+}
+
+void *realloc_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
+{
+	(void)ua;
+	(void)old_sz;
+	START_TSC_TIMING_LFENCE(realloc);
+	//--------------------------------------
+	void *new = realloc(ptr, sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(realloc);
+	uint64_t alloc_time = realloc_end - realloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return new;
+}
+
+#if 0
 void read_timing_data_from_file(const char *filename,
 				struct alloc_timing_data *tdata, UArena *ua)
 {
@@ -63,10 +212,10 @@ void read_timing_data_from_file(const char *filename,
 	if (!data)
 		return;
 
-	struct alloc_timing_stats *at_stats =
-		UaPushStruct(ua, struct alloc_timing_stats);
-	struct alloc_timing_collection *tcoll =
-		UaPushStruct(ua, struct alloc_timing_collection);
+	struct alloc_tstats *at_stats =
+		UaPushStruct(ua, struct alloc_tstats);
+	struct alloc_tcoll *tcoll =
+		UaPushStruct(ua, struct alloc_tcoll);
 
 	uintptr_t ptr = (uintptr_t)data;
 	tcoll->cap = *((uint64_t *)(ptr + sizeof(struct alloc_timing_stats)));
@@ -83,142 +232,4 @@ void read_timing_data_from_file(const char *filename,
 
 	free(data);
 }
-
-void *ua_alloc_timed(UArena *ua, size_t sz)
-{
-	START_TSC_TIMING_LFENCE(alloc);
-	//--------------------------------------
-	void *ptr = ua_alloc(ua, sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(alloc);
-	uint64_t alloc_time = alloc_end - alloc_start;
-	tstats.ua_alloc_total_time += alloc_time;
-	tstats.ua_alloc_total_iter += 1;
-	add_timing(alloc_time);
-	//--------------------------------------
-	return ptr;
-}
-
-void *ua_zalloc_timed(UArena *ua, size_t sz)
-{
-	START_TSC_TIMING_LFENCE(alloc);
-	//--------------------------------------
-	void *ptr = ua_zalloc(ua, sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(alloc);
-	uint64_t alloc_time = alloc_end - alloc_start;
-	tstats.ua_zalloc_total_time += alloc_time;
-	tstats.ua_zalloc_total_iter += 1;
-	add_timing(alloc_time);
-	//--------------------------------------
-	return ptr;
-}
-
-void *ua_falloc_timed(UArena *ua, size_t sz)
-{
-	START_TSC_TIMING_LFENCE(alloc);
-	//--------------------------------------
-	void *ptr = ua_falloc(ua, sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(alloc);
-	uint64_t alloc_time = alloc_end - alloc_start;
-	tstats.ua_falloc_total_time += alloc_time;
-	tstats.ua_falloc_total_iter += 1;
-	add_timing(alloc_time);
-	//--------------------------------------
-	return ptr;
-}
-
-void *ua_fzalloc_timed(UArena *ua, size_t sz)
-{
-	START_TSC_TIMING_LFENCE(alloc);
-	//--------------------------------------
-	void *ptr = ua_fzalloc(ua, sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(alloc);
-	uint64_t alloc_time = alloc_end - alloc_start;
-	tstats.ua_fzalloc_total_time += alloc_time;
-	tstats.ua_fzalloc_total_iter += 1;
-	add_timing(alloc_time);
-	//--------------------------------------
-	return ptr;
-}
-
-void *ua_realloc_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
-{
-	(void)ptr;
-	START_TSC_TIMING_LFENCE(alloc);
-	//--------------------------------------
-	void *new = ua_alloc(ua, sz);
-	memcpy(new, ptr, old_sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(alloc);
-	uint64_t alloc_time = alloc_end - alloc_start;
-	tstats.ua_realloc_total_time += alloc_time;
-	tstats.ua_realloc_total_iter += 1;
-	add_timing(alloc_time);
-	//--------------------------------------
-	return new;
-}
-
-void *malloc_timed(UArena *ua, size_t sz)
-{
-	(void)ua;
-	START_TSC_TIMING_LFENCE(alloc);
-	//--------------------------------------
-	void *ptr = malloc(sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(alloc);
-	uint64_t alloc_time = alloc_end - alloc_start;
-	tstats.malloc_total_time += alloc_time;
-	tstats.malloc_total_iter += 1;
-	add_timing(alloc_time);
-	tcoll.arr[tcoll.cur++] = alloc_time;
-	//--------------------------------------
-	return ptr;
-}
-
-void *calloc_timed(UArena *ua, size_t sz)
-{
-	(void)ua;
-	START_TSC_TIMING_LFENCE(alloc);
-	//--------------------------------------
-	void *ptr = calloc(1, sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(alloc);
-	uint64_t alloc_time = alloc_end - alloc_start;
-	tstats.calloc_total_time += alloc_time;
-	tstats.calloc_total_iter += 1;
-	add_timing(alloc_time);
-	//--------------------------------------
-	return ptr;
-}
-
-void free_timed(UArena *ua, void *ptr)
-{
-	(void)ua;
-	START_TSC_TIMING_LFENCE(free);
-	//--------------------------------------
-	free(ptr);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(free);
-	tstats.free_total_time += free_end - free_start;
-	tstats.free_total_iter += 1;
-}
-
-void *realloc_timed(UArena *ua, void *ptr, size_t old_sz, size_t sz)
-{
-	(void)ua;
-	(void)old_sz;
-	START_TSC_TIMING_LFENCE(realloc);
-	//--------------------------------------
-	void *new = realloc(ptr, sz);
-	//--------------------------------------
-	END_TSC_TIMING_LFENCE(realloc);
-	uint64_t alloc_time = realloc_end - realloc_start;
-	tstats.realloc_total_time += alloc_time;
-	tstats.realloc_total_iter += 1;
-	add_timing(alloc_time);
-	//--------------------------------------
-	return new;
-}
+#endif

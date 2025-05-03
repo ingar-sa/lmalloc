@@ -1,6 +1,6 @@
 {
         "enabled": true,
-        "debugger": true,
+        "debugger": false,
         "tests": [
                 {
                         "name": "u_arena_m_c",
@@ -30,7 +30,7 @@
                 },
                 {
                         "name": "u_arena_nm_c",
-                        "enabled": true,
+                        "enabled": false,
                         "ctx": 
                         {
                                 "arena_sz": "4gB",
@@ -65,7 +65,11 @@
                 },
                 {
                         "name": "sdhs",
-                        "enabled": false
+                        "enabled": true,
+                        "ctx":
+                        {
+                                "log_directory": "./logs/sdhs/"
+                        }
                 }
         ],
         "data_handlers": [
