@@ -36,21 +36,20 @@ double get_tsc_freq(void)
 	static bool tsc_has_been_calibrated = false;
 	if (!tsc_has_been_calibrated) {
 		struct timespec start_ts, end_ts;
-		uint64_t start_tsc, end_tsc;
 		double elapsed_sec, cycles_per_sec;
 
 		clock_gettime(CLOCK_MONOTONIC, &start_ts);
-		start_tsc = rdtsc();
+		START_TSC_TIMING_LFENCE(tsc);
 
 		usleep(100000);
 
-		end_tsc = rdtscp();
+		END_TSC_TIMING_LFENCE(tsc);
 		clock_gettime(CLOCK_MONOTONIC, &end_ts);
 
 		elapsed_sec = (double)(end_ts.tv_sec - start_ts.tv_sec) +
 			      (double)(end_ts.tv_nsec - start_ts.tv_nsec) / 1e9;
 
-		cycles_per_sec = (double)(end_tsc - start_tsc) / elapsed_sec;
+		cycles_per_sec = (double)(tsc_end - tsc_start) / elapsed_sec;
 		tsc_freq = cycles_per_sec;
 		tsc_has_been_calibrated = true;
 	}

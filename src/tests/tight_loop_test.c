@@ -16,17 +16,17 @@ extern UArena *main_ua;
 static enum allocation_type get_allocation_type(alloc_fn_t alloc_fn)
 {
 	enum allocation_type type = -1;
-	if (alloc_fn == ua_alloc_wrapper_timed)
+	if (alloc_fn == ua_alloc_timed)
 		type = UA_ALLOC;
-	else if (alloc_fn == ua_zalloc_wrapper_timed)
+	else if (alloc_fn == ua_zalloc_timed)
 		type = UA_ZALLOC;
-	else if (alloc_fn == ua_falloc_wrapper_timed)
+	else if (alloc_fn == ua_falloc_timed)
 		type = UA_FALLOC;
-	else if (alloc_fn == ua_fzalloc_wrapper_timed)
+	else if (alloc_fn == ua_fzalloc_timed)
 		type = UA_FZALLOC;
-	else if (alloc_fn == malloc_wrapper_timed)
+	else if (alloc_fn == malloc_timed)
 		type = MALLOC;
-	else if (alloc_fn == calloc_wrapper_timed)
+	else if (alloc_fn == calloc_timed)
 		type = CALLOC;
 
 	return type;
@@ -46,16 +46,16 @@ static void all_sizes_repeatedly(UArena *test_ua, uint64_t alloc_iterations,
 				       sizeof(uint64_t));
 	uint64_t *timing_arr =
 		UaPushArray(timings_ua, uint64_t, total_iterations);
-	provide_alloc_timing_collection_arr(total_iterations, timing_arr);
-	struct alloc_timing_collection *timings = get_wrapper_timings();
+	init_alloc_tcoll(total_iterations, timing_arr);
+	struct alloc_tcoll *tcoll = get_alloc_tcoll();
 	for (size_t i = 0; i < alloc_iterations; ++i) {
 		for (uint j = 0; j < alloc_sizes_len; ++j) {
 			uint8_t *ptr = alloc_fn(test_ua, alloc_sizes[j]);
 			if (!!0 && LM_UNLIKELY(!ptr)) {
 				LmLogDebug("Arena ran out of memory! Freeing");
 				ua_free(test_ua);
-				timings->idx -=
-					1; // Overwrite failed allocation timing
+				// Overwrite failed allocation timing
+				tcoll->cur -= 1;
 				ptr = alloc_fn(test_ua, alloc_sizes[j]);
 			}
 			*ptr = 1;

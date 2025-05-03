@@ -20,7 +20,7 @@ typedef UAScratch SdhsArenaScratch;
 #define SDHS_ARENA_TEST_IS_MALLOCD false
 #define SDHS_ARENA_TEST_ALIGNMENT 16
 
-#define UA_ALLOC_FN(ua, size) ua_alloc_wrapper_timed(ua, size)
+#define UA_ALLOC_FN(ua, size) ua_alloc_timed(ua, size)
 
 #define ArenaCreate(cap, contiguous, mallocd, alignment) \
 	ua_create(cap, contiguous, mallocd, alignment)

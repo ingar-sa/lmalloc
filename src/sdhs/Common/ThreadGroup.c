@@ -2,6 +2,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <src/allocators/allocator_wrappers.h>
+#include <src/allocators/sdhs_arena.h>
+#include <src/metrics/timing.h>
+
 #include <src/sdhs/Sdb.h>
 SDB_LOG_REGISTER(ThreadGroup);
 
@@ -9,10 +13,6 @@ SDB_LOG_REGISTER(ThreadGroup);
 #include <src/sdhs/Common/ThreadGroup.h>
 #include <src/sdhs/Common/Time.h>
 #include <src/sdhs/Signals.h>
-
-#include <src/allocators/allocator_wrappers.h>
-#include <src/allocators/sdhs_arena.h>
-#include <src/metrics/timing.h>
 
 tg_manager *
 TgCreateManager(tg_group **Groups, u64 GroupCount, SdhsArena *A)
@@ -208,9 +208,8 @@ TgManagerWaitForAll(tg_manager *Manager)
         Manager->CompletedCount = Manager->GroupCount;
     }
 
-    struct alloc_timing_stats *stats = get_alloc_stats();
-    lm_print_tsc_timing_avg(stats->ua_alloc_total_time, stats->ua_alloc_total_iter,
-                            "Average time spent in alloc: ", NS);
+    struct alloc_tstats *tstats = get_alloc_stats();
+    lm_print_tsc_timing_avg(tstats->total_time, tstats->iter, "Average time spent in alloc: ", NS);
 
 
     SdbLogInfo("All groups have completed or shutdown requested");

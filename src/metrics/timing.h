@@ -72,55 +72,6 @@ static const char *lm_clock_type_str(clockid_t type)
 
 #define LM_END_TIMING(name, type) long long name##_end = lm_get_time_stamp(type)
 
-#define LM_START_TSC_TIMING(name) uint64_t name##_start = start_tsc_timing()
-
-#define LM_END_TSC_TIMING(name) uint64_t name##_end = end_tsc_timing()
-
-#define LM_TIME_LOOP(name, clock, var_t, var, start, end, comp, incr, op) \
-	LM_START_TIMING(name, clock);                                     \
-	for (var_t var = start; var comp end; incr var) {                 \
-		op                                                        \
-	}                                                                 \
-	LM_END_TIMING(name, clock);
-
-// NOTE: (isa): cpuid, rdtsc, and rdtscp are written by Claude
-static inline void cpuid(void)
-{
-	uint32_t eax, ebx, ecx, edx;
-	__asm__ volatile("cpuid"
-			 : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
-			 : "a"(0));
-	// We discard the results as we only care about the serializing effect
-}
-
-static inline uint64_t rdtsc(void)
-{
-	uint32_t low, high;
-	__asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
-	return ((uint64_t)high << 32) | low;
-}
-
-static inline uint64_t rdtscp(void)
-{
-	uint32_t low, high, aux;
-	__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux));
-	return ((uint64_t)high << 32) | low;
-}
-
-static inline uint64_t start_tsc_timing(void)
-{
-	cpuid();
-	uint64_t result = rdtsc();
-	return result;
-}
-
-static inline uint64_t end_tsc_timing(void)
-{
-	uint64_t result = rdtscp();
-	cpuid();
-	return result;
-}
-
 // NOTE: (isa): There seems to be a consistent pattern that the smallest "unit"
 // of a TSC timing is 10^(-8) * TSC frequency. On my desktop PC, which has a
 // 3.8GHz base clock speed with an invariant TSC -- meaning the TSC will always
@@ -135,6 +86,31 @@ static inline uint64_t end_tsc_timing(void)
 // I'll have to investigate further, and potentially look for other ways of
 // timing small sections of code. The uops.info people might have a way of doing
 // so.
+// NOTE: (isa): This is apparently only the case on AMD CPUs. Intel's TSC counter
+// works as expected, and we will therefore run benchmarks on an Intel CPU
+
+// NOTE: (isa): The lfence, rdtsc, lfence sequence is used by the uops.info guys
+// in the nanoBench software, so we can use that as an argument for why we
+// use this method
+#define START_TSC_TIMING_LFENCE(name)                              \
+	uint64_t name##_start;                                     \
+	do {                                                       \
+		uint32_t low, high;                                \
+		__asm__ volatile("lfence");                        \
+		__asm__ volatile("rdtsc" : "=a"(low), "=d"(high)); \
+		__asm__ volatile("lfence");                        \
+		name##_start = ((uint64_t)high << 32) | low;       \
+	} while (0)
+
+#define END_TSC_TIMING_LFENCE(name)                                \
+	uint64_t name##_end;                                       \
+	do {                                                       \
+		uint32_t low, high;                                \
+		__asm__ volatile("lfence");                        \
+		__asm__ volatile("rdtsc" : "=a"(low), "=d"(high)); \
+		__asm__ volatile("lfence");                        \
+		name##_end = ((uint64_t)high << 32) | low;         \
+	} while (0)
 
 #define START_TSC_TIMING(name)                                                \
 	uint64_t name##_start;                                                \
@@ -158,58 +134,6 @@ static inline uint64_t end_tsc_timing(void)
 		__asm__ volatile("cpuid"                                       \
 				 : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)  \
 				 : "a"(0));                                    \
-	} while (0)
-
-#define START_TSC_TIMING_MFENCE(name)                              \
-	uint64_t name##_start;                                     \
-	do {                                                       \
-		uint32_t low, high;                                \
-		__asm__ volatile("mfence");                        \
-		__asm__ volatile("rdtsc" : "=a"(low), "=d"(high)); \
-		name##_start = ((uint64_t)high << 32) | low;       \
-	} while (0)
-
-#define END_TSC_TIMING_MFENCE(name)                                            \
-	uint64_t name##_end;                                                   \
-	do {                                                                   \
-		uint32_t low, high, aux;                                       \
-		__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux)); \
-		name##_end = ((uint64_t)high << 32) | low;                     \
-		__asm__ volatile("mfence");                                    \
-	} while (0)
-
-#define START_TSC_TIMING_LFENCE(name)                              \
-	uint64_t name##_start;                                     \
-	do {                                                       \
-		uint32_t low, high;                                \
-		__asm__ volatile("lfence");                        \
-		__asm__ volatile("rdtsc" : "=a"(low), "=d"(high)); \
-		name##_start = ((uint64_t)high << 32) | low;       \
-	} while (0)
-
-#define END_TSC_TIMING_LFENCE(name)                                            \
-	uint64_t name##_end;                                                   \
-	do {                                                                   \
-		uint32_t low, high, aux;                                       \
-		__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux)); \
-		name##_end = ((uint64_t)high << 32) | low;                     \
-		__asm__ volatile("lfence");                                    \
-	} while (0)
-
-#define START_TSC_TIMING_NOSERIAL(name)                            \
-	uint64_t name##_start;                                     \
-	do {                                                       \
-		uint32_t low, high;                                \
-		__asm__ volatile("rdtsc" : "=a"(low), "=d"(high)); \
-		name##_start = ((uint64_t)high << 32) | low;       \
-	} while (0)
-
-#define END_TSC_TIMING_RDTSCP(name)                                            \
-	uint64_t name##_end;                                                   \
-	do {                                                                   \
-		uint32_t low, high, aux;                                       \
-		__asm__ volatile("rdtscp" : "=a"(low), "=d"(high), "=c"(aux)); \
-		name##_end = ((uint64_t)high << 32) | low;                     \
 	} while (0)
 
 #define TscToNs(tsc, freq) ((uint64_t)((double)(tsc) * 1e9 / (freq)))
