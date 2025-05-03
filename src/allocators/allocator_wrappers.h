@@ -6,6 +6,7 @@
 
 #include "u_arena.h"
 #include "karena.h"
+#include "oldkarena.h"
 
 // NOTE: (isa): (ingar): Made by Claude
 enum alloc_type {
@@ -13,6 +14,7 @@ enum alloc_type {
 	CALLOC,
 	REALLOC,
 	FREE,
+	OKA_ALLOC,
 	KA_ALLOC,
 	UA_ALLOC,
 	UA_ZALLOC,
@@ -34,6 +36,8 @@ static inline const char *alloct_string(enum alloc_type type)
 		return "realloc";
 	case FREE:
 		return "free";
+	case OKA_ALLOC:
+		return "oka_alloc";
 	case KA_ALLOC:
 		return "ka_alloc";
 	case UA_ALLOC:
@@ -79,6 +83,7 @@ struct alloc_tcoll *get_alloc_tcoll(void);
 
 int write_alloc_timing_data_to_file(LmString filename, enum alloc_type type);
 
+void *oka_alloc_timed(UArena *ua, KArena *ka, size_t sz);
 void *ka_alloc_timed(UArena *ua, KArena *ka, size_t sz);
 
 void *ua_alloc_timed(UArena *ua, KArena *ka, size_t sz);
@@ -97,7 +102,9 @@ void free_timed(UArena *ua, void *ptr);
 static enum alloc_type get_alloc_type(alloc_fn_t alloc_fn)
 {
 	enum alloc_type type = UNKNOWN;
-	if (alloc_fn == ka_alloc_timed)
+	if (alloc_fn == oka_alloc_timed)
+		type = OKA_ALLOC;
+	else if (alloc_fn == ka_alloc_timed)
 		type = KA_ALLOC;
 	else if (alloc_fn == ua_alloc_timed)
 		type = UA_ALLOC;

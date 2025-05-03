@@ -3,6 +3,7 @@
 modules.*
 Module.*
 logs/*
+*.zip
 
 # Compiled Object files
 *.slo

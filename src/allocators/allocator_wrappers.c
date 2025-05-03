@@ -5,6 +5,7 @@ LM_LOG_REGISTER(allocator_wrappers);
 
 #include "u_arena.h"
 #include "karena.h"
+#include "oldkarena.h"
 #include "allocator_wrappers.h"
 
 #include <string.h>
@@ -63,6 +64,22 @@ int write_alloc_timing_data_to_file(LmString filename, enum alloc_type type)
 
 	LmLogInfo("Wrote timing stats and collection to %s", filename);
 	return 0;
+}
+
+void *oka_alloc_timed(UArena *ua, KArena *ka, size_t sz)
+{
+	(void)ua;
+	START_TSC_TIMING_LFENCE(alloc);
+	//--------------------------------------
+	void *ptr = oka_alloc((void *)ka, sz);
+	//--------------------------------------
+	END_TSC_TIMING_LFENCE(alloc);
+	uint64_t alloc_time = alloc_end - alloc_start;
+	tstats.total_tsc += alloc_time;
+	tstats.iter += 1;
+	add_timing(alloc_time);
+	//--------------------------------------
+	return ptr;
 }
 
 void *ka_alloc_timed(UArena *ua, KArena *ka, size_t sz)

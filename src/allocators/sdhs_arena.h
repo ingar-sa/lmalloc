@@ -37,7 +37,7 @@ typedef KAScratch SdhsArenaScratch;
 #define ArenaPushArray(a, type, count) KaPushArray(a, type, count)
 #define ArenaPushArrayZero(a, type, count) KaPushArrayZero(a, type, count)
 #define ArenaPushStruct(a, type) KaPushStruct(a, type)
-#define ArenaPushStructZero(a, type) KaPushStruct(a, type)
+#define ArenaPushStructZero(a, type) KaPushStructZero(a, type)
 #define THREAD_ARENAS_REGISTER(thread_name, count) \
 	KA_THREAD_ARENAS_REGISTER(thread_name, count)
 #define THREAD_ARENAS_EXTERN(thread_name) KA_THREAD_ARENAS_EXTERN(thread_name)

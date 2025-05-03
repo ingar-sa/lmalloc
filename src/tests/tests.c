@@ -19,8 +19,9 @@ LM_LOG_REGISTER(tests);
 extern UArena *main_ua;
 
 static const alloc_fn_t a_alloc_functions[] = {
-	ka_alloc_timed,
-	//ua_alloc_timed,
+	oka_alloc_timed,
+	// ka_alloc_timed,
+	// ua_alloc_timed,
 	//ua_zalloc_timed,
 	//ua_falloc_timed
 	//ua_fzalloc_timed
@@ -31,8 +32,9 @@ static const realloc_fn_t a_realloc_functions[] = { ua_realloc_timed };
 static const alloc_fn_t malloc_and_fam[] = { malloc_timed, calloc_timed };
 static const realloc_fn_t realloc_functions[] = { realloc_timed };
 
-static const char *a_alloc_function_names[] = { "kalloc", "alloc", "zalloc",
-						"falloc", "fzalloc" };
+static const char *a_alloc_function_names[] = {
+	"okalloc", "alloc", "kalloc", "zalloc", "falloc", "fzalloc"
+};
 static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
 
 // NOTE: (isa): Made by Claude
@@ -187,7 +189,8 @@ static int arena_test(void *ctx, bool running_in_debugger)
 		const char *alloc_fn_name = a_alloc_function_names[i];
 		realloc_fn_t realloc_fn = a_realloc_functions[0];
 
-		bool is_karena = (alloc_fn == ka_alloc_timed);
+		bool is_karena = (alloc_fn == ka_alloc_timed ||
+				  alloc_fn == oka_alloc_timed);
 
 #if 1
 		tight_loop_test_all_sizes(&params, running_in_debugger,
@@ -207,69 +210,6 @@ static int arena_test(void *ctx, bool running_in_debugger)
 
 	return 0;
 }
-
-#if 0
-// static void karena_tight_loop(uint64_t alloc_iterations, char *log_filename,
-// 			      const array_test *test)
-// {
-// 	FILE *log_file = lm_open_file_by_name(log_filename, "a");
-// 	LmSetLogFileLocal(log_file);
-//
-// 	size_t arena_size = test->array[test->len] * alloc_iterations;
-//
-// 	LmLogDebugR("\n------------------------------");
-// 	LmLogDebug("%s -- %s", "karena", test->name);
-//
-// 	for (size_t j = 0; j < test->len; ++j) {
-// 		void *a = karena_create(arena_size);
-// 		LmLogDebugR("\n%s'ing %zd bytes %lu times", "alloc",
-// 			    test->array[j], alloc_iterations);
-//
-// 		TIME_TIGHT_LOOP(PROC_CPUTIME, alloc_iterations,
-// 				uint8_t *ptr = karena_alloc(a, test->array[j]);
-// 				*ptr = 1;);
-// 	}
-//
-// 	LmRemoveLogFileLocal();
-// 	lm_close_file(log_file);
-// }
-
-int karena_tests(void *ctx, bool running_in_debugger)
-{
-	(void)running_in_debugger;
-	cJSON *ctx_json = ctx;
-	cJSON *alloc_iterations_json =
-		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
-	cJSON *log_filename_json =
-		cJSON_GetObjectItem(ctx_json, "log_filename");
-
-	uint64_t alloc_iterations =
-		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
-	char *log_filename = cJSON_GetStringValue(log_filename_json);
-
-	array_test small = {
-		.array = small_sizes,
-		.len = LmArrayLen(small_sizes),
-		.name = "small",
-	};
-
-	array_test medium = {
-		.array = medium_sizes,
-		.len = LmArrayLen(medium_sizes),
-		.name = "medium",
-	};
-
-	array_test large = { .array = large_sizes,
-			     .len = LmArrayLen(large_sizes),
-			     .name = "large" };
-
-	karena_tight_loop(alloc_iterations, log_filename, &small);
-	karena_tight_loop(alloc_iterations, log_filename, &medium);
-	// large no work ):
-	// karena_tight_loop(params, &large);
-	return 0;
-}
-#endif
 
 static int malloc_test(void *ctx, bool running_in_debugger)
 {

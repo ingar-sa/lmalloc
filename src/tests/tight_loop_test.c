@@ -40,8 +40,10 @@ static void all_sizes_repeatedly(UArena *test_ua, KArena *test_ka,
 	if (test_ua)
 		ua_free(test_ua);
 
-	if (test_ka)
+	if (test_ka && alloc_fn == ka_alloc_timed)
 		ka_free(test_ka);
+	else if (test_ka && alloc_fn == oka_alloc_timed)
+		oka_free(test_ka);
 
 	enum alloc_type atype = get_alloc_type(alloc_fn);
 	struct alloc_tstats *tstats = get_alloc_tstats();
@@ -97,8 +99,10 @@ static void each_size_by_itself(UArena *test_ua, KArena *test_ka,
 		if (test_ua)
 			ua_free(test_ua);
 
-		if (test_ka)
+		if (test_ka && alloc_fn == ka_alloc_timed)
 			ka_free(test_ka);
+		else if (test_ka && alloc_fn == oka_alloc_timed)
+			oka_free(test_ka);
 
 		struct alloc_tstats *tstats = get_alloc_tstats();
 		enum alloc_type atype = get_alloc_type(alloc_fn);
@@ -163,8 +167,13 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 					       ua_params->contiguous,
 					       ua_params->mallocd,
 					       ua_params->alignment);
-			else if (ua_params && is_karena)
+			else if (ua_params && is_karena &&
+				 alloc_fn == ka_alloc_timed) {
 				ka = ka_create(ua_params->arena_sz);
+
+			} else if (alloc_fn == oka_alloc_timed) {
+				ka = oka_create(ua_params->arena_sz);
+			}
 
 			LmLogInfoR("\n\n------------------------------\n");
 			LmLogInfo("%s -- %s", alloc_fn_name, size_name);
@@ -175,8 +184,10 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 					    log_directory);
 			if (ua)
 				ua_destroy(&ua);
-			if (ka)
+			if (ka && alloc_fn == ka_alloc_timed)
 				ka_destroy(ka);
+			else if (ka && alloc_fn == oka_alloc_timed)
+				oka_destroy(ka);
 
 			LmRemoveLogFileLocal();
 			lm_close_file(log_file);
@@ -201,8 +212,12 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 					       ua_params->contiguous,
 					       ua_params->mallocd,
 					       ua_params->alignment);
-			else if (ua_params && is_karena)
+			else if (ua_params && is_karena &&
+				 alloc_fn == ka_alloc_timed) {
 				ka = ka_create(ua_params->arena_sz);
+			} else if (alloc_fn == oka_alloc_timed) {
+				ka = oka_create(ua_params->arena_sz);
+			}
 
 			all_sizes_repeatedly(ua, ka, alloc_iterations, alloc_fn,
 					     alloc_fn_name, alloc_sizes,
@@ -211,8 +226,10 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 			if (ua)
 				ua_destroy(&ua);
 
-			if (ka)
+			if (ka && alloc_fn == ka_alloc_timed)
 				ka_destroy(ka);
+			else if (ka && alloc_fn == oka_alloc_timed)
+				oka_destroy(ka);
 
 			LmRemoveLogFileLocal();
 			lm_close_file(log_file);
@@ -230,9 +247,11 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 				       ua_params->contiguous,
 				       ua_params->mallocd,
 				       ua_params->alignment);
-		else if (ua_params && is_karena)
+		else if (ua_params && is_karena && alloc_fn == ka_alloc_timed) {
 			ka = ka_create(ua_params->arena_sz);
-
+		} else if (alloc_fn == oka_alloc_timed) {
+			ka = oka_create(ua_params->arena_sz);
+		}
 		LmLogInfoR("\n\n------------------------------\n");
 		LmLogInfo("%s -- %s", alloc_fn_name, size_name);
 
@@ -245,8 +264,10 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 				     alloc_sizes_len, size_name, log_directory);
 		if (ua)
 			ua_destroy(&ua);
-		if (ka)
+		if (ka && alloc_fn == ka_alloc_timed)
 			ka_destroy(ka);
+		else if (ka && alloc_fn == oka_alloc_timed)
+			oka_destroy(ka);
 
 		LmRemoveLogFileLocal();
 		lm_close_file(log_file);

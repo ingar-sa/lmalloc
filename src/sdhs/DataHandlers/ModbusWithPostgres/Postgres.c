@@ -146,7 +146,7 @@ PgRun(void *Arg)
 
         if(Events[0].events & EPOLLIN) {
             while((Buf = SdPipeGetReadBuffer(Pipe)) != NULL) {
-                SdbAssert(Buf->cur % Pipe->PacketSize == 0,
+                SdbAssert(ArenaPos(Buf) % Pipe->PacketSize == 0,
                           "Pipe does not contain a multiple of the packet size");
 
                 // u64 ItemCount = Buf->cur / Pipe->PacketSize;
