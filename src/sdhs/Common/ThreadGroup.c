@@ -209,8 +209,13 @@ TgManagerWaitForAll(tg_manager *Manager)
     }
 
     struct alloc_timing_stats *stats = get_alloc_stats();
+#if SDHS_TEST_ARENA == 1
+    lm_print_tsc_timing_avg(stats->ka_alloc_total_time, stats->ka_alloc_total_iter,
+                            "Average time spent in alloc: ", NS);
+#else
     lm_print_tsc_timing_avg(stats->ua_alloc_total_time, stats->ua_alloc_total_iter,
                             "Average time spent in alloc: ", NS);
+#endif
 
 
     SdbLogInfo("All groups have completed or shutdown requested");

@@ -30,7 +30,7 @@
                 },
                 {
                         "name": "u_arena_nm_c",
-                        "enabled": true,
+                        "enabled": false,
                         "ctx": 
                         {
                                 "arena_sz": "4gB",
@@ -77,7 +77,7 @@
                 },
                 {
                         "name": "sdhs",
-                        "enabled": false
+                        "enabled": true
                 }
         ],
         "data_handlers": [

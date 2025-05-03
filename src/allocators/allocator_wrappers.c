@@ -192,11 +192,11 @@ void read_timing_data_from_file(const char *filename,
 
 void *ka_alloc_wrapper_timed(KArena *ka, size_t sz)
 {
-	START_TSC_TIMING(alloc);
+	START_TSC_TIMING_LFENCE(alloc);
 	//--------------------------------------
 	void *ptr = ka_alloc(ka, sz);
 	//--------------------------------------
-	END_TSC_TIMING(alloc);
+	END_TSC_TIMING_LFENCE(alloc);
 	uint64_t alloc_time = alloc_end - alloc_start;
 #if 1
 	static int nl = 0;

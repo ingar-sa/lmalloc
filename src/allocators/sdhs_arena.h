@@ -3,11 +3,11 @@
 
 #include <src/lm.h>
 
-#ifndef SDHS_TEST_K_ARENA
-#define SDHS_TEST_K_ARENA 1
+#ifndef SDHS_TEST_ARENA
+#define SDHS_TEST_ARENA 1
 #endif
 
-#if SDHS_TEST_K_ARENA == 1
+#if SDHS_TEST_ARENA == 1
 
 #include "karena.h"
 #include "allocator_wrappers.h"
@@ -22,17 +22,18 @@ typedef KAScratch SdhsArenaScratch;
 
 #define KA_ALLOC_FN(ka, size) ka_alloc_wrapper_timed(ka, size)
 
-#define ArenaCreate(cap, contiguous, mallocd, alignment) ka_create(cap)
-#define ArenaDestroy(kap) ka_destroy(*kap)
-#define ArenaBootstrap(ka, new_existing, cap, alignment) ka_bootstrap(ka, cap)
-#define ArenaAlloc(ka, size) KA_ALLOC_FN(ka, size)
-#define ArenaFree(ka) ka_free(ka)
-#define ArenaPop(ka, size) ka_pop(ka, size)
-#define ArenaPos(ka) ka_pos(ka)
-#define ArenaSeek(ka, pos) ka_seek(ka, pos)
-#define ArenaCap(ka) ka_size(ka)
-#define ArenaBase(ka) ka_base(ka)
-#define ArenaReserve(ka, sz) ka_reserve(ka, sz)
+#define ArenaCreate(cap, contiguous, mallocd, alignment) ka_create((cap))
+#define ArenaDestroy(kap) ka_destroy((*kap))
+#define ArenaBootstrap(ka, new_existing, cap, alignment) \
+	ka_bootstrap((ka), (cap))
+#define ArenaAlloc(ka, size) KA_ALLOC_FN((ka), (size))
+#define ArenaFree(ka) ka_free((ka))
+#define ArenaPop(ka, size) ka_pop((ka), (size))
+#define ArenaPos(ka) ka_pos((ka))
+#define ArenaSeek(ka, pos) ka_seek((ka), (pos))
+#define ArenaCap(ka) ka_size((ka))
+#define ArenaBase(ka) ka_base((ka))
+#define ArenaReserve(ka, sz) ka_reserve((ka), (sz))
 #define ArenaPushArray(a, type, count) KaPushArray(a, type, count)
 #define ArenaPushArrayZero(a, type, count) KaPushArrayZero(a, type, count)
 #define ArenaPushStruct(a, type) KaPushStruct(a, type)
@@ -55,7 +56,7 @@ typedef KAScratch SdhsArenaScratch;
 #define SDHS_TEST_U_ARENA 0
 #endif
 
-#if SDHS_TEST_U_ARENA == 1
+#if SDHS_TEST_ARENA == 2
 
 #include "u_arena.h"
 #include "allocator_wrappers.h"
@@ -80,6 +81,8 @@ typedef UAScratch SdhsArenaScratch;
 #define ArenaPop(ua, size) ua_pop(ua, size)
 #define ArenaPos(ua) ua_pos(ua)
 #define ArenaSeek(ua, pos) ua_seek(ua, pos)
+#define ArenaCap(ua) (ua)->cap
+#define ArenaBase(ua) (ua)->mem
 #define ArenaReserve(ua, sz) ua_reserve(ua, sz)
 #define ArenaPushArray(a, type, count) UaPushArray(a, type, count)
 #define ArenaPushArrayZero(a, type, count) UaPushArrayZero(a, type, count)
@@ -98,3 +101,4 @@ typedef UAScratch SdhsArenaScratch;
 #define ScratchRelease(scratch) ua_scratch_release(scratch)
 
 #endif // SDHS_TEST_U_ARENA
+#endif

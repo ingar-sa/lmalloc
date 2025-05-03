@@ -148,7 +148,6 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		pr_info("Found slot for arena @ index %u\n", index);
 		karena.mmap_info->index = index;
 		alloc.arena = index;
-		pr_info("here\n");
 
 		if (!info)
 			return -ENOMEM;
@@ -172,6 +171,8 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 		karena.mmap_info->size = info->size;
 
+		alloc.size = info->size;
+
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
 			vfree((void *)info->addr);
 			kfree(info);
@@ -183,12 +184,14 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case KARENA_ALLOC:
 		case_id = "ALLOC";
 
-		pr_info("Arena %lu, pos %lu\n", alloc.arena, info->cur);
+		// pr_info("Arena %lu @ %lx, pos %lu\n", alloc.arena, info->addr,
+		// 	info->cur);
+		if (info->cur + alloc.size > info->size) {
+			pr_err("Not enough space in arena");
+			return -ENOMEM;
+		}
 		alloc.arena = info->cur + (unsigned long)info->addr;
 		info->cur += alloc.size;
-
-		pr_info("addr at: %lx\n", alloc.arena);
-		pr_info("cur at after: %lu\n", info->cur);
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
 			pr_err("Could not copy alloc back to user\n");
@@ -222,11 +225,7 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case KARENA_POS:
 		case_id = "POS";
 
-		pr_info();
-
 		alloc.size = info->cur;
-
-		pr_info("Current pos: %lu\n", alloc.size);
 
 		if (copy_to_user((void __user *)arg, &alloc, sizeof(alloc))) {
 			pr_err("Could not copy pos back to user");
