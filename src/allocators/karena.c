@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <string.h>
 
 #include "karena.h"
 
@@ -56,6 +57,13 @@ void *ka_alloc(KArena *arena, size_t size)
 	}
 
 	return (void *)alloc.arena;
+}
+
+void *ka_zalloc(KArena *arena, size_t size)
+{
+	void *ptr = ka_alloc(arena, size);
+	explicit_bzero(ptr, size);
+	return ptr;
 }
 
 void *ka_seek(KArena *arena, size_t pos)
@@ -130,7 +138,7 @@ void *ka_base(KArena *arena)
 		return NULL;
 	}
 
-	return (void*)alloc.arena;
+	return (void *)alloc.arena;
 }
 
 size_t ka_size(KArena *arena)

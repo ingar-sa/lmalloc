@@ -72,13 +72,14 @@ struct ka__thread_arenas__ {
 			  ka__thread_arenas_instance__)
 
 #define KaPushArray(a, type, count) ka_alloc(a, sizeof(type) * count)
-#define KaPushArrayZero(a, type, count) ka_alloc(a, sizeof(type) * count)
+#define KaPushArrayZero(a, type, count) ka_zalloc(a, sizeof(type) * count)
 
 #define KaPushStruct(a, type) KaPushArray(a, type, 1)
 #define KaPushStructZero(a, type) KaPushArrayZero(a, type, 1)
 
 KArena *ka_create(size_t size);
 void *ka_alloc(KArena *arena, size_t size);
+void *ka_zalloc(KArena *arena, size_t size);
 void *ka_seek(KArena *arena, size_t pos);
 void *ka_free(KArena *arena);
 void ka_pop(KArena *arena, size_t size);
