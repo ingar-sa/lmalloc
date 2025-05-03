@@ -416,14 +416,14 @@ def analyze_unique_tsc_values(filepath, base_dir=None, use_wall_clock=True, top_
     )
 
 def main():
-    filepath = "./logs/ua_nmc/6/ua_falloc-16B.bin"
+    filepath = "./logs/ua_nmc/21/ua_alloc-16B.bin"
     #compare_tsc_and_wall_clock(filepath)
     #analyze_allocation_file(filepath, use_wall_clock=False)
     #analyze_unique_tsc_values(filepath, None, False, None, None)
 
     alloc_fn, n_bytes = parse_timing_filename(filepath)
     stats, collection = load_timing_data(filepath)
-    tsc_freq = parse_tsc_frequency("./logs/ua_nmc/1/")
+    tsc_freq = parse_tsc_frequency("./logs/ua_nmc/21/")
 
     print("TSC frequency: ", tsc_freq, '\n')
 

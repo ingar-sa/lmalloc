@@ -1,5 +1,5 @@
 CC = gcc
-SRC = $(filter-out src/foo.c src/sdhs/DevUtils/TestDataGenerator.c poc glibc linux gcc, $(shell find src -name "*.c"))
+SRC = $(filter-out src/foo.c src/godbolt/wrappers.c src/sdhs/DevUtils/TestDataGenerator.c poc glibc linux gcc, $(shell find src -name "*.c"))
 #SRC = src/foo.c
 INCLUDES = -I. -I/usr/include/postgresql
 LIBS =  -lpthread -lpq -lm
@@ -29,7 +29,7 @@ LM_RELEASE_FLAGS = -DLM_MEM_TRACE=0 -DLM_PRINTF_DEBUG_ENABLE=0 -DLM_LOG_LEVEL=$(
 SDHS_LOG_LEVEL ?= -DSDHS_LOG_LEVEL=3
 SDHS_REL_LOG_LEVEL ?= -DSDHS_LOG_LEVEL=2
 
-SDHS_DEBUG_FLAGS = -DSDHS_MEM_TRACE=1 -DSDHS_PRINTF_DEBUG_ENABLE=1 -DSDHS_ASSERT=1 $(SDHS_LOG_LEVEL)
+SDHS_DEBUG_FLAGS = -DSDHS_MEM_TRACE=0 -DSDHS_PRINTF_DEBUG_ENABLE=1 -DSDHS_ASSERT=1 $(SDHS_LOG_LEVEL)
 RELEASE_SDHS_FLAGS = -DSDHS_MEM_TRACE=0 -DSDHS_PRINTF_DEBUG_ENABLE=0 -DSDHS_ASSERT=0 $(SDHS_REL_LOG_LEVEL)
 
 DEBUG_FLAGS = -std=gnu11 -g -O$(DEBUG_OPT_LEVEL) $(WARNING_FLAGS) $(DISABLED_DEBUG_WARNING_FLAGS) $(DISABLED_WARNING_FLAGS) -DDEBUG

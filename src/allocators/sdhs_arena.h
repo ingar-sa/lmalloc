@@ -20,13 +20,13 @@ typedef KAScratch SdhsArenaScratch;
 #define SDHS_ARENA_TEST_IS_MALLOCD false
 #define SDHS_ARENA_TEST_ALIGNMENT 16
 
-#define KA_ALLOC_FN(ka, size) ka_alloc_wrapper_timed(ka, size)
+#define SDHS_ALLOC_FN ka_alloc_timed
 
 #define ArenaCreate(cap, contiguous, mallocd, alignment) ka_create((cap))
 #define ArenaDestroy(kap) ka_destroy((*kap))
 #define ArenaBootstrap(ka, new_existing, cap, alignment) \
 	ka_bootstrap((ka), (cap))
-#define ArenaAlloc(ka, size) KA_ALLOC_FN((ka), (size))
+#define ArenaAlloc(ka, size) SDHS_ALLOC_FN(NULL, (ka), (size))
 #define ArenaFree(ka) ka_free((ka))
 #define ArenaPop(ka, size) ka_pop((ka), (size))
 #define ArenaPos(ka) ka_pos((ka))
@@ -69,14 +69,14 @@ typedef UAScratch SdhsArenaScratch;
 #define SDHS_ARENA_TEST_IS_MALLOCD false
 #define SDHS_ARENA_TEST_ALIGNMENT 16
 
-#define UA_ALLOC_FN(ua, size) ua_alloc_wrapper_timed(ua, size)
+#define SDHS_ALLOC_FN ua_falloc_timed
 
 #define ArenaCreate(cap, contiguous, mallocd, alignment) \
 	ua_create(cap, contiguous, mallocd, alignment)
 #define ArenaDestroy(uap) ua_destroy(uap)
 #define ArenaBootstrap(ua, new_existing, cap, alignment) \
 	ua_bootstrap(ua, new_existing, cap, alignment)
-#define ArenaAlloc(ua, size) UA_ALLOC_FN(ua, size)
+#define ArenaAlloc(ua, size) SDHS_ALLOC_FN(ua, NULL, size)
 #define ArenaFree(ua) ua_free(ua)
 #define ArenaPop(ua, size) ua_pop(ua, size)
 #define ArenaPos(ua) ua_pos(ua)

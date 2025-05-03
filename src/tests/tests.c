@@ -18,23 +18,21 @@ LM_LOG_REGISTER(tests);
 
 extern UArena *main_ua;
 
-static const alloc_fn_t ua_alloc_functions[] = {
-	ua_alloc_wrapper_timed
-	//ua_zalloc_wrapper_timed,
-	//ua_falloc_wrapper_timed
-	//ua_fzalloc_wrapper_timed
+static const alloc_fn_t a_alloc_functions[] = {
+	ka_alloc_timed,
+	//ua_alloc_timed,
+	//ua_zalloc_timed,
+	//ua_falloc_timed
+	//ua_fzalloc_timed
 };
 
-static const free_fn_t ua_free_functions[] = { ua_free_wrapper };
-static const realloc_fn_t ua_realloc_functions[] = { ua_realloc_wrapper_timed };
+static const realloc_fn_t a_realloc_functions[] = { ua_realloc_timed };
 
-static const alloc_fn_t malloc_and_fam[] = { malloc_wrapper_timed,
-					     calloc_wrapper_timed };
-static const free_fn_t free_functions[] = { free_wrapper_timed };
-static const realloc_fn_t realloc_functions[] = { realloc_wrapper_timed };
+static const alloc_fn_t malloc_and_fam[] = { malloc_timed, calloc_timed };
+static const realloc_fn_t realloc_functions[] = { realloc_timed };
 
-static const char *ua_alloc_function_names[] = { "alloc", "zalloc", "falloc",
-						 "fzalloc" };
+static const char *a_alloc_function_names[] = { "kalloc", "alloc", "zalloc",
+						"falloc", "fzalloc" };
 static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
 
 // NOTE: (isa): Made by Claude
@@ -179,11 +177,10 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 	ua_scratch_release(uas);
 
 	const char *file_mode = "a";
-	for (int i = 0; i < (int)LmArrayLen(ua_alloc_functions); ++i) {
-		alloc_fn_t alloc_fn = ua_alloc_functions[i];
-		const char *alloc_fn_name = ua_alloc_function_names[i];
-		free_fn_t free_fn = ua_free_functions[0];
-		realloc_fn_t realloc_fn = ua_realloc_functions[0];
+	for (int i = 0; i < (int)LmArrayLen(a_alloc_functions); ++i) {
+		alloc_fn_t alloc_fn = a_alloc_functions[i];
+		const char *alloc_fn_name = a_alloc_function_names[i];
+		realloc_fn_t realloc_fn = a_realloc_functions[0];
 #if 1
 		tight_loop_test_all_sizes(&params, running_in_debugger,
 					  alloc_iterations, alloc_fn,
@@ -193,6 +190,7 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 
 #if 0
                 // NOTE: (isa): Network test has been moved to "poc" for now
+                free_fn_t free_fn = ua_free_functions[0];
 		network_test(&params, alloc_fn, alloc_fn_name, free_fn,
 			     realloc_fn, alloc_iterations, running_in_debugger,
 			     log_filename, file_mode);
@@ -226,42 +224,42 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 // 	LmRemoveLogFileLocal();
 // 	lm_close_file(log_file);
 // }
-//
-// int karena_tests(void *ctx, bool running_in_debugger)
-// {
-// 	(void)running_in_debugger;
-// 	cJSON *ctx_json = ctx;
-// 	cJSON *alloc_iterations_json =
-// 		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
-// 	cJSON *log_filename_json =
-// 		cJSON_GetObjectItem(ctx_json, "log_filename");
-//
-// 	uint64_t alloc_iterations =
-// 		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
-// 	char *log_filename = cJSON_GetStringValue(log_filename_json);
-//
-// 	array_test small = {
-// 		.array = small_sizes,
-// 		.len = LmArrayLen(small_sizes),
-// 		.name = "small",
-// 	};
-//
-// 	array_test medium = {
-// 		.array = medium_sizes,
-// 		.len = LmArrayLen(medium_sizes),
-// 		.name = "medium",
-// 	};
-//
-// 	array_test large = { .array = large_sizes,
-// 			     .len = LmArrayLen(large_sizes),
-// 			     .name = "large" };
-//
-// 	karena_tight_loop(alloc_iterations, log_filename, &small);
-// 	karena_tight_loop(alloc_iterations, log_filename, &medium);
-// 	// large no work ):
-// 	// karena_tight_loop(params, &large);
-// 	return 0;
-// }
+
+int karena_tests(void *ctx, bool running_in_debugger)
+{
+	(void)running_in_debugger;
+	cJSON *ctx_json = ctx;
+	cJSON *alloc_iterations_json =
+		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
+	cJSON *log_filename_json =
+		cJSON_GetObjectItem(ctx_json, "log_filename");
+
+	uint64_t alloc_iterations =
+		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
+	char *log_filename = cJSON_GetStringValue(log_filename_json);
+
+	array_test small = {
+		.array = small_sizes,
+		.len = LmArrayLen(small_sizes),
+		.name = "small",
+	};
+
+	array_test medium = {
+		.array = medium_sizes,
+		.len = LmArrayLen(medium_sizes),
+		.name = "medium",
+	};
+
+	array_test large = { .array = large_sizes,
+			     .len = LmArrayLen(large_sizes),
+			     .name = "large" };
+
+	karena_tight_loop(alloc_iterations, log_filename, &small);
+	karena_tight_loop(alloc_iterations, log_filename, &medium);
+	// large no work ):
+	// karena_tight_loop(params, &large);
+	return 0;
+}
 
 static int malloc_test(void *ctx, bool running_in_debugger)
 {
@@ -289,7 +287,6 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 	for (int i = 0; i < (int)LmArrayLen(malloc_and_fam); ++i) {
 		alloc_fn_t alloc_fn = malloc_and_fam[i];
 		const char *alloc_fn_name = malloc_and_fam_names[i];
-		free_fn_t free_fn = free_functions[0];
 		realloc_fn_t realloc_fn = realloc_functions[0];
 #if 1
 		tight_loop_test_all_sizes(NULL, running_in_debugger,
@@ -310,9 +307,30 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 
 static int sdhs_test(void *ctx, bool running_in_debugger)
 {
-	(void)ctx;
-	(void)running_in_debugger;
-	SdhsMain(0, NULL);
+	cJSON *ctx_json = ctx;
+	cJSON *log_directory_json =
+		cJSON_GetObjectItem(ctx_json, "log_directory");
+	if (!ctx_json || !log_directory_json) {
+		LmLogError(
+			"Context JSON or log directory entry for the sdhs test do not exist!");
+		return -1;
+	}
+
+	LmString log_directory = lm_string_make(
+		cJSON_GetStringValue(log_directory_json), main_ua);
+	make_and_update_log_dir(log_directory);
+
+	UAScratch uas = ua_scratch_begin(main_ua);
+	LmString tsc_freq_filename = lm_string_make(log_directory, uas.ua);
+	lm_string_append_fmt(tsc_freq_filename, "tsc_freq.bin");
+	double tsc_freq = get_tsc_freq();
+	if (lm_write_bytes_to_file_by_name((uint8_t *)&tsc_freq,
+					   sizeof(tsc_freq),
+					   tsc_freq_filename) != 0)
+		return -1;
+	ua_scratch_release(uas);
+
+	SdhsMain(log_directory);
 	return 0;
 }
 

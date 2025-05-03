@@ -34,6 +34,8 @@ typedef struct signal_handler_context
 /** @brief Global signal handler context */
 extern signal_handler_context GSignalContext;
 
+void InitiateGracefulShutdown(void);
+
 /**
  * @brief Initializes signal handlers for the application
  *

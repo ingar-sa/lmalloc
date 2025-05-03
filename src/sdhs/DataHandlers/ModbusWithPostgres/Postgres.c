@@ -112,10 +112,11 @@ PgRun(void *Arg)
     u64        PgFailCounter      = 0;
     u64        TimeoutCounter     = 0;
     static u64 TotalInsertedItems = 0;
+    const u64  break_on_count     = 1e4;
     SdhsArena *Buf                = NULL;
     SdbLogDebug("Item count/buf: %lu\n", Pipe->ItemMaxCount);
 
-    while(!SdbShouldShutdown()) {
+    while(!SdbShouldShutdown() && TotalInsertedItems < break_on_count) {
         struct epoll_event Events[1];
         int                EpollRet = epoll_wait(EpollFd, Events, 1, SDB_TIME_MS(100));
         if(EpollRet == -1) {
@@ -157,7 +158,7 @@ PgRun(void *Arg)
                 sdb_errno InsertRet
                     = PgInsertData(Conn, TableInfo, (const char *)ArenaBase(Buf), ItemCount);
 
-                if(TotalInsertedItems >= (u64)1e6) {
+                if(TotalInsertedItems >= break_on_count) {
                     break;
                 }
 
@@ -176,6 +177,7 @@ PgRun(void *Arg)
         }
     }
 
+    InitiateGracefulShutdown();
     PQfinish(PgCtx->DbConn);
     close(EpollFd);
     ArenaDestroy(&PgArena);

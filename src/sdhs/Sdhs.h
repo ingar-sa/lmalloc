@@ -1,6 +1,8 @@
 #ifndef SDHS_H
 #define SDHS_H
 
-int SdhsMain(int ArgCount, char **ArgV);
+#include <src/lm.h>
+
+int SdhsMain(LmString log_dir);
 
 #endif

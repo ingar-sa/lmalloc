@@ -33,6 +33,14 @@ SDB_LOG_REGISTER(Sdhs);
 
 #include "Sdhs.h"
 
+#include <src/lm.h>
+LM_LOG_REGISTER(sdhs);
+
+#include <src/allocators/allocator_wrappers.h>
+#include <src/allocators/u_arena.h>
+
+extern UArena *main_ua;
+
 /**
  * @brief Sets up the thread group manager from a configuration file
  *
@@ -146,7 +154,7 @@ cleanup:
  * @return EXIT_SUCCESS on successful execution, EXIT_FAILURE if initialization fails
  */
 int
-SdhsMain(int ArgCount, char **ArgV)
+SdhsMain(LmString log_dir)
 {
     tg_manager *Manager = NULL;
     SetUpFromConf("./configs/validation.json", &Manager);
@@ -164,6 +172,7 @@ SdhsMain(int ArgCount, char **ArgV)
         exit(EXIT_FAILURE);
     }
 
+    init_alloc_tcoll_dynamic(LmMebiByte(16));
 
     SdbLogInfo("Starting all thread groups");
     sdb_errno TgStartRet = TgManagerStartAll(Manager);
@@ -177,6 +186,25 @@ SdhsMain(int ArgCount, char **ArgV)
 
     TgManagerWaitForAll(Manager);
     TgDestroyManager(Manager);
+
+    UAScratch            uas    = ua_scratch_begin(main_ua);
+    enum alloc_type      atype  = get_alloc_type(SDHS_ALLOC_FN);
+    struct alloc_tstats *tstats = get_alloc_tstats();
+
+    lm_string_append_fmt(log_dir, "%s", alloct_string(atype));
+    LmString log_string = lm_string_make(alloct_string(atype), uas.ua);
+    lm_string_append_c(log_string, " avg: ");
+
+    lm_log_tsc_timing_avg(tstats->total_tsc, tstats->iter, log_string, NS, false, INF,
+                          LM_LOG_MODULE_LOCAL);
+
+    LmString data_dump_filename = lm_string_make(log_dir, uas.ua);
+    lm_string_append_c(data_dump_filename, ".bin");
+    if(write_alloc_timing_data_to_file(data_dump_filename, atype) != 0) {
+        LmLogError("Failed to write data to file %s", data_dump_filename);
+        return EXIT_FAILURE;
+    }
+    ua_scratch_release(uas);
 
     return EXIT_SUCCESS;
 }
