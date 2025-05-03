@@ -99,26 +99,31 @@ static int make_and_update_log_dir(LmString log_directory)
 	return 0;
 }
 
-static void
-tight_loop_test_all_sizes(struct ua_params *params, bool running_in_debugger,
-			  uint64_t iterations, alloc_fn_t alloc_fn,
-			  const char *alloc_fn_name, LmString log_filename,
-			  const char *file_mode, const char *log_filename_base)
+static void tight_loop_test_all_sizes(struct ua_params *params,
+				      bool running_in_debugger, bool is_karena,
+				      uint64_t iterations, alloc_fn_t alloc_fn,
+				      const char *alloc_fn_name,
+				      LmString log_filename,
+				      const char *file_mode,
+				      const char *log_filename_base)
 {
-	tight_loop_test(params, running_in_debugger, iterations, alloc_fn,
-			alloc_fn_name, small_sizes, LmArrayLen(small_sizes),
-			"small", log_filename, file_mode, log_filename_base);
+	tight_loop_test(params, running_in_debugger, is_karena, iterations,
+			alloc_fn, alloc_fn_name, small_sizes,
+			LmArrayLen(small_sizes), "small", log_filename,
+			file_mode, log_filename_base);
 
-	tight_loop_test(params, running_in_debugger, iterations, alloc_fn,
-			alloc_fn_name, medium_sizes, LmArrayLen(medium_sizes),
-			"medium", log_filename, file_mode, log_filename_base);
+	tight_loop_test(params, running_in_debugger, is_karena, iterations,
+			alloc_fn, alloc_fn_name, medium_sizes,
+			LmArrayLen(medium_sizes), "medium", log_filename,
+			file_mode, log_filename_base);
 
-	tight_loop_test(params, running_in_debugger, iterations, alloc_fn,
-			alloc_fn_name, large_sizes, LmArrayLen(large_sizes),
-			"large", log_filename, file_mode, log_filename_base);
+	tight_loop_test(params, running_in_debugger, is_karena, iterations,
+			alloc_fn, alloc_fn_name, large_sizes,
+			LmArrayLen(large_sizes), "large", log_filename,
+			file_mode, log_filename_base);
 }
 
-static int u_arena_test(void *ctx, bool running_in_debugger)
+static int arena_test(void *ctx, bool running_in_debugger)
 {
 	cJSON *ctx_json = ctx;
 	cJSON *arena_sz_json = cJSON_GetObjectItem(ctx_json, "arena_sz");
@@ -181,9 +186,12 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 		alloc_fn_t alloc_fn = a_alloc_functions[i];
 		const char *alloc_fn_name = a_alloc_function_names[i];
 		realloc_fn_t realloc_fn = a_realloc_functions[0];
+
+		bool is_karena = (alloc_fn == ka_alloc_timed);
+
 #if 1
 		tight_loop_test_all_sizes(&params, running_in_debugger,
-					  alloc_iterations, alloc_fn,
+					  is_karena, alloc_iterations, alloc_fn,
 					  alloc_fn_name, log_filename,
 					  file_mode, log_directory);
 #endif
@@ -225,6 +233,7 @@ static int u_arena_test(void *ctx, bool running_in_debugger)
 // 	lm_close_file(log_file);
 // }
 
+#if 0
 int karena_tests(void *ctx, bool running_in_debugger)
 {
 	(void)running_in_debugger;
@@ -260,6 +269,7 @@ int karena_tests(void *ctx, bool running_in_debugger)
 	// karena_tight_loop(params, &large);
 	return 0;
 }
+#endif
 
 static int malloc_test(void *ctx, bool running_in_debugger)
 {
@@ -289,7 +299,7 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 		const char *alloc_fn_name = malloc_and_fam_names[i];
 		realloc_fn_t realloc_fn = realloc_functions[0];
 #if 1
-		tight_loop_test_all_sizes(NULL, running_in_debugger,
+		tight_loop_test_all_sizes(NULL, running_in_debugger, false,
 					  alloc_iterations, alloc_fn,
 					  alloc_fn_name, log_filename,
 					  file_mode, log_directory);
@@ -335,10 +345,10 @@ static int sdhs_test(void *ctx, bool running_in_debugger)
 }
 
 static struct test_definition test_definitions[] = {
-	{ u_arena_test, "u_arena_m_c" },
-	{ u_arena_test, "u_arena_m_nc" },
-	{ u_arena_test, "u_arena_nm_c" },
-	{ u_arena_test, "u_arena_nm_nc" },
+	{ arena_test, "u_arena_m_c" },
+	{ arena_test, "u_arena_m_nc" },
+	{ arena_test, "u_arena_nm_c" },
+	{ arena_test, "u_arena_nm_nc" },
 	{ malloc_test, "malloc" },
 	{ sdhs_test, "sdhs" },
 	{ 0 }
