@@ -19,8 +19,8 @@ LM_LOG_REGISTER(tests);
 extern UArena *main_ua;
 
 static const alloc_fn_t a_alloc_functions[] = {
-	ka_alloc_timed,
-	//ua_alloc_timed,
+	//ka_alloc_timed,
+	ua_alloc_timed,
 	//ua_zalloc_timed,
 	//ua_falloc_timed
 	//ua_fzalloc_timed
@@ -31,7 +31,7 @@ static const realloc_fn_t a_realloc_functions[] = { ua_realloc_timed };
 static const alloc_fn_t malloc_and_fam[] = { malloc_timed, calloc_timed };
 static const realloc_fn_t realloc_functions[] = { realloc_timed };
 
-static const char *a_alloc_function_names[] = { "kalloc", "alloc", "zalloc",
+static const char *a_alloc_function_names[] = { /*"kalloc",*/ "alloc", "zalloc",
 						"falloc", "fzalloc" };
 static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
 
@@ -57,10 +57,7 @@ static int get_next_dir_num(LmString directory)
 
 		if (entry->d_type == DT_DIR) {
 			current_num = atoi(entry->d_name);
-
-			if (current_num > 0 ||
-			    (current_num == 0 &&
-			     strcmp(entry->d_name, "0") == 0)) {
+			if (current_num > 0) {
 				if (current_num > largest_num) {
 					largest_num = current_num;
 				}
@@ -69,31 +66,28 @@ static int get_next_dir_num(LmString directory)
 	}
 
 	closedir(dir);
-	return largest_num + 1;
+
+	return (largest_num == 0) ? 1 : largest_num + 1;
 }
 
 static int make_and_update_log_dir(LmString log_directory)
 {
 	int ret = mkdir(log_directory, S_IRWXU);
+	if (ret != 0 && errno != EEXIST) {
+		LmLogError("Unable to create directory %s: %s", log_directory,
+			   strerror(errno));
+		return -errno;
+	}
+
+	int next_dirn = get_next_dir_num(log_directory);
+	lm_string_append_fmt(log_directory, "%d/", next_dirn);
+	printf("%s\n", log_directory);
+
+	ret = mkdir(log_directory, S_IRWXU);
 	if (ret != 0) {
-		if (errno != EEXIST) {
-			LmLogError("Unable to create directory %s: %s",
-				   log_directory, strerror(errno));
-			return -errno;
-		}
-
-		int next_dirn = get_next_dir_num(log_directory);
-		if (next_dirn < 1)
-			return next_dirn;
-
-		lm_string_append_fmt(log_directory, "%d/", next_dirn);
-
-		ret = mkdir(log_directory, S_IRWXU);
-		if (ret != 0) {
-			LmLogError("Unable to create directory %s: %s",
-				   log_directory, strerror(errno));
-			return -errno;
-		}
+		LmLogError("Unable to create directory %s: %s", log_directory,
+			   strerror(errno));
+		return -errno;
 	}
 
 	return 0;
@@ -137,6 +131,9 @@ static int write_tsc_freq_to_file(LmString log_dir)
 	return 0;
 }
 
+// TODO: (isa): Make the data directory just "./logs/arena/", since karena
+// is included in the tests and it doesn't make sense to have the ua config
+// as the name
 static int arena_test(void *ctx, bool running_in_debugger)
 {
 	cJSON *ctx_json = ctx;
