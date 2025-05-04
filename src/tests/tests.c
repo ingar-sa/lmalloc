@@ -299,7 +299,20 @@ static int sdhs_test(void *ctx, bool running_in_debugger)
 	int run_nr = get_next_run_nr(log_directory);
 	write_tsc_freq_to_file(log_directory, run_nr);
 
-	SdhsMain(log_directory);
+	if (!running_in_debugger) {
+		pid_t pid;
+		int status;
+		if ((pid = fork()) == -1) {
+			LmLogError("Fork failed: %s", strerror(errno));
+			return -1;
+		} else if (pid == 0) {
+			SdhsMain(log_directory);
+			exit(EXIT_SUCCESS);
+		}
+	} else {
+		SdhsMain(log_directory);
+	}
+
 	return 0;
 }
 
