@@ -5,7 +5,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include "karena.h"
+#include "../../allocators/karena.h"
 
 static int fd = 0;
 
@@ -191,7 +191,7 @@ KAScratch ka_scratch_begin(KArena *ka)
 {
 	KAScratch kas = { 0 };
 	if (ka) {
-		kas.ka = ka;
+		kas.ua = ka;
 		kas.f5 = ka_pos(ka);
 	}
 	return kas;
@@ -284,9 +284,9 @@ int main(void)
 
 	printf("Third: %lu @ %p\n", *third, third);
 
-	ka_destroy(arena);
-	ka_destroy(arena2);
-	ka_destroy(arena3);
+	// ka_destroy(arena);
+	// ka_destroy(arena2);
+	// ka_destroy(arena3);
 
 	// printf("Third: %lu @ %p\n", *third, third);
 

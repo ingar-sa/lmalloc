@@ -11,7 +11,7 @@ static char *case_id = "";
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 
-#include "okarena.h"
+#include "../../allocators/oldkarena.h"
 
 MODULE_LICENSE("GPL");
 

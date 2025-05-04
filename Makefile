@@ -1,5 +1,5 @@
 CC = gcc
-SRC = $(filter-out src/foo.c src/godbolt/wrappers.c src/sdhs/DevUtils/TestDataGenerator.c poc glibc linux gcc, $(shell find src -name "*.c"))
+SRC = $(filter-out src/modules/% src/foo.c src/godbolt/wrappers.c src/sdhs/DevUtils/TestDataGenerator.c poc glibc linux gcc, $(shell find src -name "*.c"))
 #SRC = src/foo.c
 INCLUDES = -I. -I/usr/include/postgresql
 LIBS =  -lpthread -lpq -lm
