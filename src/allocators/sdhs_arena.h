@@ -4,7 +4,7 @@
 #include <src/lm.h>
 
 #ifndef SDHS_TEST_ARENA
-#define SDHS_TEST_ARENA 1
+#define SDHS_TEST_ARENA 2
 #endif
 
 #if SDHS_TEST_ARENA == 1
@@ -50,10 +50,6 @@ typedef KAScratch SdhsArenaScratch;
 	KaScratchGet(conflicts, conflict_count)
 #define ScratchRelease(scratch) ka_scratch_release(scratch)
 
-#endif
-
-#ifndef SDHS_TEST_U_ARENA
-#define SDHS_TEST_U_ARENA 0
 #endif
 
 #if SDHS_TEST_ARENA == 2

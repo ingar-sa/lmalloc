@@ -70,21 +70,45 @@ static int get_next_dir_num(LmString directory)
 	return (largest_num == 0) ? 1 : largest_num + 1;
 }
 
+static int get_next_run_nr(LmString directory)
+{
+	DIR *dir;
+	struct dirent *entry;
+	int largest_num = 0;
+	int current_num;
+
+	dir = opendir(directory);
+	if (dir == NULL) {
+		LmLogError("Unable to open directory: %s", strerror(errno));
+		return -errno;
+	}
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (entry->d_type == DT_DIR)
+			continue;
+
+		UAScratch uas = ua_scratch_begin(main_ua);
+		LmString filename = lm_string_make(entry->d_name, uas.ua);
+		lm_string_backspace(filename, 4); // "Remove" extension
+
+		current_num = atoi(filename);
+		if (current_num > 0) {
+			if (current_num > largest_num) {
+				largest_num = current_num;
+			}
+		}
+
+		ua_scratch_release(uas);
+	}
+
+	closedir(dir);
+	return (largest_num == 0) ? 1 : largest_num + 1;
+}
+
 static int make_and_update_log_dir(LmString log_directory)
 {
 	int ret = mkdir(log_directory, S_IRWXU);
 	if (ret != 0 && errno != EEXIST) {
-		LmLogError("Unable to create directory %s: %s", log_directory,
-			   strerror(errno));
-		return -errno;
-	}
-
-	int next_dirn = get_next_dir_num(log_directory);
-	lm_string_append_fmt(log_directory, "%d/", next_dirn);
-	printf("%s\n", log_directory);
-
-	ret = mkdir(log_directory, S_IRWXU);
-	if (ret != 0) {
 		LmLogError("Unable to create directory %s: %s", log_directory,
 			   strerror(errno));
 		return -errno;
@@ -117,11 +141,11 @@ static void tight_loop_test_all_sizes(struct ua_params *params,
 			file_mode, log_filename_base);
 }
 
-static int write_tsc_freq_to_file(LmString log_dir)
+static int write_tsc_freq_to_file(LmString log_dir, int run_nr)
 {
 	UAScratch uas = ua_scratch_begin(main_ua);
 	LmString tsc_freq_filename = lm_string_make(log_dir, uas.ua);
-	lm_string_append_fmt(tsc_freq_filename, "tsc_freq.bin");
+	lm_string_append_fmt(tsc_freq_filename, "%d-tsc_freq.bin", run_nr);
 	double tsc_freq = get_tsc_freq();
 	if (lm_write_bytes_to_file_by_name((uint8_t *)&tsc_freq,
 					   sizeof(tsc_freq),
@@ -165,8 +189,9 @@ static int arena_test(void *ctx, bool running_in_debugger)
 		cJSON_GetStringValue(log_directory_json), main_ua);
 	make_and_update_log_dir(log_directory);
 
+	int run_nr = get_next_run_nr(log_directory);
 	LmString log_filename = lm_string_make(log_directory, main_ua);
-	lm_string_append_fmt(log_filename, "%s", "log.txt");
+	lm_string_append_fmt(log_filename, "%d-log.txt", run_nr);
 
 	FILE *log_file = lm_open_file_by_name(log_filename, "w");
 	LmSetLogFileLocal(log_file);
@@ -182,7 +207,7 @@ static int arena_test(void *ctx, bool running_in_debugger)
 	LmRemoveLogFileLocal();
 	lm_close_file(log_file);
 
-	write_tsc_freq_to_file(log_directory);
+	write_tsc_freq_to_file(log_directory, run_nr);
 
 	const char *file_mode = "a";
 	for (int i = 0; i < (int)LmArrayLen(a_alloc_functions); ++i) {
@@ -211,69 +236,6 @@ static int arena_test(void *ctx, bool running_in_debugger)
 	return 0;
 }
 
-#if 0
-// static void karena_tight_loop(uint64_t alloc_iterations, char *log_filename,
-// 			      const array_test *test)
-// {
-// 	FILE *log_file = lm_open_file_by_name(log_filename, "a");
-// 	LmSetLogFileLocal(log_file);
-//
-// 	size_t arena_size = test->array[test->len] * alloc_iterations;
-//
-// 	LmLogDebugR("\n------------------------------");
-// 	LmLogDebug("%s -- %s", "karena", test->name);
-//
-// 	for (size_t j = 0; j < test->len; ++j) {
-// 		void *a = karena_create(arena_size);
-// 		LmLogDebugR("\n%s'ing %zd bytes %lu times", "alloc",
-// 			    test->array[j], alloc_iterations);
-//
-// 		TIME_TIGHT_LOOP(PROC_CPUTIME, alloc_iterations,
-// 				uint8_t *ptr = karena_alloc(a, test->array[j]);
-// 				*ptr = 1;);
-// 	}
-//
-// 	LmRemoveLogFileLocal();
-// 	lm_close_file(log_file);
-// }
-
-int karena_tests(void *ctx, bool running_in_debugger)
-{
-	(void)running_in_debugger;
-	cJSON *ctx_json = ctx;
-	cJSON *alloc_iterations_json =
-		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
-	cJSON *log_filename_json =
-		cJSON_GetObjectItem(ctx_json, "log_filename");
-
-	uint64_t alloc_iterations =
-		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
-	char *log_filename = cJSON_GetStringValue(log_filename_json);
-
-	array_test small = {
-		.array = small_sizes,
-		.len = LmArrayLen(small_sizes),
-		.name = "small",
-	};
-
-	array_test medium = {
-		.array = medium_sizes,
-		.len = LmArrayLen(medium_sizes),
-		.name = "medium",
-	};
-
-	array_test large = { .array = large_sizes,
-			     .len = LmArrayLen(large_sizes),
-			     .name = "large" };
-
-	karena_tight_loop(alloc_iterations, log_filename, &small);
-	karena_tight_loop(alloc_iterations, log_filename, &medium);
-	// large no work ):
-	// karena_tight_loop(params, &large);
-	return 0;
-}
-#endif
-
 static int malloc_test(void *ctx, bool running_in_debugger)
 {
 	cJSON *ctx_json = ctx;
@@ -292,8 +254,9 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 	make_and_update_log_dir(log_directory);
 
 	LmString log_filename = lm_string_make(log_directory, main_ua);
-	lm_string_append_fmt(log_filename, "%s", "log.txt");
-	write_tsc_freq_to_file(log_directory);
+	int run_nr = get_next_run_nr(log_directory);
+	lm_string_append_fmt(log_filename, "%d-log.txt", run_nr);
+	write_tsc_freq_to_file(log_directory, run_nr);
 
 	LmAssert(alloc_iterations > 0, "malloc_test's alloc_iterations is 0");
 
@@ -333,7 +296,8 @@ static int sdhs_test(void *ctx, bool running_in_debugger)
 	LmString log_directory = lm_string_make(
 		cJSON_GetStringValue(log_directory_json), main_ua);
 	make_and_update_log_dir(log_directory);
-	write_tsc_freq_to_file(log_directory);
+	int run_nr = get_next_run_nr(log_directory);
+	write_tsc_freq_to_file(log_directory, run_nr);
 
 	SdhsMain(log_directory);
 	return 0;

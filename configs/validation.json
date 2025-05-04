@@ -1,6 +1,6 @@
 {
         "enabled": true,
-        "debugger": false,
+        "debugger": true,
         "tests": [
                 {
                         "name": "u_arena_m_c",
@@ -37,8 +37,8 @@
                                 "alignment": 16,
                                 "mallocd": false,
                                 "contiguous": true,
-                                "alloc_iterations": 10000,
-                                "log_directory": "./logs/ua_nmc/"
+                                "alloc_iterations": 1000,
+                                "log_directory": "./logs/arena/"
                         }
                 },
                 {
@@ -56,7 +56,7 @@
                 },
                 {
                         "name": "malloc",
-                        "enabled": true,
+                        "enabled": false,
                         "ctx":
                         {
                                 "alloc_iterations": 1000,
@@ -65,7 +65,7 @@
                 },
                 {
                         "name": "sdhs",
-                        "enabled": false,
+                        "enabled": true,
                         "ctx":
                         {
                                 "log_directory": "./logs/sdhs/"
