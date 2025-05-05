@@ -1462,10 +1462,12 @@ SdbLoadFileIntoMemory(const char *Filename, SdhsArena *Arena)
     } else {
         FileData = calloc(1, FileDataSize);
     }
-    if(!FileData) {
+    if(NULL == FileData) {
         fclose(File);
         return NULL;
     }
+
+    printf("Filedata: %lu\n", (unsigned long)FileData);
 
     FileData->Size = FileSize;
     u64 BytesRead  = fread(FileData->Data, 1, FileSize, File);

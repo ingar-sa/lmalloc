@@ -4,13 +4,10 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <string.h>
 
 #include "karena.h"
 
 static int fd = 0;
-
-KA_THREAD_ARENAS_REGISTER(threadkas, 2);
 
 KArena *ka_create(size_t size)
 {
@@ -31,8 +28,6 @@ KArena *ka_create(size_t size)
 		close(fd);
 		return NULL;
 	}
-
-	// printf("Memory size allocated: %lu bytes\n", size);
 
 	if (mmap(NULL, alloc.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0) ==
 	    MAP_FAILED) {
@@ -62,7 +57,6 @@ void *ka_alloc(KArena *arena, size_t size)
 void *ka_zalloc(KArena *arena, size_t size)
 {
 	void *ptr = ka_alloc(arena, size);
-	explicit_bzero(ptr, size);
 	return ptr;
 }
 
@@ -161,18 +155,16 @@ void ka_destroy(KArena *arena)
 		.arena = (unsigned long)arena,
 	};
 
-	size_t size = ka_size(arena);
-
 	if (ioctl(fd, KARENA_DESTROY, &alloc)) {
 		perror("Destroy failed");
 	}
 
-	munmap((void *)arena, size);
+	if (alloc.size > 0)
+		munmap((void *)arena, alloc.size);
 }
 
 KArena *ka_bootstrap(KArena *arena, size_t size)
 {
-	KArena *ka;
 	struct ka_data alloc = {
 		.arena = (unsigned long)arena,
 		.size = size,

@@ -19,8 +19,8 @@ LM_LOG_REGISTER(tests);
 extern UArena *main_ua;
 
 static const alloc_fn_t a_alloc_functions[] = {
-	//ka_alloc_timed,
-	ua_alloc_timed,
+	ka_alloc_timed,
+	// ua_alloc_timed,
 	//ua_zalloc_timed,
 	//ua_falloc_timed
 	//ua_fzalloc_timed
@@ -31,7 +31,7 @@ static const realloc_fn_t a_realloc_functions[] = { ua_realloc_timed };
 static const alloc_fn_t malloc_and_fam[] = { malloc_timed, calloc_timed };
 static const realloc_fn_t realloc_functions[] = { realloc_timed };
 
-static const char *a_alloc_function_names[] = { /*"kalloc",*/ "alloc", "zalloc",
+static const char *a_alloc_function_names[] = { "kalloc", "alloc", "zalloc",
 						"falloc", "fzalloc" };
 static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
 

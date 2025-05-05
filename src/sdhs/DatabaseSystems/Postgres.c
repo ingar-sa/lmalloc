@@ -215,6 +215,7 @@ pg_col_metadata *GetTableMetadata(PGconn *DbConn, sdb_string TableName,
 
 postgres_ctx *PgPrepareCtx(SdhsArena *PgArena, sensor_data_pipe *Pipe)
 {
+	printf("arena: %lu\n", (unsigned long)PgArena);
 	sdb_errno Errno = 0;
 	postgres_ctx *PgCtx = NULL;
 	SdhsArenaScratch Scratch = ScratchGet(NULL, 0);
