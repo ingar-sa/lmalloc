@@ -206,8 +206,10 @@ void free_timed(UArena *ua, void *ptr)
 	free(ptr);
 	//--------------------------------------
 	END_TSC_TIMING_LFENCE(free);
-	tstats.total_tsc += free_end - free_start;
+	uint64_t free_time = free_end - free_start;
+	tstats.total_tsc += free_time;
 	tstats.iter += 1;
+	add_timing(free_time);
 }
 
 void *realloc_timed(UArena *ua, KArena *ka, void *ptr, size_t old_sz, size_t sz)
@@ -220,42 +222,10 @@ void *realloc_timed(UArena *ua, KArena *ka, void *ptr, size_t old_sz, size_t sz)
 	void *new = realloc(ptr, sz);
 	//--------------------------------------
 	END_TSC_TIMING_LFENCE(realloc);
-	uint64_t alloc_time = realloc_end - realloc_start;
-	tstats.total_tsc += alloc_time;
+	uint64_t realloc_time = realloc_end - realloc_start;
+	tstats.total_tsc += realloc_time;
 	tstats.iter += 1;
-	add_timing(alloc_time);
+	add_timing(realloc_time);
 	//--------------------------------------
 	return new;
 }
-
-#if 0
-void read_timing_data_from_file(const char *filename,
-				struct alloc_timing_data *tdata, UArena *ua)
-{
-	size_t file_sz;
-	uint8_t *data = lm_load_file_into_memory(filename, &file_sz, NULL);
-	if (!data)
-		return;
-
-	struct alloc_tstats *at_stats =
-		UaPushStruct(ua, struct alloc_tstats);
-	struct alloc_tcoll *tcoll =
-		UaPushStruct(ua, struct alloc_tcoll);
-
-	uintptr_t ptr = (uintptr_t)data;
-	tcoll->cap = *((uint64_t *)(ptr + sizeof(struct alloc_timing_stats)));
-	tcoll->idx = tcoll->cap;
-	tcoll->arr = UaPushArray(ua, uint64_t, tcoll->cap);
-
-	memcpy(at_stats, data, sizeof(*at_stats));
-	uint8_t *tcoll_data =
-		(uint8_t *)(data + sizeof(*at_stats) + sizeof(uint64_t));
-	memcpy(tcoll, tcoll_data, tcoll->cap);
-
-	tdata->tstats = at_stats;
-	tdata->tcoll = tcoll;
-
-	free(data);
-}
-
-#endif
