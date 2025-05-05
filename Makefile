@@ -39,7 +39,7 @@ RELEASE_FLAGS = -std=gnu11 -O3 -march=native $(WARNING_FLAGS) $(DISABLED_DEBUG_W
 PROGRAM_NAME = validation
 
 TASKSET_C = 0
-PROGRAM_ARGS = -core=$(TASKSET_C)
+PROGRAM_ARGS = 
 
 .PHONY: all debug relwdb release run docs lint static_analysis format compile_commands.json clean
 
@@ -55,6 +55,8 @@ release: CFLAGS = $(RELEASE_FLAGS) $(LM_RELEASE_FLAGS) $(SDHS_RELEASE_FLAGS)
 release: build_suite
 
 run:
+	@echo "Setting cpu frequency governor to performance"
+	sudo cpupower frequency-set -g performance
 	taskset -c $(TASKSET_C) ./build/$(PROGRAM_NAME) $(PROGRAM_ARGS)
 
 docs:
