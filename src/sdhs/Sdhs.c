@@ -39,7 +39,42 @@ LM_LOG_REGISTER(sdhs);
 #include <src/allocators/allocator_wrappers.h>
 #include <src/allocators/u_arena.h>
 
+#include <dirent.h>
+#include <sys/stat.h>
+
 extern UArena *main_ua;
+
+// NOTE: (isa): Made by Claude
+static int
+get_next_run_nr(LmString directory)
+{
+    DIR           *dir;
+    struct dirent *entry;
+    int            largest_num = 0;
+    int            current_num;
+
+    dir = opendir(directory);
+    if(dir == NULL) {
+        LmLogError("Unable to open directory: %s", strerror(errno));
+        return -errno;
+    }
+
+    while((entry = readdir(dir)) != NULL) {
+        if(entry->d_type == DT_DIR) {
+            continue;
+        }
+
+        current_num = atoi(entry->d_name);
+        if(current_num > 0) {
+            if(current_num > largest_num) {
+                largest_num = current_num;
+            }
+        }
+    }
+
+    closedir(dir);
+    return (largest_num == 0) ? 1 : largest_num + 1;
+}
 
 /**
  * @brief Sets up the thread group manager from a configuration file
@@ -191,19 +226,30 @@ SdhsMain(LmString log_dir)
     enum alloc_type      atype  = get_alloc_type(SDHS_ALLOC_FN);
     struct alloc_tstats *tstats = get_alloc_tstats();
 
-    lm_string_append_fmt(log_dir, "%s", alloct_string(atype));
+    lm_string_append_fmt(log_dir, "%s/", alloct_string(atype));
+    int ret = mkdir(log_dir, S_IRWXU);
+    if(ret != 0 && errno != EEXIST) {
+        LmLogError("Unable to create directory %s: %s", log_dir, strerror(errno));
+        return -errno;
+    }
+
+    int run_nr = get_next_run_nr(log_dir);
+    if(run_nr <= 0) {
+        return run_nr;
+    } else {
+        lm_string_append_fmt(log_dir, "%d.bin", run_nr);
+    }
+
+    if(write_alloc_timing_data_to_file(log_dir, atype) != 0) {
+        LmLogError("Failed to write data to file %s", log_dir);
+        return EXIT_FAILURE;
+    }
+
     LmString log_string = lm_string_make(alloct_string(atype), uas.ua);
     lm_string_append_c(log_string, " avg: ");
-
     lm_log_tsc_timing_avg(tstats->total_tsc, tstats->iter, log_string, NS, false, INF,
                           LM_LOG_MODULE_LOCAL);
 
-    LmString data_dump_filename = lm_string_make(log_dir, uas.ua);
-    lm_string_append_c(data_dump_filename, ".bin");
-    if(write_alloc_timing_data_to_file(data_dump_filename, atype) != 0) {
-        LmLogError("Failed to write data to file %s", data_dump_filename);
-        return EXIT_FAILURE;
-    }
     ua_scratch_release(uas);
 
     return EXIT_SUCCESS;
