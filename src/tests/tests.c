@@ -35,41 +35,7 @@ static const char *a_alloc_function_names[] = { /*"kalloc",*/ "alloc", "zalloc",
 						"falloc", "fzalloc" };
 static const char *malloc_and_fam_names[] = { "malloc", "calloc" };
 
-// NOTE: (isa): Made by Claude
-static int get_next_dir_num(LmString directory)
-{
-	DIR *dir;
-	struct dirent *entry;
-	int largest_num = 0;
-	int current_num;
-
-	dir = opendir(directory);
-	if (dir == NULL) {
-		LmLogError("Unable to open directory: %s", strerror(errno));
-		return -errno;
-	}
-
-	while ((entry = readdir(dir)) != NULL) {
-		if (strcmp(entry->d_name, ".") == 0 ||
-		    strcmp(entry->d_name, "..") == 0) {
-			continue;
-		}
-
-		if (entry->d_type == DT_DIR) {
-			current_num = atoi(entry->d_name);
-			if (current_num > 0) {
-				if (current_num > largest_num) {
-					largest_num = current_num;
-				}
-			}
-		}
-	}
-
-	closedir(dir);
-
-	return (largest_num == 0) ? 1 : largest_num + 1;
-}
-
+// NOTE: (isa): Claude
 static int get_next_run_nr(LmString directory)
 {
 	DIR *dir;
@@ -105,7 +71,7 @@ static int get_next_run_nr(LmString directory)
 	return (largest_num == 0) ? 1 : largest_num + 1;
 }
 
-static int make_and_update_log_dir(LmString log_directory)
+static int make_dir(LmString log_directory)
 {
 	int ret = mkdir(log_directory, S_IRWXU);
 	if (ret != 0 && errno != EEXIST) {
@@ -155,6 +121,17 @@ static int write_tsc_freq_to_file(LmString log_dir, int run_nr)
 	return 0;
 }
 
+static void prepare_logging(cJSON *log_dir_json, LmString *log_dir,
+			    LmString *log_filename)
+{
+	*log_dir = lm_string_make(cJSON_GetStringValue(log_dir_json), main_ua);
+	make_dir(*log_dir);
+	*log_filename = lm_string_make(*log_dir, main_ua);
+	int run_nr = get_next_run_nr(*log_dir);
+	lm_string_append_fmt(*log_filename, "%d-log.txt", run_nr);
+	write_tsc_freq_to_file(*log_dir, run_nr);
+}
+
 // TODO: (isa): Make the data directory just "./logs/arena/", since karena
 // is included in the tests and it doesn't make sense to have the ua config
 // as the name
@@ -185,13 +162,9 @@ static int arena_test(void *ctx, bool running_in_debugger)
 		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
 	LmAssert(alloc_iterations > 0, "u_arena_test's alloc_iterations is 0");
 
-	LmString log_directory = lm_string_make(
-		cJSON_GetStringValue(log_directory_json), main_ua);
-	make_and_update_log_dir(log_directory);
-
-	int run_nr = get_next_run_nr(log_directory);
-	LmString log_filename = lm_string_make(log_directory, main_ua);
-	lm_string_append_fmt(log_filename, "%d-log.txt", run_nr);
+	LmString log_dir;
+	LmString log_filename;
+	prepare_logging(log_directory_json, &log_dir, &log_filename);
 
 	FILE *log_file = lm_open_file_by_name(log_filename, "w");
 	LmSetLogFileLocal(log_file);
@@ -207,30 +180,17 @@ static int arena_test(void *ctx, bool running_in_debugger)
 	LmRemoveLogFileLocal();
 	lm_close_file(log_file);
 
-	write_tsc_freq_to_file(log_directory, run_nr);
-
 	const char *file_mode = "a";
 	for (int i = 0; i < (int)LmArrayLen(a_alloc_functions); ++i) {
 		alloc_fn_t alloc_fn = a_alloc_functions[i];
 		const char *alloc_fn_name = a_alloc_function_names[i];
 		realloc_fn_t realloc_fn = a_realloc_functions[0];
-
 		bool is_karena = (alloc_fn == ka_alloc_timed);
 
-#if 1
 		tight_loop_test_all_sizes(&params, running_in_debugger,
 					  is_karena, alloc_iterations, alloc_fn,
 					  alloc_fn_name, log_filename,
-					  file_mode, log_directory);
-#endif
-
-#if 0
-                // NOTE: (isa): Network test has been moved to "poc" for now
-                free_fn_t free_fn = ua_free_functions[0];
-		network_test(&params, alloc_fn, alloc_fn_name, free_fn,
-			     realloc_fn, alloc_iterations, running_in_debugger,
-			     log_filename, file_mode);
-#endif
+					  file_mode, log_dir);
 	}
 
 	return 0;
@@ -249,14 +209,9 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 	uint64_t alloc_iterations =
 		(uint64_t)cJSON_GetNumberValue(alloc_iterations_json);
 
-	LmString log_directory = lm_string_make(
-		cJSON_GetStringValue(log_directory_json), main_ua);
-	make_and_update_log_dir(log_directory);
-
-	LmString log_filename = lm_string_make(log_directory, main_ua);
-	int run_nr = get_next_run_nr(log_directory);
-	lm_string_append_fmt(log_filename, "%d-log.txt", run_nr);
-	write_tsc_freq_to_file(log_directory, run_nr);
+	LmString log_dir;
+	LmString log_filename;
+	prepare_logging(log_directory_json, &log_dir, &log_filename);
 
 	LmAssert(alloc_iterations > 0, "malloc_test's alloc_iterations is 0");
 
@@ -265,19 +220,11 @@ static int malloc_test(void *ctx, bool running_in_debugger)
 		alloc_fn_t alloc_fn = malloc_and_fam[i];
 		const char *alloc_fn_name = malloc_and_fam_names[i];
 		realloc_fn_t realloc_fn = realloc_functions[0];
-#if 1
+
 		tight_loop_test_all_sizes(NULL, running_in_debugger, false,
 					  alloc_iterations, alloc_fn,
 					  alloc_fn_name, log_filename,
-					  file_mode, log_directory);
-#endif
-
-#if 0
-                // NOTE: (isa): Network test has been moved to "poc" for now
-		network_test(NULL, alloc_fn, alloc_fn_name, free_fn, realloc_fn,
-			     alloc_iterations, running_in_debugger,
-			     log_filename, file_mode);
-#endif
+					  file_mode, log_dir);
 	}
 	return 0;
 }
@@ -293,11 +240,9 @@ static int sdhs_test(void *ctx, bool running_in_debugger)
 		return -1;
 	}
 
-	LmString log_directory = lm_string_make(
-		cJSON_GetStringValue(log_directory_json), main_ua);
-	make_and_update_log_dir(log_directory);
-	int run_nr = get_next_run_nr(log_directory);
-	write_tsc_freq_to_file(log_directory, run_nr);
+	LmString log_dir;
+	LmString log_filename;
+	prepare_logging(log_directory_json, &log_dir, &log_filename);
 
 	if (!running_in_debugger) {
 		pid_t pid;
@@ -306,25 +251,22 @@ static int sdhs_test(void *ctx, bool running_in_debugger)
 			LmLogError("Fork failed: %s", strerror(errno));
 			return -1;
 		} else if (pid == 0) {
-			SdhsMain(log_directory);
+			SdhsMain(log_dir);
 			exit(EXIT_SUCCESS);
+		} else {
+			waitpid(pid, &status, 0);
 		}
 	} else {
-		SdhsMain(log_directory);
+		SdhsMain(log_dir);
 	}
 
 	return 0;
 }
 
-static struct test_definition test_definitions[] = {
-	{ arena_test, "u_arena_m_c" },
-	{ arena_test, "u_arena_m_nc" },
-	{ arena_test, "u_arena_nm_c" },
-	{ arena_test, "u_arena_nm_nc" },
-	{ malloc_test, "malloc" },
-	{ sdhs_test, "sdhs" },
-	{ 0 }
-};
+static struct test_definition test_definitions[] = { { arena_test, "arena" },
+						     { malloc_test, "malloc" },
+						     { sdhs_test, "sdhs" },
+						     { 0 } };
 
 static struct test_definition *get_test_definition(cJSON *test_name_json)
 {

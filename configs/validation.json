@@ -2,35 +2,9 @@
         "enabled": true,
         "debugger": false,
         "tests": [
-                {
-                        "name": "u_arena_m_c",
-                        "enabled": false,
-                        "ctx": 
-                        {
-                                "arena_sz": "4gB",
-                                "alignment": 16,
-                                "mallocd": true,
-                                "contiguous": true,
-                                "alloc_iterations": 1000,
-                                "log_directory": "./logs/ua_mc/"
-                        }
-                },
-                {
-                        "name": "u_arena_m_nc",
-                        "enabled": false,
-                        "ctx": 
-                        {
-                                "arena_sz": "4gB",
-                                "alignment": 16,
-                                "mallocd": true,
-                                "contiguous": false,
-                                "alloc_iterations": 1000,
-                                "log_directory": "./logs/ua_mnc/"
-                        }
-                },
-                {
-                        "name": "u_arena_nm_c",
-                        "enabled": false,
+               {
+                        "name": "arena",
+                        "enabled": true,
                         "ctx": 
                         {
                                 "arena_sz": "4gB",
@@ -42,21 +16,8 @@
                         }
                 },
                 {
-                        "name": "u_arena_nm_nc",
-                        "enabled": false,
-                        "ctx": 
-                        {
-                                "arena_sz": "4gB",
-                                "alignment": 16,
-                                "mallocd": false,
-                                "contiguous": false,
-                                "alloc_iterations": 10000,
-                                "log_directory": "./logs/ua_nmnc/"
-                        }
-                },
-                {
                         "name": "malloc",
-                        "enabled": false,
+                        "enabled": true,
                         "ctx":
                         {
                                 "alloc_iterations": 1000,
