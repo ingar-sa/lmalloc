@@ -45,11 +45,10 @@ int main(int argc, char **argv)
 	int result = EXIT_SUCCESS;
 
 	size_t main_ua_sz = LmGibiByte(4);
-	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD, 16);
+	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD);
 
 	size_t cjson_ua_sz = LmKibiByte(512);
-	cjson_arena =
-		ua_bootstrap(main_ua, NULL, cjson_ua_sz, main_ua->alignment);
+	cjson_arena = ua_bootstrap(main_ua, NULL, cjson_ua_sz);
 	cJSON_Hooks cjson_hooks = { 0 };
 	cjson_hooks.malloc_fn = cjson_alloc;
 	cjson_hooks.free_fn = cjson_free;

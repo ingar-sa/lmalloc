@@ -63,13 +63,13 @@ PgRun(void *Arg)
     mbpg_ctx *Ctx = Arg;
 
     u64        PgASize = Ctx->PgMemSize + PG_SCRATCH_COUNT * Ctx->PgScratchSize;
-    SdhsArena *PgArena = ArenaCreate(PgASize, SDHS_ARENA_TEST_IS_CONTIGUOUS,
-                                     SDHS_ARENA_TEST_IS_MALLOCD, SDHS_ARENA_TEST_ALIGNMENT);
+    SdhsArena *PgArena
+        = ArenaCreate(PgASize, SDHS_ARENA_TEST_IS_CONTIGUOUS, SDHS_ARENA_TEST_IS_MALLOCD);
 
     PgInitThreadArenas();
     ThreadArenasInitExtern(Postgres);
     for(u64 s = 0; s < PG_SCRATCH_COUNT; ++s) {
-        SdhsArena *Scratch = ArenaBootstrap(PgArena, NULL, Ctx->PgScratchSize, PgArena->alignment);
+        SdhsArena *Scratch = ArenaBootstrap(PgArena, NULL, Ctx->PgScratchSize);
         ThreadArenasAdd(Scratch);
     }
 

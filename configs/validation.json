@@ -8,7 +8,6 @@
                         "ctx": 
                         {
                                 "arena_sz": "4gB",
-                                "alignment": 16,
                                 "mallocd": false,
                                 "contiguous": true,
                                 "alloc_iterations": 1000,
