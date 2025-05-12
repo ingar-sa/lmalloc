@@ -192,7 +192,7 @@ int
 SdhsMain(LmString log_dir)
 {
     tg_manager *Manager = NULL;
-    SetUpFromConf("./configs/validation.json", &Manager);
+    SetUpFromConf("./configs/benchmark_config.json", &Manager);
     if(Manager == NULL) {
         SdbLogError("Failed to set up from config file");
         exit(EXIT_FAILURE);

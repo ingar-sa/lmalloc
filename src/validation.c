@@ -60,7 +60,7 @@ int main(int argc, char **argv)
 #else
 	size_t config_file_sz = 0;
 	uint8_t *test_config_file = lm_load_file_into_memory(
-		"./configs/validation.json", &config_file_sz, main_ua);
+		"./configs/benchmark_config.json", &config_file_sz, main_ua);
 	cJSON *test_config_json = cJSON_Parse((char *)test_config_file);
 	result = run_tests(test_config_json);
 #endif
