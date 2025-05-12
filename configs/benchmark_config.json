@@ -4,7 +4,7 @@
         "tests": [
                {
                         "name": "arena",
-                        "enabled": false,
+                        "enabled": true,
                         "ctx": 
                         {
                                 "arena_sz": "4gB",
@@ -16,7 +16,7 @@
                 },
                 {
                         "name": "malloc",
-                        "enabled": false,
+                        "enabled": true,
                         "ctx":
                         {
                                 "alloc_iterations": 1000,

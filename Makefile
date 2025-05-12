@@ -30,7 +30,7 @@ benchmarks: build_suite
 
 run:
 	@echo "Setting cpu frequency governor to performance"
-	sudo cpupower frequency-set -g performance
+	# sudo cpupower frequency-set -g performance
 	taskset -c $(TASKSET_C) ./build/$(PROGRAM_NAME) $(PROGRAM_ARGS)
 
 format:

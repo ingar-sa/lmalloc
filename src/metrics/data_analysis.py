@@ -379,8 +379,9 @@ def analyze_all_timing_data(logs_dir="./logs", test_name=None, ignore_files=["ts
     Returns:
         dict: Summary of processing
     """
-    scale_options = [('linear', 'linear'), ('linear', 'symlog'), ('log', 'linear'), 
-                     ('log', 'log'), ('rank', 'linear'), ('rank', 'log')]
+    # scale_options = [('linear', 'linear'), ('linear', 'symlog'), ('log', 'linear'), 
+                     # ('log', 'log')]
+    scale_options = [ ('log', 'linear'), ('log', 'log') ]
    
     summary = {'processed': [], 'skipped': [], 'errors': [], 'interrupted': False}
     
@@ -445,7 +446,7 @@ def analyze_all_timing_data(logs_dir="./logs", test_name=None, ignore_files=["ts
                                 output_dir=output_dir,
                                 x_scale=x_scale,
                                 y_scale=y_scale,
-                                outlier_percentile=99.9,
+                                # outlier_percentile=99.0,
                                 **kwargs
                             )
                             

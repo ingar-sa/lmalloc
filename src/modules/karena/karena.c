@@ -121,7 +121,7 @@ static long handle_arena_create(struct file *file, struct ka_data *alloc)
 	struct KArena *info;
 
 	unsigned int index = find_open_slot();
-	pr_info("index: %u", index);
+	pr_info("Found slot for arena @ index %u\n", index);
 
 	if (index == -1) {
 		pr_err("Did not find open slot");
@@ -129,15 +129,16 @@ static long handle_arena_create(struct file *file, struct ka_data *alloc)
 	}
 
 	info = &karenas[index];
-	info->uaddr = 0;
-
-	pr_info("Found slot for arena @ index %u\n", index);
-	dev_data->current_arena_index = index;
-	alloc->arena = index;
-
 	if (!info)
 		return -ENOMEM;
+
+	info->uaddr = 0;
+	info->bootstrapped = false;
+	info->owner_pid = task_pid_nr(current);
 	info->cur = 0;
+
+	dev_data->current_arena_index = index;
+	alloc->arena = index;
 
 	pr_info("Reqested arena size: %lu\n", alloc->size);
 
@@ -146,40 +147,35 @@ static long handle_arena_create(struct file *file, struct ka_data *alloc)
 		kfree(info);
 		return -EINVAL;
 	}
+
+	alloc->size = info->size;
+
 	pr_info("Aligned size: %lu\n", info->size);
 
-	info->bootstrapped = false;
-
-	info->kaddr = vzalloc(info->size);
+	info->kaddr = vmalloc(info->size);
 	if (!info->kaddr) {
 		kfree(info);
 		info = NULL;
 		return -ENOMEM;
 	}
 
-	info->owner_pid = task_pid_nr(current);
-
-	alloc->size = info->size;
-
 	return 0;
 }
 
 static long handle_arena_alloc(struct KArena *arena, struct ka_data *alloc)
 {
-	if (arena->cur + alloc->size > arena->size) {
-		pr_err("Not enough space in arena");
-		return -ENOMEM;
+	if (__builtin_expect(!!(arena->cur + alloc->size <= arena->size), 1)) {
+		alloc->arena = arena->uaddr + arena->cur;
+		arena->cur += alloc->size;
+		return 0;
 	}
+	return -ENOMEM;
 
 	// unsigned long index = alloc->arena;
 	// unsigned long cur = arena->cur;
-	alloc->arena = arena->uaddr + arena->cur;
-	arena->cur += alloc->size;
 
 	// pr_info("Allocating %lu to arena %lu, at address %lx, base %lx, offset %lx\n",
 	// 	alloc->size, index, alloc->arena, arena->uaddr, cur);
-
-	return 0;
 }
 
 static long handle_arena_seek(struct KArena *arena, struct ka_data *alloc)

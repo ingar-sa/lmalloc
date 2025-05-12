@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <string.h>
 
 #include "karena.h"
 
@@ -57,6 +58,7 @@ void *ka_alloc(KArena *arena, size_t size)
 void *ka_zalloc(KArena *arena, size_t size)
 {
 	void *ptr = ka_alloc(arena, size);
+	explicit_bzero(ptr, size);
 	return ptr;
 }
 

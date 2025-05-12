@@ -4,7 +4,7 @@
 #include <src/lm.h>
 
 #ifndef SDHS_TEST_ARENA
-#define SDHS_TEST_ARENA 1
+#define SDHS_TEST_ARENA 2
 #endif
 
 #if SDHS_TEST_ARENA == 1
