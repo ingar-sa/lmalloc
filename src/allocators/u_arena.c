@@ -125,7 +125,7 @@ UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap)
 	return new;
 }
 
-inline void *ua_alloc(UArena *ua, size_t size)
+void *ua_alloc(UArena *ua, size_t size)
 {
 	void *ptr = NULL;
 	if (LM_LIKELY(ua->cur + size <= ua->cap)) {
@@ -139,7 +139,7 @@ inline void *ua_alloc(UArena *ua, size_t size)
 // NOTE: (isa): See 'poc/page_zalloc/u_arena.c' for a short
 // discussion on why zeroing individual allocations is better
 // than pre-zeroing larger chunks
-inline void *ua_zalloc(UArena *ua, size_t size)
+void *ua_zalloc(UArena *ua, size_t size)
 {
 	void *ptr = NULL;
 	if (LM_LIKELY(ua->cur + size <= ua->cap)) {
@@ -150,14 +150,14 @@ inline void *ua_zalloc(UArena *ua, size_t size)
 	return ptr;
 }
 
-inline void *ua_falloc(UArena *ua, size_t size)
+void *ua_falloc(UArena *ua, size_t size)
 {
 	void *ptr = ua->mem + ua->cur;
 	ua->cur += size;
 	return ptr;
 }
 
-inline void *ua_fzalloc(UArena *ua, size_t size)
+void *ua_fzalloc(UArena *ua, size_t size)
 {
 	void *ptr = ua->mem + ua->cur;
 	ua->cur += size;
@@ -165,26 +165,26 @@ inline void *ua_fzalloc(UArena *ua, size_t size)
 	return ptr;
 }
 
-inline void ua_free(UArena *ua)
+void ua_free(UArena *ua)
 {
 	if (ua)
 		ua->cur = 0;
 }
 
-inline void ua_pop(UArena *ua, size_t size)
+void ua_pop(UArena *ua, size_t size)
 {
 	if (LM_LIKELY(((ssize_t)ua->cur - (ssize_t)size >= 0))) {
 		ua->cur -= size;
 	}
 }
 
-inline size_t ua_pos(UArena *ua)
+size_t ua_pos(UArena *ua)
 {
 	size_t pos = ua->cur;
 	return pos;
 }
 
-inline void *ua_seek(UArena *ua, size_t pos)
+void *ua_seek(UArena *ua, size_t pos)
 {
 	if (LM_LIKELY(pos <= ua->cap)) {
 		ua->cur = pos;
@@ -194,7 +194,7 @@ inline void *ua_seek(UArena *ua, size_t pos)
 	return NULL;
 }
 
-inline size_t ua_reserve(UArena *ua, size_t sz)
+size_t ua_reserve(UArena *ua, size_t sz)
 {
 	if (LM_LIKELY(ua->cur + sz <= ua->cap)) {
 		ua->cur += sz;

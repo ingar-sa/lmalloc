@@ -1,5 +1,5 @@
 CC = gcc
-SRC = $(filter-out src/modules/% poc, $(shell find src -name "*.c"))
+SRC = $(filter-out poc, $(shell find src -name "*.c"))
 INCLUDES = -I. -I/usr/include/postgresql
 LIBS =  -lpthread -lpq -lm
 
@@ -30,7 +30,7 @@ benchmarks: build_suite
 
 run:
 	@echo "Setting cpu frequency governor to performance"
-	# sudo cpupower frequency-set -g performance
+	sudo cpupower frequency-set -g performance
 	taskset -c $(TASKSET_C) ./build/$(PROGRAM_NAME) $(PROGRAM_ARGS)
 
 format:
