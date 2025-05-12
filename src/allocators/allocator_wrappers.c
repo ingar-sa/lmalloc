@@ -39,7 +39,7 @@ static inline void add_timing(uint64_t t)
 
 void init_alloc_tcoll_dynamic(size_t cap)
 {
-	UArena *ua = ua_create(cap, UA_CONTIGUOUS, UA_MMAPD, 8);
+	UArena *ua = ua_create(cap, UA_CONTIGUOUS, UA_MMAPD);
 	tcoll.cap = cap;
 	tcoll.arr = (uint64_t *)(uintptr_t)ua->mem;
 }

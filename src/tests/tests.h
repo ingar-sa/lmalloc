@@ -65,7 +65,6 @@ int run_tests(cJSON *conf);
 
 struct ua_params {
 	size_t arena_sz;
-	size_t alignment;
 	bool contiguous;
 	bool mallocd;
 };

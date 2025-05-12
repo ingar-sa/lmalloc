@@ -29,7 +29,6 @@
 
 typedef struct {
 	uint_least64_t flags;
-	size_t alignment;
 	size_t cap;
 	size_t cur;
 	uint8_t *mem;
@@ -57,7 +56,6 @@ struct ua__thread_arenas__ {
 					  .max_count = count_ };            \
 	static __thread struct ua__thread_arenas__                          \
 		*ua__thread_arenas_instance__ __attribute__((used))
-
 
 #define UA_THREAD_ARENAS_EXTERN(thread_name)                   \
 	extern __thread struct ua__thread_arenas__ LM_CONCAT3( \
@@ -92,14 +90,13 @@ struct ua__thread_arenas__ {
 #define UaPushStructZero(a, type) UaPushArrayZero(a, type, 1)
 
 void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
-	     size_t alignment, size_t page_sz, size_t cap, uint8_t *mem);
+	     size_t page_sz, size_t cap, uint8_t *mem);
 
-UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment);
+UArena *ua_create(size_t cap, bool contiguous, bool mallocd);
 
 void ua_destroy(UArena **uap);
 
-UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap,
-		     size_t alignment);
+UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap);
 
 void *ua_alloc(UArena *ua, size_t size);
 

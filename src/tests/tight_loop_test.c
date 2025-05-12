@@ -90,8 +90,7 @@ static void all_sizes_repeatedly(UArena *test_ua, KArena *test_ka,
 		   alloc_fn_name, size_name, alloc_iterations);
 	uint64_t total_iterations = alloc_iterations * alloc_sizes_len;
 	size_t timing_vals_sz = total_iterations * sizeof(uint64_t);
-	UArena *timings_ua = ua_create(timing_vals_sz, UA_CONTIGUOUS, UA_MMAPD,
-				       sizeof(uint64_t));
+	UArena *timings_ua = ua_create(timing_vals_sz, UA_CONTIGUOUS, UA_MMAPD);
 	uint64_t *timing_arr =
 		UaPushArray(timings_ua, uint64_t, total_iterations);
 	init_alloc_tcoll(total_iterations, timing_arr);
@@ -135,8 +134,7 @@ static void each_size_by_itself(UArena *test_ua, KArena *test_ka,
 		   size_name, alloc_iterations);
 
 	size_t timing_vals_sz = alloc_iterations * sizeof(uint64_t);
-	UArena *timings_ua = ua_create(timing_vals_sz, UA_CONTIGUOUS, UA_MMAPD,
-				       sizeof(uint64_t));
+	UArena *timings_ua = ua_create(timing_vals_sz, UA_CONTIGUOUS, UA_MMAPD);
 	uint64_t *timing_arr =
 		UaPushArray(timings_ua, uint64_t, alloc_iterations);
 	struct alloc_tstats *tstats = get_alloc_tstats();
@@ -208,8 +206,7 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 			if (ua_params && !is_karena)
 				ua = ua_create(ua_params->arena_sz,
 					       ua_params->contiguous,
-					       ua_params->mallocd,
-					       ua_params->alignment);
+					       ua_params->mallocd);
 			else if (ua_params && is_karena &&
 				 alloc_fn == ka_alloc_timed) {
 				ka = ka_create(ua_params->arena_sz);
@@ -253,8 +250,7 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 			if (ua_params && !is_karena)
 				ua = ua_create(ua_params->arena_sz,
 					       ua_params->contiguous,
-					       ua_params->mallocd,
-					       ua_params->alignment);
+					       ua_params->mallocd);
 			else if (ua_params && is_karena &&
 				 alloc_fn == ka_alloc_timed) {
 				ka = ka_create(ua_params->arena_sz);
@@ -288,8 +284,7 @@ void tight_loop_test(struct ua_params *ua_params, bool running_in_debugger,
 		if (ua_params && !is_karena)
 			ua = ua_create(ua_params->arena_sz,
 				       ua_params->contiguous,
-				       ua_params->mallocd,
-				       ua_params->alignment);
+				       ua_params->mallocd);
 		else if (ua_params && is_karena && alloc_fn == ka_alloc_timed) {
 			ka = ka_create(ua_params->arena_sz);
 		} else if (alloc_fn == oka_alloc_timed) {

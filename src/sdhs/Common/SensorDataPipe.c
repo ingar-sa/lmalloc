@@ -38,15 +38,13 @@ SdpCreate(u64 BufCount, u64 BufSize, SdhsArena *Arena)
 {
     bool UsingArena = Arena != NULL;
     if(!UsingArena) {
-        size_t al     = SDHS_ARENA_TEST_ALIGNMENT;
-        u64    SdpSz  = sizeof(sensor_data_pipe) + LmPow2AlignUp(sizeof(sensor_data_pipe), al);
-        u64 ArenaPsSz = BufCount * (sizeof(SdhsArena *) + LmPow2AlignUp(sizeof(SdhsArena *), al));
-        u64 ArenasSz  = BufCount * (sizeof(SdhsArena) + LmPow2AlignUp(sizeof(SdhsArena), al));
-        u64 BufsSz    = BufCount * (BufSize + LmPow2AlignUp(BufSize, al));
+        u64 SdpSz     = sizeof(sensor_data_pipe);
+        u64 ArenaPsSz = BufCount * sizeof(SdhsArena *);
+        u64 ArenasSz  = BufCount * sizeof(SdhsArena);
+        u64 BufsSz    = BufCount * BufSize;
         u64 PipeSize  = SdpSz + ArenaPsSz + ArenasSz + BufsSz;
 
-        Arena = ArenaCreate(PipeSize, SDHS_ARENA_TEST_IS_CONTIGUOUS, SDHS_ARENA_TEST_IS_MALLOCD,
-                            SDHS_ARENA_TEST_ALIGNMENT);
+        Arena = ArenaCreate(PipeSize, SDHS_ARENA_TEST_IS_CONTIGUOUS, SDHS_ARENA_TEST_IS_MALLOCD);
     }
 
     u64               ArenaF5 = ArenaPos(Arena);
@@ -54,7 +52,7 @@ SdpCreate(u64 BufCount, u64 BufSize, SdhsArena *Arena)
     Pipe          = ArenaPushStruct(Arena, sensor_data_pipe);
     Pipe->Buffers = ArenaPushArray(Arena, SdhsArena *, BufCount);
     for(u64 b = 0; b < BufCount; ++b) {
-        SdhsArena *Buffer = ArenaBootstrap(Arena, NULL, BufSize, Arena->alignment);
+        SdhsArena *Buffer = ArenaBootstrap(Arena, NULL, BufSize);
         Pipe->Buffers[b]  = Buffer;
     }
 

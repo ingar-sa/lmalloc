@@ -45,11 +45,10 @@ int main(int argc, char **argv)
 	int result = EXIT_SUCCESS;
 
 	size_t main_ua_sz = LmGibiByte(4);
-	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD, 16);
+	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD);
 
 	size_t cjson_ua_sz = LmKibiByte(512);
-	cjson_arena =
-		ua_bootstrap(main_ua, NULL, cjson_ua_sz, main_ua->alignment);
+	cjson_arena = ua_bootstrap(main_ua, NULL, cjson_ua_sz);
 	cJSON_Hooks cjson_hooks = { 0 };
 	cjson_hooks.malloc_fn = cjson_alloc;
 	cjson_hooks.free_fn = cjson_free;
@@ -61,7 +60,7 @@ int main(int argc, char **argv)
 #else
 	size_t config_file_sz = 0;
 	uint8_t *test_config_file = lm_load_file_into_memory(
-		"./configs/validation.json", &config_file_sz, main_ua);
+		"./configs/benchmark_config.json", &config_file_sz, main_ua);
 	cJSON *test_config_json = cJSON_Parse((char *)test_config_file);
 	result = run_tests(test_config_json);
 #endif

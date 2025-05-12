@@ -139,23 +139,20 @@ static int arena_test(void *ctx, bool running_in_debugger)
 {
 	cJSON *ctx_json = ctx;
 	cJSON *arena_sz_json = cJSON_GetObjectItem(ctx_json, "arena_sz");
-	cJSON *alignment_json = cJSON_GetObjectItem(ctx_json, "alignment");
 	cJSON *mallocd_json = cJSON_GetObjectItem(ctx_json, "mallocd");
 	cJSON *contiguous_json = cJSON_GetObjectItem(ctx_json, "contiguous");
 	cJSON *alloc_iterations_json =
 		cJSON_GetObjectItem(ctx_json, "alloc_iterations");
 	cJSON *log_directory_json =
 		cJSON_GetObjectItem(ctx_json, "log_directory");
-	LmAssert(arena_sz_json && alignment_json && mallocd_json &&
-			 contiguous_json && alloc_iterations_json &&
-			 log_directory_json,
+	LmAssert(arena_sz_json && mallocd_json && contiguous_json &&
+			 alloc_iterations_json && log_directory_json,
 		 "u_arena_test's context JSON is malformed");
 
 	struct ua_params params = { 0 };
 
 	params.arena_sz =
 		lm_mem_sz_from_string(cJSON_GetStringValue(arena_sz_json));
-	params.alignment = (size_t)cJSON_GetNumberValue(alignment_json);
 	params.mallocd = cJSON_IsTrue(mallocd_json);
 	params.contiguous = cJSON_IsTrue(contiguous_json);
 	uint64_t alloc_iterations =
@@ -171,11 +168,9 @@ static int arena_test(void *ctx, bool running_in_debugger)
 	LmLogInfoR("UArena info:\n"
 		   "\tContiguous:   %s\n"
 		   "\tMallocd:      %s\n"
-		   "\tAlignment:    %zd\n"
 		   "\tCap:          %zd\n",
 		   LmBoolToString(params.contiguous),
-		   LmBoolToString(params.mallocd), params.alignment,
-		   params.arena_sz);
+		   LmBoolToString(params.mallocd), params.arena_sz);
 	LmLogInfoR("\nTSC freq: %.0f\n", get_tsc_freq());
 	LmRemoveLogFileLocal();
 	lm_close_file(log_file);
