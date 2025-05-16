@@ -13,7 +13,7 @@ LM_LOG_REGISTER(u_arena);
 #include <stdlib.h>
 #include <string.h>
 
-static size_t arena_cache_size(void)
+static size_t arena_cache_aligned_sz(void)
 {
 	size_t cacheln_sz = get_l1d_cacheln_sz();
 	size_t arena_cache_size =
@@ -94,7 +94,7 @@ void ua_destroy(UArena **uap)
 			}
 		} else {
 			if (UaIsContiguous(ua->flags)) {
-				munmap(ua, arena_cache_size() + ua->cap);
+				munmap(ua, arena_cache_aligned_sz() + ua->cap);
 			} else {
 				munmap(ua->mem, ua->cap);
 				free(ua);
