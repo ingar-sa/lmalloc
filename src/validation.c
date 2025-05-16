@@ -40,60 +40,15 @@ void cjson_free(void *ptr)
 	(void)ptr;
 }
 
-struct program_args {
-	int cpu_core;
-};
-
-static void print_use(void)
-{
-	printf("\tArguments that must be passed to the program:\n"
-	       "\t-core=<core number> where 'core number' is the number specified to 'taskset'\n");
-}
-
-// NOTE: (isa): Written by Claude
-static void parse_args(int argc, char **argv, struct program_args *args)
-{
-	if (argc <= 1) {
-		printf("\tNo parameters were given\n");
-		print_use();
-		exit(EXIT_FAILURE);
-	}
-
-	args->cpu_core = -1;
-
-	for (int i = 1; i < argc; ++i) {
-		if (strncmp(argv[i], "-core=", 6) == 0) {
-			char *value = argv[i] + 6;
-			if (*value == '\0') {
-				fprintf(stderr,
-					"Error: No value provided for -core argument\n");
-				exit(EXIT_FAILURE);
-			}
-			args->cpu_core = atoi(value);
-		}
-	}
-
-	if (args->cpu_core < 0) {
-		fprintf(stderr,
-			"Error: Invalid value for '-core' argument was provided (was %d, must be >= 0)",
-			args->cpu_core);
-		exit(EXIT_FAILURE);
-	}
-}
-
 int main(int argc, char **argv)
 {
 	int result = EXIT_SUCCESS;
 
-	struct program_args args;
-	parse_args(argc, argv, &args);
-
 	size_t main_ua_sz = LmGibiByte(4);
-	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD, 16);
+	main_ua = ua_create(main_ua_sz, UA_CONTIGUOUS, UA_MMAPD);
 
 	size_t cjson_ua_sz = LmKibiByte(512);
-	cjson_arena =
-		ua_bootstrap(main_ua, NULL, cjson_ua_sz, main_ua->alignment);
+	cjson_arena = ua_bootstrap(main_ua, NULL, cjson_ua_sz);
 	cJSON_Hooks cjson_hooks = { 0 };
 	cjson_hooks.malloc_fn = cjson_alloc;
 	cjson_hooks.free_fn = cjson_free;
@@ -105,10 +60,9 @@ int main(int argc, char **argv)
 #else
 	size_t config_file_sz = 0;
 	uint8_t *test_config_file = lm_load_file_into_memory(
-		"./configs/validation.json", &config_file_sz, main_ua);
+		"./configs/benchmark_config.json", &config_file_sz, main_ua);
 	cJSON *test_config_json = cJSON_Parse((char *)test_config_file);
 	result = run_tests(test_config_json);
 #endif
-	printf("\033[0;33m\nHave you remembered to run `sudo cpupower frequency-set -g performance`, Ingar?\n\033[0m");
 	return result;
 }

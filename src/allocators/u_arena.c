@@ -13,12 +13,12 @@ LM_LOG_REGISTER(u_arena);
 #include <stdlib.h>
 #include <string.h>
 
-static size_t arena_cache_aligned_sz(void)
+static size_t arena_cache_size(void)
 {
 	size_t cacheln_sz = get_l1d_cacheln_sz();
-	size_t arena_cache_aligned_sz =
+	size_t arena_cache_size =
 		sizeof(UArena) + LmPaddingToAlign(sizeof(UArena), cacheln_sz);
-	return arena_cache_aligned_sz;
+	return arena_cache_size;
 }
 
 void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
@@ -37,7 +37,7 @@ void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
 	ua->mem = mem;
 }
 
-UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment)
+UArena *ua_create(size_t cap, bool contiguous, bool mallocd)
 {
 	UArena *ua;
 	uint8_t *mem;
@@ -94,7 +94,7 @@ void ua_destroy(UArena **uap)
 			}
 		} else {
 			if (UaIsContiguous(ua->flags)) {
-				munmap(ua, arena_cache_aligned_sz() + ua->cap);
+				munmap(ua, arena_cache_size() + ua->cap);
 			} else {
 				munmap(ua->mem, ua->cap);
 				free(ua);
@@ -104,8 +104,7 @@ void ua_destroy(UArena **uap)
 	}
 }
 
-UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap,
-		     size_t alignment)
+UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap)
 {
 	UArena *new;
 	if (new_existing)
@@ -126,10 +125,9 @@ UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap,
 inline void *ua_alloc(UArena *ua, size_t size)
 {
 	void *ptr = NULL;
-	size_t aligned_sz = size + LmPow2AlignUp(size, ua->alignment);
-	if (LM_LIKELY(ua->cur + aligned_sz <= ua->cap)) {
+	if (LM_LIKELY(ua->cur + size <= ua->cap)) {
 		ptr = ua->mem + ua->cur;
-		ua->cur += aligned_sz;
+		ua->cur += size;
 	}
 
 	return ptr;
@@ -141,29 +139,26 @@ inline void *ua_alloc(UArena *ua, size_t size)
 inline void *ua_zalloc(UArena *ua, size_t size)
 {
 	void *ptr = NULL;
-	size_t aligned_sz = size + LmPow2AlignUp(size, ua->alignment);
-	if (LM_LIKELY(ua->cur + aligned_sz <= ua->cap)) {
+	if (LM_LIKELY(ua->cur + size <= ua->cap)) {
 		ptr = ua->mem + ua->cur;
-		ua->cur += aligned_sz;
-		explicit_bzero(ptr, aligned_sz);
+		ua->cur += size;
+		explicit_bzero(ptr, size);
 	}
 	return ptr;
 }
 
 inline void *ua_falloc(UArena *ua, size_t size)
 {
-	size_t aligned_sz = size + LmPow2AlignUp(size, ua->alignment);
 	void *ptr = ua->mem + ua->cur;
-	ua->cur += aligned_sz;
+	ua->cur += size;
 	return ptr;
 }
 
 inline void *ua_fzalloc(UArena *ua, size_t size)
 {
-	size_t aligned_sz = size + LmPow2AlignUp(size, ua->alignment);
 	void *ptr = ua->mem + ua->cur;
-	ua->cur += aligned_sz;
-	explicit_bzero(ptr, aligned_sz);
+	ua->cur += size;
+	explicit_bzero(ptr, size);
 	return ptr;
 }
 
@@ -175,8 +170,7 @@ inline void ua_free(UArena *ua)
 
 inline void ua_pop(UArena *ua, size_t size)
 {
-	if (LM_LIKELY(((size % ua->alignment) == 0) &&
-		      ((ssize_t)ua->cur - (ssize_t)size >= 0))) {
+	if (LM_LIKELY(((ssize_t)ua->cur - (ssize_t)size >= 0))) {
 		ua->cur -= size;
 	}
 }
@@ -189,7 +183,7 @@ inline size_t ua_pos(UArena *ua)
 
 inline void *ua_seek(UArena *ua, size_t pos)
 {
-	if (LM_LIKELY(pos <= ua->cap && (pos % ua->alignment) == 0)) {
+	if (LM_LIKELY(pos <= ua->cap)) {
 		ua->cur = pos;
 		return ua->mem + ua->cur;
 	}
@@ -215,12 +209,11 @@ LmString ua_info_string(UArena *ua, UArena *string_allocator)
 			     "\tContiguous:   %s\n"
 			     "\tMallocd:      %s\n"
 			     "\tBootstrapped: %s\n"
-			     "\tAlignment:    %zd\n"
 			     "\tCap:          %zd",
 			     LmBoolToString(UaIsContiguous(ua->flags)),
 			     LmBoolToString(UaIsMallocd(ua->flags)),
 			     LmBoolToString(UaIsBootstrapped(ua->flags)),
-			     ua->alignment, ua->cap);
+			     ua->cap);
 	return info_string;
 }
 

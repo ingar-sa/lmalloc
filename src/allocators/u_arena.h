@@ -29,7 +29,6 @@
 
 typedef struct {
 	uint_least64_t flags;
-	size_t alignment;
 	size_t cap;
 	size_t cur;
 	uint8_t *mem;
@@ -93,12 +92,11 @@ struct ua__thread_arenas__ {
 void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
 	     size_t cap, uint8_t *mem);
 
-UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment);
+UArena *ua_create(size_t cap, bool contiguous, bool mallocd);
 
 void ua_destroy(UArena **uap);
 
-UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap,
-		     size_t alignment);
+UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap);
 
 void *ua_alloc(UArena *ua, size_t size);
 

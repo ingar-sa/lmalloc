@@ -19,7 +19,7 @@ kernel-module:
 	make -C $(KDIR) M=$(PWD) modules
 
 userspace:
-	gcc main.c $(INCLUDES) -o $(BUILD_DIR)/main $(LIBS)
+	gcc main.c ../../allocators/karena.c $(INCLUDES) -o $(BUILD_DIR)/main $(LIBS)
 
 clean:
 	make -C $(KDIR) M=$(PWD) clean

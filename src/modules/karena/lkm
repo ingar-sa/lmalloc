@@ -47,7 +47,7 @@ echo -n "Kernel: " ; uname -r
 runcmd "sudo rmmod $1 2> /dev/null" || true
 #runcmd "make clean"
 runcmd "sudo dmesg -C" || true
-runcmd "bear -- make || exit 1" || true
+runcmd "make || exit 1" || true
 
 [[ ! -f "build/$1".ko ]] && {
   echo "[!] ${name}: \"$1.ko\" has not been built, aborting...

@@ -18,7 +18,7 @@ MODULE_LICENSE("GPL");
 struct karena_device_data {
 	struct cdev cdev;
 	struct mutex lock;
-	struct mmap_info *mmap_info;
+	unsigned long current_arena_index;
 };
 
 struct KArena {
@@ -30,16 +30,7 @@ struct KArena {
 	pid_t owner_pid;
 };
 
-static DEFINE_MUTEX(karenas_mutex);
 static struct KArena karenas[100];
-
-struct thread_arenas {};
-
-struct mmap_info {
-	size_t size;
-	unsigned long index;
-	void *data;
-};
 
 static struct class *class;
 static dev_t dev;
@@ -85,8 +76,6 @@ static int __init karena_init(void)
 		return -1;
 	}
 
-	karena.mmap_info = vzalloc(sizeof(struct mmap_info));
-
 	pr_info("Device has been inserted!\n");
 
 	return 0;
@@ -105,37 +94,34 @@ module_exit(karena_exit);
 
 static unsigned int find_open_slot(void)
 {
+	mutex_lock(&karena.lock);
 	struct KArena *info;
 	unsigned int index = 0;
-
-	mutex_lock(&karenas_mutex);
-	pr_info("have lock\n");
 
 	info = karenas;
 	while (info->uaddr != 0) {
 		index++;
 		info = &karenas[index];
 		if (index > 99) {
-			mutex_unlock(&karenas_mutex);
+			mutex_unlock(&karena.lock);
 			return -1;
 		}
 	}
 
 	info->uaddr = 1;
-
-	mutex_unlock(&karenas_mutex);
-	pr_info("released lock\n");
+	mutex_unlock(&karena.lock);
 
 	return index;
 }
 
-static long handle_arena_create(struct ka_data *alloc)
+static long handle_arena_create(struct file *file, struct ka_data *alloc)
 {
 	pr_info("Creating arena\n");
+	struct karena_device_data *dev_data = file->private_data;
 	struct KArena *info;
 
 	unsigned int index = find_open_slot();
-	pr_info("index: %u", index);
+	pr_info("Found slot for arena @ index %u\n", index);
 
 	if (index == -1) {
 		pr_err("Did not find open slot");
@@ -143,14 +129,16 @@ static long handle_arena_create(struct ka_data *alloc)
 	}
 
 	info = &karenas[index];
-
-	pr_info("Found slot for arena @ index %u\n", index);
-	karena.mmap_info->index = index;
-	alloc->arena = index;
-
 	if (!info)
 		return -ENOMEM;
+
+	info->uaddr = 0;
+	info->bootstrapped = false;
+	info->owner_pid = task_pid_nr(current);
 	info->cur = 0;
+
+	dev_data->current_arena_index = index;
+	alloc->arena = index;
 
 	pr_info("Reqested arena size: %lu\n", alloc->size);
 
@@ -159,37 +147,35 @@ static long handle_arena_create(struct ka_data *alloc)
 		kfree(info);
 		return -EINVAL;
 	}
+
+	alloc->size = info->size;
+
 	pr_info("Aligned size: %lu\n", info->size);
 
-	info->bootstrapped = false;
-
-	karena.mmap_info->data = vzalloc(info->size);
-	if (!karena.mmap_info->data) {
+	info->kaddr = vmalloc(info->size);
+	if (!info->kaddr) {
 		kfree(info);
 		info = NULL;
 		return -ENOMEM;
 	}
-
-	info->kaddr = karena.mmap_info->data;
-	info->owner_pid = task_pid_nr(current);
-
-	karena.mmap_info->size = info->size;
-
-	alloc->size = info->size;
 
 	return 0;
 }
 
 static long handle_arena_alloc(struct KArena *arena, struct ka_data *alloc)
 {
-	if (arena->cur + alloc->size > arena->size) {
-		pr_err("Not enough space in arena");
-		return -ENOMEM;
+	if (__builtin_expect(!!(arena->cur + alloc->size <= arena->size), 1)) {
+		alloc->arena = arena->uaddr + arena->cur;
+		arena->cur += alloc->size;
+		return 0;
 	}
-	alloc->arena = arena->cur + (unsigned long)arena->uaddr;
-	arena->cur += alloc->size;
+	return -ENOMEM;
 
-	return 0;
+	// unsigned long index = alloc->arena;
+	// unsigned long cur = arena->cur;
+
+	// pr_info("Allocating %lu to arena %lu, at address %lx, base %lx, offset %lx\n",
+	// 	alloc->size, index, alloc->arena, arena->uaddr, cur);
 }
 
 static long handle_arena_seek(struct KArena *arena, struct ka_data *alloc)
@@ -230,15 +216,20 @@ static long handle_arena_reserve(struct KArena *arena, struct ka_data *alloc)
 
 static long handle_arena_destroy(struct KArena *arena, struct ka_data *alloc)
 {
+	pr_info("destroying arena %lu", alloc->arena);
+	alloc->size = arena->size;
 	arena->uaddr = 0;
 	arena->cur = 0;
 	arena->size = 0;
+	arena->owner_pid = 0;
 	if (arena->bootstrapped) {
 		arena->bootstrapped = false;
+		alloc->size = 0;
 		return 0;
 	}
 
-	vfree(arena->kaddr);
+	if (arena->kaddr)
+		vfree(arena->kaddr);
 
 	return 0;
 }
@@ -247,7 +238,6 @@ static long handle_arena_size(struct KArena *arena, struct ka_data *alloc)
 {
 	alloc->size = arena->size;
 
-	pr_info("Alloc size: %lu\n", alloc->size);
 	return 0;
 }
 
@@ -270,12 +260,15 @@ static long handle_arena_bootstrap(struct KArena *arena, struct ka_data *alloc)
 		return -EFAULT;
 	}
 
-	pr_info("Found slot for arena @ index %u\n", index);
+	pr_info("Found slot for arena @ index %u, addr %lx, size %lx, made from arena %lu\n",
+		index, addr, alloc->size, alloc->arena);
 
 	karenas[index].uaddr = addr;
 	karenas[index].cur = 0;
 	karenas[index].size = alloc->size;
 	karenas[index].bootstrapped = true;
+	karenas[index].owner_pid = arena->owner_pid;
+	karenas[index].kaddr = arena->kaddr;
 
 	alloc->arena = index;
 	return 0;
@@ -283,7 +276,9 @@ static long handle_arena_bootstrap(struct KArena *arena, struct ka_data *alloc)
 
 static long handle_arena_base(struct KArena *arena, struct ka_data *alloc)
 {
+	unsigned long index = alloc->arena;
 	alloc->arena = arena->uaddr;
+	pr_info("Base: %lx for arena %lu", alloc->arena, index);
 	return 0;
 }
 
@@ -304,7 +299,7 @@ static long karena_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case KARENA_CREATE:
-		ret = handle_arena_create(&alloc);
+		ret = handle_arena_create(file, &alloc);
 		break;
 	case KARENA_ALLOC:
 		ret = handle_arena_alloc(info, &alloc);
@@ -356,24 +351,24 @@ static vm_fault_t karena_vm_fault(struct vm_fault *vmf)
 	might_sleep();
 
 	struct vm_area_struct *vma = vmf->vma;
-	struct mmap_info *info;
+	struct KArena *arena;
 	unsigned long offset;
 	struct page *page;
 
-	info = vma->vm_private_data;
-	if (!info) {
-		pr_err("No mmap info in vma private data\n");
+	arena = vma->vm_private_data;
+	if (!arena) {
+		pr_err("No arena in vma private data\n");
 		return VM_FAULT_SIGBUS;
 	}
 
 	offset = vmf->pgoff << PAGE_SHIFT;
-	if (offset >= info->size) {
+	if (offset >= arena->size) {
 		pr_err("Offset out of bounds: %lu >= %lu\n", offset,
-		       info->size);
+		       arena->size);
 		return VM_FAULT_SIGBUS;
 	}
 
-	page = vmalloc_to_page(info->data + offset);
+	page = vmalloc_to_page(arena->kaddr + offset);
 	if (!page) {
 		pr_err("Failed to get page for offset %lu\n", offset);
 		return VM_FAULT_SIGBUS;
@@ -391,12 +386,16 @@ static const struct vm_operations_struct vm_ops = {
 
 static int karena_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	if (!karena.mmap_info) {
-		pr_err("No memory allocated for mapping\n");
+	struct karena_device_data *dev_data = file->private_data;
+	unsigned long arena_index = dev_data->current_arena_index;
+	struct KArena *arena = &karenas[arena_index];
+
+	if (!arena || arena->uaddr != 0) {
+		pr_err("Invalid arena or arena already mapped\n");
 		return -EINVAL;
 	}
 
-	if ((vma->vm_end - vma->vm_start) > karena.mmap_info->size) {
+	if ((vma->vm_end - vma->vm_start) > arena->size) {
 		pr_err("Requested mapping too large\n");
 		return -EINVAL;
 	}
@@ -406,29 +405,37 @@ static int karena_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
-	karenas[karena.mmap_info->index].uaddr = vma->vm_start;
+	arena->uaddr = vma->vm_start;
+
 	vma->vm_ops = &vm_ops;
-	vma->vm_private_data = karena.mmap_info;
+	vma->vm_private_data = arena;
 	vm_flags_set(vma, VM_DONTEXPAND);
 
-	pr_info("Memory mapped @ %lx with size %lu\n", vma->vm_start,
-		karena.mmap_info->size);
+	pr_info("Memory mapped for arena %lu @ %lx with size %lu\n",
+		arena_index, vma->vm_start, arena->size);
 
 	return 0;
 }
 
 static int dev_open(struct inode *inode, struct file *file)
 {
+	struct karena_device_data *dev_data =
+		container_of(inode->i_cdev, struct karena_device_data, cdev);
+	file->private_data = dev_data;
+
+	dev_data->current_arena_index = -1;
 	return 0;
 }
 
 static int dev_release(struct inode *inode, struct file *file)
 {
+	pr_info("release called");
 	int i;
 	pid_t pid = task_pid_nr(current);
 
 	for (i = 0; i < 100; i++) {
 		if (karenas[i].uaddr != 0 && karenas[i].owner_pid == pid) {
+			pr_info("cleaning up arena %d", i);
 			karenas[i].uaddr = 0;
 			karenas[i].cur = 0;
 			karenas[i].size = 0;
@@ -438,7 +445,10 @@ static int dev_release(struct inode *inode, struct file *file)
 				return 0;
 			}
 
-			vfree(karenas[i].kaddr);
+			if (karenas[i].kaddr) {
+				vfree(karenas[i].kaddr);
+				karenas[i].kaddr = NULL;
+			}
 		}
 	}
 	return 0;

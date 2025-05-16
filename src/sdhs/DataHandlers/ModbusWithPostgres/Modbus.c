@@ -43,14 +43,13 @@ MbPipeThroughputTest(void *Arg)
     mbpg_ctx *Ctx = Arg;
 
     u64        MbASize = Ctx->ModbusMemSize + MB_SCRATCH_COUNT * Ctx->ModbusScratchSize;
-    SdhsArena *MbArena = ArenaCreate(MbASize, SDHS_ARENA_TEST_IS_CONTIGUOUS,
-                                     SDHS_ARENA_TEST_IS_MALLOCD, SDHS_ARENA_TEST_ALIGNMENT);
+    SdhsArena *MbArena
+        = ArenaCreate(MbASize, SDHS_ARENA_TEST_IS_CONTIGUOUS, SDHS_ARENA_TEST_IS_MALLOCD);
 
     MbThreadArenasInit();
     ThreadArenasInitExtern(Modbus);
     for(u64 s = 0; s < MB_SCRATCH_COUNT; ++s) {
-        SdhsArena *Scratch
-            = ArenaBootstrap(MbArena, NULL, Ctx->ModbusScratchSize, MbArena->alignment);
+        SdhsArena *Scratch = ArenaBootstrap(MbArena, NULL, Ctx->ModbusScratchSize);
         ThreadArenasAdd(Scratch);
     }
 
@@ -110,14 +109,13 @@ MbRun(void *Arg)
     bool      FirstRun = true;
 
     u64        MbASize = Ctx->ModbusMemSize + MB_SCRATCH_COUNT * Ctx->ModbusScratchSize;
-    SdhsArena *MbArena = ArenaCreate(MbASize, SDHS_ARENA_TEST_IS_CONTIGUOUS,
-                                     SDHS_ARENA_TEST_IS_MALLOCD, SDHS_ARENA_TEST_ALIGNMENT);
+    SdhsArena *MbArena
+        = ArenaCreate(MbASize, SDHS_ARENA_TEST_IS_CONTIGUOUS, SDHS_ARENA_TEST_IS_MALLOCD);
 
     MbThreadArenasInit();
     ThreadArenasInitExtern(Modbus);
     for(u64 s = 0; s < MB_SCRATCH_COUNT; ++s) {
-        SdhsArena *Scratch
-            = ArenaBootstrap(MbArena, NULL, Ctx->ModbusScratchSize, MbArena->alignment);
+        SdhsArena *Scratch = ArenaBootstrap(MbArena, NULL, Ctx->ModbusScratchSize);
         ThreadArenasAdd(Scratch);
     }
 

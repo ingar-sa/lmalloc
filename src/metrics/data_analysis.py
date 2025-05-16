@@ -3,11 +3,14 @@
 import re
 import os
 import struct
+import itertools
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from typing import List, Optional, BinaryIO, Tuple, Dict
+from typing import List, BinaryIO, Tuple
 from collections import Counter
+import glob
 
 @dataclass
 class AllocTimingStats:
@@ -48,6 +51,28 @@ def parse_tsc_frequency(dir):
         tsc_freq: double = struct.unpack('d', tsc_freq_bytes)[0]
     return tsc_freq
 
+def load_all_tsc_frequencies(test_dir: str) -> float:
+    """Load all TSC frequency files and return the mean."""
+    tsc_files = glob.glob(os.path.join(test_dir, "*-tsc_freq.bin"))
+    frequencies = []
+    
+    for tsc_file in tsc_files:
+        try:
+            with open(tsc_file, 'rb') as f:
+                tsc_freq_bytes = f.read(8)
+                tsc_freq = struct.unpack('d', tsc_freq_bytes)[0]
+                frequencies.append(tsc_freq)
+        except Exception as e:
+            print(f"Warning: Couldn't parse {tsc_file}: {str(e)}")
+    
+    if frequencies:
+        mean_freq = np.mean(frequencies)
+        print(f"Loaded {len(frequencies)} TSC frequencies, mean: {mean_freq/1e6:.2f} MHz")
+        return mean_freq
+    else:
+        print("Warning: No TSC frequency files found")
+        return None
+
 def tsc_to_ns(tsc, tsc_freq):
     return (tsc * 1e9) / tsc_freq
 
@@ -59,213 +84,126 @@ def load_timing_data(filename):
         stats, collection = parse_timing_data(f)
     return stats, collection
 
-def parse_timing_filename(filepath):
-    filename = os.path.basename(filepath)
-    pattern = r"([a-zA-Z_]+)-(\d+)B\.bin"
-
-    match = re.match(pattern, filename)
-    if not match:
-        raise ValueError(f"Filename '{filename}' does not match the expected format '<alloc_fn_name>-<n bytes>B.bin'")
+def parse_timing_directory(dirpath):
+    """Extract allocator function and size from directory name."""
+    dirname = os.path.basename(dirpath)
     
-    alloc_fn = match.group(1)
-    n_bytes = int(match.group(2))
+    # Split by hyphen
+    parts = dirname.split('-')
+    
+    if len(parts) == 1:
+        # No hyphen in filename
+        alloc_fn = parts[0]
+        n_bytes = ""
+    else:
+        # Has hyphen - take everything before the last hyphen as function name
+        alloc_fn = '-'.join(parts[:-1])
+        
+        # Try to parse the byte size from the last part
+        byte_part = parts[-1]
+        
+        # Check if the last part matches the pattern for bytes (e.g., "32B")
+        byte_match = re.match(r"(\d+)B$", byte_part)
+        if byte_match:
+            n_bytes = int(byte_match.group(1))
+        else:
+            # If it doesn't match the pattern, treat the whole name as the function
+            alloc_fn = dirname
+            n_bytes = ""
     
     return alloc_fn, n_bytes
 
-def plot_timing_distribution(
-    timing_arr: List[int], 
-    tsc_freq: Optional[float] = None,
-    use_wall_clock: bool = True,
-    title: Optional[str] = None,
-    alloc_fn: Optional[str] = None,
-    size_bytes: Optional[int] = None,
-    show_stats: bool = True,
-    save_path: Optional[str] = None,
-    bins: int = 50,
-    figsize: Tuple[int, int] = (10, 6)
+def load_aggregate_timing_data(dirpath):
+    """Load and aggregate timing data from all run files in a directory."""
+    run_files = glob.glob(os.path.join(dirpath, "[0-9]*.bin"))
+    run_files.sort(key=lambda x: int(os.path.basename(x).split('.')[0]))
+    
+    all_timings = []
+    total_stats = AllocTimingStats()
+    
+    for run_file in run_files:
+        try:
+            stats, collection = load_timing_data(run_file)
+            all_timings.extend(collection.arr)
+            total_stats.total_tsc += stats.total_tsc
+            total_stats.iter += stats.iter
+        except Exception as e:
+            print(f"Warning: Couldn't load {run_file}: {str(e)}")
+    
+    return total_stats, all_timings, len(run_files)
+
+def get_next_output_dir(base_dir):
+    """Get the next available numbered directory."""
+    existing_dirs = glob.glob(os.path.join(base_dir, "[0-9]*"))
+    if not existing_dirs:
+        return os.path.join(base_dir, "1")
+    
+    # Find the highest number
+    numbers = []
+    for dir in existing_dirs:
+        try:
+            num = int(os.path.basename(dir))
+            numbers.append(num)
+        except ValueError:
+            continue
+    
+    next_num = max(numbers) + 1 if numbers else 1
+    return os.path.join(base_dir, str(next_num))
+
+def analyze_tsc_distribution(
+    dirpath, 
+    test_dir=None,
+    output_dir=None,
+    top_n=None,
+    min_count=None,
+    figsize=(12, 8),
+    x_scale='rank',
+    y_scale='log',
+    outlier_percentile=None,
+    linear_threshold=10,
+    show_plot=False
 ):
     """
-    Plot the distribution of timing measurements.
+    Analyze TSC distribution for all runs in a directory and plot with flexible scaling options.
     
     Args:
-        timing_arr: List of TSC timing values
-        tsc_freq: TSC frequency in Hz (required if use_wall_clock=True)
-        use_wall_clock: If True, convert TSC cycles to nanoseconds (requires tsc_freq)
-        title: Custom title for the plot (if None, a title will be generated)
-        alloc_fn: Name of the allocation function
-        size_bytes: Size in bytes for the allocation
-        show_stats: Whether to display statistics on the plot
-        save_path: If provided, save the plot to this path
-        bins: Number of bins for the histogram
-        figsize: Size of the figure (width, height) in inches
-    """
-    # Convert to numpy array for better handling
-    timings = np.array(timing_arr)
-    
-    # Determine if we should convert to wall clock time
-    convert_to_ns = use_wall_clock and tsc_freq is not None
-    
-    if convert_to_ns:
-        x_values = (timings * 1e9) / tsc_freq
-        x_label = "Time (ns)"
-        time_unit = "ns"
-    else:
-        x_values = timings
-        x_label = "TSC Cycles"
-        time_unit = "cycles"
-    
-    # Create figure and axis
-    fig, ax = plt.subplots(figsize=figsize)
-    
-    # Plot histogram
-    n, bins, patches = ax.hist(x_values, bins=bins, alpha=0.7, color='skyblue', edgecolor='black')
-    
-    # Set labels and title
-    ax.set_xlabel(x_label)
-    ax.set_ylabel('Frequency')
-    
-    if title is None:
-        title_parts = []
-        if alloc_fn:
-            title_parts.append(f"{alloc_fn}")
-        if size_bytes:
-            title_parts.append(f"{size_bytes}B")
-        
-        time_type = "Wall Clock Time" if convert_to_ns else "TSC Cycles"
-        if title_parts:
-            plot_title = f"{time_type} Distribution for {' '.join(title_parts)}"
-        else:
-            plot_title = f"{time_type} Distribution"
-    else:
-        plot_title = title
-        
-    ax.set_title(plot_title)
-    
-    # Calculate statistics
-    if show_stats:
-        stats = {
-            "Mean": np.mean(x_values),
-            "Median": np.median(x_values),
-            "Min": np.min(x_values),
-            "Max": np.max(x_values),
-            "Std Dev": np.std(x_values),
-            "95th %ile": np.percentile(x_values, 95),
-            "99th %ile": np.percentile(x_values, 99)
-        }
-        
-        # Add stats text box
-        stats_text = "\n".join([f"{k}: {v:.2f} {time_unit}" for k, v in stats.items()])
-        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-        ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=10,
-                verticalalignment='top', bbox=props)
-        
-        # Add vertical lines for mean and median
-        ax.axvline(stats["Mean"], color='r', linestyle='--', alpha=0.7, 
-                   label=f'Mean: {stats["Mean"]:.2f} {time_unit}')
-        ax.axvline(stats["Median"], color='g', linestyle=':', alpha=0.7, 
-                   label=f'Median: {stats["Median"]:.2f} {time_unit}')
-        ax.legend()
-    
-    # Adjust layout
-    plt.tight_layout()
-    
-    # Save if requested
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-    
-    # Show plot
-    plt.show()
-    
-    return fig, ax
-
-# Example of comparing both visualizations for the same data
-def compare_tsc_and_wall_clock(filepath, base_dir=None):
-    """
-    Create two plots for the same data - one in TSC cycles and one in wall clock time
-    
-    Args:
-        filepath: Path to the timing file
-        base_dir: Base directory where tsc_freq.bin is located
-    """
-    alloc_fn, size_bytes = parse_timing_filename(filepath)
-    stats, collection = load_timing_data(filepath)
-    
-    if base_dir is None:
-        base_dir = os.path.dirname(filepath) + "/"
-    
-    try:
-        tsc_freq = parse_tsc_frequency(base_dir)
-        print(f"TSC Frequency: {tsc_freq/1e6:.2f} MHz")
-        
-        # Plot using raw TSC cycles
-        plot_timing_distribution(
-            collection.arr,
-            tsc_freq=tsc_freq,
-            use_wall_clock=False,
-            alloc_fn=alloc_fn,
-            size_bytes=size_bytes,
-            show_stats=True
-        )
-        
-        # Plot using wall clock time (nanoseconds)
-        plot_timing_distribution(
-            collection.arr,
-            tsc_freq=tsc_freq,
-            use_wall_clock=True,
-            alloc_fn=alloc_fn,
-            size_bytes=size_bytes,
-            show_stats=True
-        )
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        print("Could not create comparison plots")
-
-def plot_unique_tsc_counts(
-    timing_arr: List[int],
-    tsc_freq: Optional[float] = None,
-    use_wall_clock: bool = True,
-    top_n: Optional[int] = None,
-    min_count: Optional[int] = None,
-    title: Optional[str] = None,
-    alloc_fn: Optional[str] = None,
-    size_bytes: Optional[int] = None,
-    save_path: Optional[str] = None,
-    figsize: Tuple[int, int] = (12, 6),
-    rotate_labels: bool = False
-):
-    """
-    Plot bars representing the count of each unique TSC value in the array.
-    
-    Args:
-        timing_arr: List of TSC timing values
-        tsc_freq: TSC frequency in Hz (required if use_wall_clock=True)
-        use_wall_clock: If True, convert TSC cycles to nanoseconds (requires tsc_freq)
-        top_n: If provided, only show the top N most common values
-        min_count: If provided, only show values that appear at least this many times
-        title: Custom title for the plot (if None, a title will be generated)
-        alloc_fn: Name of the allocation function
-        size_bytes: Size in bytes for the allocation
-        save_path: If provided, save the plot to this path
-        figsize: Size of the figure (width, height) in inches
-        rotate_labels: If True, rotate x-axis labels 90 degrees (helpful for many bars)
+        dirpath: Path to the directory containing run files
+        test_dir: Directory containing TSC frequency files
+        output_dir: Directory where plots should be saved
+        [Other args remain the same]
     
     Returns:
         Tuple of (figure, axis) matplotlib objects
     """
+    # Parse directory and load aggregate data
+    alloc_fn, size_bytes = parse_timing_directory(dirpath)
+    stats, all_timings, num_runs = load_aggregate_timing_data(dirpath)
+    
+    # Get TSC frequency
+    tsc_freq = None
+    if test_dir:
+        tsc_freq = load_all_tsc_frequencies(test_dir)
+    
+    # Ensure the directories end with path separator for consistency
+    if output_dir and not output_dir.endswith(os.sep):
+        output_dir += os.sep
+    
     # Convert to numpy array
-    timings = np.array(timing_arr)
+    timings = np.array(all_timings)
+    original_timings = timings.copy()
     
-    # Determine if we should convert to wall clock time
-    convert_to_ns = use_wall_clock and tsc_freq is not None
-    
-    if convert_to_ns:
-        values = (timings * 1e9) / tsc_freq
-        x_label = "Time (ns)"
-        time_unit = "ns"
+    # Handle outliers if specified
+    if outlier_percentile is not None:
+        cutoff = np.percentile(timings, outlier_percentile)
+        original_count = len(timings)
+        timings = timings[timings <= cutoff]
+        excluded_count = original_count - len(timings)
     else:
-        values = timings
-        x_label = "TSC Cycles"
-        time_unit = "cycles"
+        excluded_count = 0
+    
+    # Always plot in cycles
+    values = timings
+    x_label = "TSC Cycles"
     
     # Count occurrences of each unique value
     value_counts = Counter(values)
@@ -278,170 +216,316 @@ def plot_unique_tsc_counts(
     if top_n is not None:
         value_counts = dict(value_counts.most_common(top_n))
     
-    # Sort by value (for chronological order)
+    # Sort by value
     sorted_items = sorted(value_counts.items())
-    x_values = [item[0] for item in sorted_items]
+    x_plot = [item[0] for item in sorted_items]
     counts = [item[1] for item in sorted_items]
     
-    # Check if we have any data to plot after filtering
-    if len(x_values) == 0:
-        print("No data to plot after applying filters")
-        return None, None
+    # Apply x-axis transformation
+    if x_scale == 'rank':
+        x_transformed = list(range(len(x_plot)))
+        x_tick_labels = [f"{val:.2f}" for val in x_plot]
+    else:
+        x_transformed = x_plot
+        x_tick_labels = None
     
     # Create the plot
     fig, ax = plt.subplots(figsize=figsize)
-    bars = ax.bar(x_values, counts, alpha=0.7)
+    
+    # Plot bars
+    if x_scale == 'rank':
+        bars = ax.bar(x_transformed, counts, width=0.8)
+    else:
+        bars = ax.bar(x_transformed, counts, width=0.8)
+    
+    # Set scales
+    if x_scale == 'log' and x_scale != 'rank':
+        ax.set_xscale('log')
+
+    if y_scale == 'log':
+        ax.set_yscale('log')
+    elif y_scale == 'symlog':
+        # Symlog scale: linear near zero, logarithmic for larger values
+        ax.set_yscale('symlog', linthresh=linear_threshold)
+    elif y_scale == 'linear':
+        ax.set_yscale('linear')
     
     # Set labels and title
-    ax.set_xlabel(x_label)
+    if x_scale == 'rank':
+        ax.set_xlabel(f"{x_label} (ordered by value)")
+    else:
+        ax.set_xlabel(x_label)
+    
     ax.set_ylabel("Count")
     
-    if title:
-        plot_title = title
+    # Create title
+    plot_title = "TSC Value Distribution"
+    if alloc_fn:
+        plot_title += f" for {alloc_fn}"
+    if size_bytes:
+        plot_title += f" ({size_bytes}B)"
+    plot_title += f" [x-axis: {x_scale}]"
+    plot_title += f" [y-axis: {y_scale}"
+    if y_scale == 'symlog':
+        plot_title += f" (linear threshold {linear_threshold})]"
     else:
-        plot_title = f"Unique {time_unit.capitalize()} Value Counts"
-        if alloc_fn:
-            plot_title += f" for {alloc_fn}"
-        if size_bytes:
-            plot_title += f" ({size_bytes}B)"
-        if top_n:
-            plot_title += f" (Top {top_n})"
-    
+        plot_title += "]"
+
     ax.set_title(plot_title)
     
-    # Add a note about the total number of unique values
-    total_unique = len(value_counts)
-    original_unique = len(np.unique(values))
-    if total_unique != original_unique:
-        ax.text(0.98, 0.98, 
-                f"Showing {total_unique} of {original_unique} unique values",
-                horizontalalignment='right',
-                verticalalignment='top',
-                transform=ax.transAxes,
-                fontsize=9,
-                bbox=dict(facecolor='white', alpha=0.7))
+    # Handle x-axis ticks for rank scale
+    if x_scale == 'rank' and x_tick_labels:
+        # Show selected tick labels
+        n_ticks = min(10, len(x_transformed))
+        tick_indices = np.linspace(0, len(x_transformed)-1, n_ticks, dtype=int)
+        ax.set_xticks([x_transformed[i] for i in tick_indices])
+        ax.set_xticklabels([x_tick_labels[i] for i in tick_indices], rotation=45, ha='right')
     
-    # Handle x-axis labels if there are many bars
-    if len(x_values) > 20 or rotate_labels:
-        plt.xticks(rotation=90)
+    # Calculate statistics on all values in cycles
+    stats_cycles = {
+        "Mean": np.mean(original_timings),
+        "Median": np.median(original_timings),
+        "Min": np.min(original_timings),
+        "Max": np.max(original_timings),
+        "Std Dev": np.std(original_timings),
+        "95th %ile": np.percentile(original_timings, 95),
+        "99th %ile": np.percentile(original_timings, 99)
+    }
     
-    # Add count labels above bars if there aren't too many
-    if len(x_values) <= 30:
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + 0.05*max(counts),
-                   f'{int(height)}', ha='center', va='bottom', 
-                   rotation=45 if len(x_values) > 15 else 0,
-                   fontsize=8 if len(x_values) > 10 else 10)
+    # Create statistics text with both cycles and ns (if available)
+    stats_text_lines = []
+    for k, v_cycles in stats_cycles.items():
+        if tsc_freq is not None:
+            v_ns = (v_cycles * 1e9) / tsc_freq
+            stats_text_lines.append(f"{k}: {v_cycles:.2f} cycles (~{v_ns:.2f} ns)")
+        else:
+            stats_text_lines.append(f"{k}: {v_cycles:.2f} cycles")
     
-    # Add summary statistics as a text box
-    if len(counts) > 0:
-        stats_text = (
-            f"Total samples: {sum(counts)}\n"
-            f"Unique values: {total_unique}\n"
-            f"Most common: {sorted(value_counts.items(), key=lambda x: x[1], reverse=True)[0][0]:.2f} {time_unit} "
-            f"({sorted(value_counts.items(), key=lambda x: x[1], reverse=True)[0][1]} occurrences)"
-        )
-        ax.text(0.02, 0.98, stats_text,
-                horizontalalignment='left',
-                verticalalignment='top',
-                transform=ax.transAxes,
-                fontsize=9,
-                bbox=dict(facecolor='wheat', alpha=0.5))
+    stats_text = "\n".join(stats_text_lines)
+    
+    ax.text(0.98, 0.98, stats_text,
+            horizontalalignment='right',
+            verticalalignment='top',
+            transform=ax.transAxes,
+            fontsize=9,
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7))
+
+    # Add info box (right-aligned, below stats)
+    info_text = []
+    info_text.append(f"Total samples: {len(original_timings)}")
+    info_text.append(f"Unique values: {len(np.unique(original_timings))}")
+    info_text.append(f"Displayed values: {len(x_plot)}")
+    info_text.append(f"Runs included: {num_runs}")
+    if excluded_count > 0:
+        info_text.append(f"Excluded outliers: {excluded_count}\n({outlier_percentile} %ile)")
+    
+    # Calculate position for second text box
+    stats_lines = len(stats_cycles)
+    y_position = 0.98 - (stats_lines + 1) * 0.03  # Approximate line height
+    
+    ax.text(0.98, y_position, '\n'.join(info_text),
+            horizontalalignment='right',
+            verticalalignment='top',
+            transform=ax.transAxes,
+            fontsize=9,
+            bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.7))
+    
+    # Add vertical lines for mean and median if appropriate
+    if x_scale != 'rank' and not (x_scale == 'log' and any(v <= 0 for v in x_plot)):
+        mean_val = stats_cycles["Mean"]
+        median_val = stats_cycles["Median"]
+            
+        if mean_val >= min(x_plot) and mean_val <= max(x_plot):
+            ax.axvline(mean_val, color='r', linestyle='--', alpha=0.7, 
+                       label=f'Mean: {mean_val:.2f}')
+        if median_val >= min(x_plot) and median_val <= max(x_plot):
+            ax.axvline(median_val, color='g', linestyle=':', alpha=0.7, 
+                       label=f'Median: {median_val:.2f}')
+        ax.legend()
+    
+    # Add grid for better readability
+    ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
     
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    # Create save path
+    save_filename = alloc_fn
+    if size_bytes != '':
+        save_filename += "-" + str(size_bytes)
+    save_filename += f"-{x_scale}-{y_scale}.png"
     
-    plt.show()
+    save_path = os.path.join(output_dir, save_filename)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    if show_plot:
+        plt.show()
+
     return fig, ax
 
-# Example usage function
-def analyze_unique_tsc_values(filepath, base_dir=None, use_wall_clock=True, top_n=20, min_count=None):
+def analyze_all_timing_data(logs_dir="./logs", test_name=None, ignore_files=["tsc_freq.bin"], **kwargs):
     """
-    Analyze and plot the unique TSC values in an allocation timing file.
+    Traverse test directories and analyze aggregated timing data.
+    
+    New directory structure:
+    ./logs/<test-name>/<allocator name>[-<allocation size>]/<nth run>.bin
+    ./logs/<test-name>/<nth run>-tsc_freq.bin
     
     Args:
-        filepath: Path to the timing file
-        base_dir: Base directory where tsc_freq.bin is located (if None, use the directory of filepath)
-        use_wall_clock: If True, convert TSC cycles to nanoseconds, otherwise use raw TSC cycles
-        top_n: Show only the top N most frequent values (None to show all)
-        min_count: Only show values that appear at least this many times (None to show all)
+        logs_dir: Root directory containing timing data
+        test_name: Optional specific test directory to analyze (if None, analyzes all)
+        ignore_files: List of filenames to skip
+        **kwargs: Additional arguments to pass to analyze_tsc_distribution
+    
+    Returns:
+        dict: Summary of processing
     """
-    alloc_fn, size_bytes = parse_timing_filename(filepath)
-    stats, collection = load_timing_data(filepath)
+    # scale_options = [('linear', 'linear'), ('linear', 'symlog'), ('log', 'linear'), 
+                     # ('log', 'log')]
+    scale_options = [ ('log', 'linear'), ('log', 'log') ]
+   
+    summary = {'processed': [], 'skipped': [], 'errors': [], 'interrupted': False}
     
-    if base_dir is None:
-        base_dir = os.path.dirname(filepath) + "/"
+    try:
+        # Determine which directories to process
+        if test_name:
+            # Process only the specified test directory
+            test_path = os.path.join(logs_dir, test_name)
+            if not os.path.isdir(test_path):
+                print(f"Error: Test directory '{test_name}' not found in {logs_dir}")
+                return summary
+            test_dirs = [(test_name, test_path)]
+        else:
+            # Process all test directories
+            test_dirs = []
+            for test_dir in os.listdir(logs_dir):
+                test_path = os.path.join(logs_dir, test_dir)
+                if os.path.isdir(test_path):
+                    test_dirs.append((test_dir, test_path))
+        
+        # Process each test directory
+        for test_dir, test_path in test_dirs:
+            print(f"\nProcessing test: {test_dir}")
+            
+            # Find allocator directories
+            for item in os.listdir(test_path):
+                item_path = os.path.join(test_path, item)
+                
+                # Skip TSC frequency files
+                if item.endswith('-tsc_freq.bin'):
+                    continue
+                    
+                if os.path.isdir(item_path):
+                    # Check if this directory contains .bin files (run files)
+                    bin_files = glob.glob(os.path.join(item_path, "[0-9]*.bin"))
+                    if not bin_files:
+                        continue
+                    
+                    relative_path = os.path.relpath(item_path, logs_dir)
+                    print(f"\nAnalyzing: {relative_path}")
+                    
+                    # Create numbered output directory
+                    output_dir = get_next_output_dir(item_path)
+                    Path(output_dir).mkdir(parents=True, exist_ok=True)
+                    print(f"  Created output directory: {output_dir}")
+                    
+                    dir_processed = True
+                    
+                    # Run analysis with each permutation
+                    for scale in scale_options:
+                        try:
+                            x_scale = scale[0]
+                            y_scale = scale[1]
+                            # Generate descriptive label for this permutation
+                            label = f"x={x_scale}, y={y_scale}"
+                            print(f"  - {label}")
+                            
+                            # Call the analysis function
+                            fig, ax = analyze_tsc_distribution(
+                                dirpath=item_path,
+                                test_dir=test_path,  # For TSC frequency files
+                                output_dir=output_dir,
+                                x_scale=x_scale,
+                                y_scale=y_scale,
+                                # outlier_percentile=99.0,
+                                **kwargs
+                            )
+                            
+                            # Close the figure to free memory
+                            plt.close(fig)
+                            
+                        except Exception as e:
+                            print(f"    Error with {label}: {str(e)}")
+                            summary['errors'].append(f"{relative_path} - {label}: {str(e)}")
+                            dir_processed = False
+                    
+                    if dir_processed:
+                        summary['processed'].append(relative_path)
     
-    tsc_freq = None
-    if use_wall_clock:
-        try:
-            tsc_freq = parse_tsc_frequency(base_dir)
-            print(f"TSC Frequency: {tsc_freq/1e6:.2f} MHz")
-        except Exception as e:
-            print(f"Warning: Couldn't find or parse tsc_freq.bin ({str(e)})")
-            print("Falling back to raw TSC cycles")
-            use_wall_clock = False
+    except KeyboardInterrupt:
+        summary['interrupted'] = True
+        print("\n\nScript interrupted by user (Ctrl+C).")
     
-    # Check the number of unique values to provide info to the user
-    unique_count = len(np.unique(collection.arr))
-    print(f"Total timing samples: {len(collection.arr)}")
-    print(f"Unique timing values: {unique_count}")
+    # Print summary
+    print(f"\nSummary:")
+    print(f"  Processed: {len(summary['processed'])} directories")
+    print(f"  Skipped: {len(summary['skipped'])} files")
+    print(f"  Errors: {len(summary['errors'])}")
+    if summary['interrupted']:
+        print("  Script was interrupted")
     
-    if unique_count > 1000 and top_n is None:
-        print(f"Warning: There are {unique_count} unique values. Consider using top_n to limit the display.")
-    
-    # Plot the unique TSC value counts
-    plot_unique_tsc_counts(
-        collection.arr,
-        tsc_freq=tsc_freq,
-        use_wall_clock=use_wall_clock,
-        top_n=top_n,
-        min_count=min_count,
-        alloc_fn=alloc_fn,
-        size_bytes=size_bytes
-    )
-    
-    # Also display the frequency distribution for comparison
-    print("\nAlso showing regular distribution histogram for comparison:")
-    plot_timing_distribution(
-        collection.arr,
-        tsc_freq=tsc_freq,
-        use_wall_clock=use_wall_clock,
-        alloc_fn=alloc_fn,
-        size_bytes=size_bytes,
-        show_stats=True
-    )
+    return summary
 
 def main():
-    directory = "./logs/malloc/1/"
-    filepath = directory + "malloc-128B.bin"
-    #compare_tsc_and_wall_clock(filepath)
-    #analyze_allocation_file(filepath, use_wall_clock=False)
-    analyze_unique_tsc_values(filepath, None, False, None, None)
+    import sys
+    
+    # Check for command line arguments
+    if len(sys.argv) > 2:
+        print("Usage: python script.py [test_name]")
+        print("  test_name: Optional specific test directory to analyze")
+        sys.exit(1)
+    
+    # If a test name is provided as argument, use it
+    test_name = sys.argv[1] if len(sys.argv) == 2 else None
+    
+    if test_name:
+        print(f"Analyzing specific test: {test_name}")
+    else:
+        print("Analyzing all tests in ./logs")
+    
+    result = analyze_all_timing_data("./logs", test_name=test_name)
+    
+    if result['interrupted']:
+        print("\nAnalysis was interrupted")
+    else:
+        print(f"\nSuccessfully processed: {result['processed']}")
 
-    alloc_fn, n_bytes = parse_timing_filename(filepath)
-    stats, collection = load_timing_data(filepath)
-    tsc_freq = parse_tsc_frequency(directory)
-    # tsc_freq = parse_tsc_frequency("./logs/ua_nmc/21/")
+if __name__ == "__main__":
+    main()
 
-    print("TSC frequency: ", tsc_freq, '\n')
+# def main():
+#     result = analyze_all_timing_data("./logs")
+#     if result['interrupted']:
+#         print("\nAnalysis was interrupted")
+#     print(f"Successfully processed: {result['processed']}")
 
-    print(f"Timing data for {n_bytes}B allocations with {alloc_fn}")
-    print("\tTotal time:  ", stats.total_tsc)
-    print("\tTotal iter:  ", stats.iter)
-    print("\tAverage TSC: ", average_tsc(stats))
-    print("\tAverage ns:  ", tsc_to_ns(average_tsc(stats), tsc_freq))
+    # stats, collection = load_timing_data(filepath)
+    # tsc_freq = parse_tsc_frequency(directory)
+    # # tsc_freq = parse_tsc_frequency("./logs/ua_nmc/21/")
+    #
+    # print("TSC frequency: ", tsc_freq, '\n')
+    #
+    # print(f"Timing data for {n_bytes}B allocations with {alloc_fn}")
+    # print("\tTotal time:  ", stats.total_tsc)
+    # print("\tTotal iter:  ", stats.iter)
+    # print("\tAverage TSC: ", average_tsc(stats))
+    # print("\tAverage ns:  ", tsc_to_ns(average_tsc(stats), tsc_freq))
+    #
+    # filtered_arr = sorted(collection.arr)[:-1]
+    # print("\nTiming data collection:")
+    # print("\tCount:    ", collection.count)
+    # print("\tSum:      ", sum(filtered_arr))
+    # print("\tAvg TSC:  ", sum(filtered_arr) / collection.count, tsc_freq)
+    # print("\tAvg ns:   ", tsc_to_ns(sum(filtered_arr) / collection.count, tsc_freq))
+    # print("\tSmallest: ", sorted(collection.arr)[:10])
+    # print("\tLargest:  ", sorted(collection.arr)[-10:])
 
-    filtered_arr = sorted(collection.arr)[:-1]
-    print("\nTiming data collection:")
-    print("\tCount:    ", collection.count)
-    print("\tSum:      ", sum(filtered_arr))
-    print("\tAvg TSC:  ", sum(filtered_arr) / collection.count, tsc_freq)
-    print("\tAvg ns:   ", tsc_to_ns(sum(filtered_arr) / collection.count, tsc_freq))
-    print("\tSmallest: ", sorted(collection.arr)[:10])
-    print("\tLargest:  ", sorted(collection.arr)[-10:])
-
-main()
