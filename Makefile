@@ -1,5 +1,5 @@
 CC = gcc
-SRC = $(filter-out poc, $(shell find src -name "*.c"))
+SRC = $(filter-out src/modules/% poc, $(shell find src -name "*.c"))
 INCLUDES = -I. -I/usr/include/postgresql
 LIBS =  -lpthread -lpq -lm
 
