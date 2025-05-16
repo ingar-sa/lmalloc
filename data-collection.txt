@@ -1,9 +1,0 @@
-CPU info
-Allocator info
-Memory use info
-        - Total
-        - Over time
-Timing info
-        - Save all individual timings?
-                - Can make distribution
-        - At least log outliers
