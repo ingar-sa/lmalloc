@@ -132,24 +132,24 @@ def load_aggregate_timing_data(dirpath):
 
 def main():
     # Base directories
-    arena_dir = "logs/temparena/"
-    # malloc_dir = "logs/malloc/"
+    arena_dir = "logs/arena/"
+    malloc_dir = "logs/malloc/"
     
     # Find all test directories
     arena_tests = glob.glob(os.path.join(arena_dir, "*-*"))
-    # malloc_tests = glob.glob(os.path.join(malloc_dir, "*-*"))
+    malloc_tests = glob.glob(os.path.join(malloc_dir, "*-*"))
     
     # Load TSC frequencies
     arena_tsc_freq = load_all_tsc_frequencies(arena_dir)
-    # malloc_tsc_freq = load_all_tsc_frequencies(malloc_dir)
+    malloc_tsc_freq = load_all_tsc_frequencies(malloc_dir)
     
     # Use the average frequency if both are available
-    # if arena_tsc_freq and malloc_tsc_freq:
-    #     if abs(arena_tsc_freq - malloc_tsc_freq) > 1e6:
-    #         print(f"Warning: Different TSC frequencies detected: arena={arena_tsc_freq/1e6:.2f}MHz, malloc={malloc_tsc_freq/1e6:.2f}MHz")
-    #     tsc_freq = np.mean([arena_tsc_freq, malloc_tsc_freq])
-    # else:
-    tsc_freq = arena_tsc_freq or malloc_tsc_freq
+    if arena_tsc_freq and malloc_tsc_freq:
+        if abs(arena_tsc_freq - malloc_tsc_freq) > 1e6:
+            print(f"Warning: Different TSC frequencies detected: arena={arena_tsc_freq/1e6:.2f}MHz, malloc={malloc_tsc_freq/1e6:.2f}MHz")
+        tsc_freq = np.mean([arena_tsc_freq, malloc_tsc_freq])
+    else:
+        tsc_freq = arena_tsc_freq or malloc_tsc_freq
     
     # Data structure to hold results: {allocator: {size: avg_time_ns}}
     allocator_data = {}
@@ -171,20 +171,20 @@ def main():
         print(f"Processed {alloc_fn} - {size}B: {avg_time_ns:.2f} ns (from {num_runs} runs)")
     
     # Process malloc test directories
-    # for test_dir in malloc_tests:
-    #     alloc_fn, size = parse_timing_directory(test_dir)
-    #     if not isinstance(size, int):
-    #         continue
-    #         
-    #     total_stats, all_timings, num_runs = load_aggregate_timing_data(test_dir)
-    #     avg_tsc = average_tsc(total_stats)
-    #     avg_time_ns = tsc_to_ns(avg_tsc, tsc_freq)
-    #     
-    #     if alloc_fn not in allocator_data:
-    #         allocator_data[alloc_fn] = {}
-    #     allocator_data[alloc_fn][size] = avg_time_ns
-    #     
-    #     print(f"Processed {alloc_fn} - {size}B: {avg_time_ns:.2f} ns (from {num_runs} runs)")
+    for test_dir in malloc_tests:
+        alloc_fn, size = parse_timing_directory(test_dir)
+        if not isinstance(size, int):
+            continue
+            
+        total_stats, all_timings, num_runs = load_aggregate_timing_data(test_dir)
+        avg_tsc = average_tsc(total_stats)
+        avg_time_ns = tsc_to_ns(avg_tsc, tsc_freq)
+        
+        if alloc_fn not in allocator_data:
+            allocator_data[alloc_fn] = {}
+        allocator_data[alloc_fn][size] = avg_time_ns
+        
+        print(f"Processed {alloc_fn} - {size}B: {avg_time_ns:.2f} ns (from {num_runs} runs)")
     
     # Generate LaTeX plot
     generate_latex_plot(allocator_data)
@@ -192,10 +192,10 @@ def main():
 def generate_latex_plot(allocator_data):
     # Colors for different allocators
     colors = {
-        # 'ka_alloc': 'red',
-        # 'oka_alloc': 'blue',
+        'ka_alloc': 'red',
+        'oka_alloc': 'blue',
         'ua_alloc': 'green',
-        # 'malloc': 'black'
+        'malloc': 'black'
     }
     
     # Prepare plot data

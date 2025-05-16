@@ -1,5 +1,4 @@
 # Note: This code has been adapted from Claude's code
-
 import re
 import os
 import struct
@@ -22,6 +21,20 @@ class AllocTimingCollection:
     count: int = 0
     arr: List[int] = None
 
+@dataclass
+class ProcessedResult:
+    """Store processed timing data for LaTeX table generation"""
+    allocator: str
+    size: str
+    mean_ns: float
+    median_ns: float
+    min_ns: float
+    max_ns: float
+    std_dev_ns: float
+    p95_ns: float
+    p99_ns: float
+    total_samples: int
+    
 def parse_timing_data(file_handle: BinaryIO):
     tstats_bytes = file_handle.read(16)
     fields = struct.unpack('Q' * 2, tstats_bytes)
@@ -44,16 +57,10 @@ def parse_timing_data(file_handle: BinaryIO):
     
     return stats, collection
 
-def parse_tsc_frequency(dir):
-    filename = dir + "tsc_freq.bin"
-    with open(filename, 'rb') as f:
-        tsc_freq_bytes = f.read(8)
-        tsc_freq: double = struct.unpack('d', tsc_freq_bytes)[0]
-    return tsc_freq
-
-def load_all_tsc_frequencies(test_dir: str) -> float:
-    """Load all TSC frequency files and return the mean."""
-    tsc_files = glob.glob(os.path.join(test_dir, "*-tsc_freq.bin"))
+def load_all_tsc_frequencies(allocator_dir: str) -> float:
+    """Load all TSC frequency files from the allocator directory and return the mean."""
+    # Look for tsc_freq.bin files directly in the allocator directory
+    tsc_files = glob.glob(os.path.join(allocator_dir, "*-tsc_freq.bin"))
     frequencies = []
     
     for tsc_file in tsc_files:
@@ -67,10 +74,10 @@ def load_all_tsc_frequencies(test_dir: str) -> float:
     
     if frequencies:
         mean_freq = np.mean(frequencies)
-        print(f"Loaded {len(frequencies)} TSC frequencies, mean: {mean_freq/1e6:.2f} MHz")
+        print(f"Loaded {len(frequencies)} TSC frequencies from {allocator_dir}, mean: {mean_freq/1e6:.2f} MHz")
         return mean_freq
     else:
-        print("Warning: No TSC frequency files found")
+        print(f"Warning: No TSC frequency files found in {allocator_dir}")
         return None
 
 def tsc_to_ns(tsc, tsc_freq):
@@ -84,34 +91,38 @@ def load_timing_data(filename):
         stats, collection = parse_timing_data(f)
     return stats, collection
 
-def parse_timing_directory(dirpath):
+def parse_allocator_directory(dirpath):
     """Extract allocator function and size from directory name."""
     dirname = os.path.basename(dirpath)
     
-    # Split by hyphen
-    parts = dirname.split('-')
+    # Split by the last hyphen to separate function name and size
+    parts = dirname.rsplit('-', 1)
     
-    if len(parts) == 1:
-        # No hyphen in filename
-        alloc_fn = parts[0]
-        n_bytes = ""
-    else:
-        # Has hyphen - take everything before the last hyphen as function name
-        alloc_fn = '-'.join(parts[:-1])
-        
-        # Try to parse the byte size from the last part
-        byte_part = parts[-1]
-        
-        # Check if the last part matches the pattern for bytes (e.g., "32B")
-        byte_match = re.match(r"(\d+)B$", byte_part)
-        if byte_match:
-            n_bytes = int(byte_match.group(1))
+    if len(parts) < 2:
+        # No hyphen in filename - this might be a SDHS directory
+        parent_dir = os.path.basename(os.path.dirname(dirpath))
+        if parent_dir == 'sdhs':
+            return dirname, None
         else:
-            # If it doesn't match the pattern, treat the whole name as the function
-            alloc_fn = dirname
-            n_bytes = ""
+            # Unexpected format
+            return dirname, None
     
-    return alloc_fn, n_bytes
+    alloc_fn = parts[0]
+    size = parts[1]
+    
+    return alloc_fn, size
+
+def should_process_directory(allocator_type, alloc_fn, size):
+    """Check if this allocator/size combination should be processed."""
+    # For arena and malloc, we want small, medium, large sizes
+    if allocator_type in ['arena', 'malloc']:
+        return size in ['small', 'medium', 'large']
+    
+    # For sdhs, we process all directories (size will be None)
+    if allocator_type == 'sdhs':
+        return True
+    
+    return False
 
 def load_aggregate_timing_data(dirpath):
     """Load and aggregate timing data from all run files in a directory."""
@@ -152,7 +163,8 @@ def get_next_output_dir(base_dir):
 
 def analyze_tsc_distribution(
     dirpath, 
-    test_dir=None,
+    allocator_type,
+    tsc_freq,
     output_dir=None,
     top_n=None,
     min_count=None,
@@ -165,45 +177,49 @@ def analyze_tsc_distribution(
 ):
     """
     Analyze TSC distribution for all runs in a directory and plot with flexible scaling options.
+    Now always converts to nanoseconds for display.
     
     Args:
         dirpath: Path to the directory containing run files
-        test_dir: Directory containing TSC frequency files
+        allocator_type: The type of allocator (arena, malloc, sdhs)
+        tsc_freq: TSC frequency for conversion to nanoseconds
         output_dir: Directory where plots should be saved
         [Other args remain the same]
     
     Returns:
-        Tuple of (figure, axis) matplotlib objects
+        Tuple of (figure, axis, ProcessedResult) matplotlib objects and processed data
     """
     # Parse directory and load aggregate data
-    alloc_fn, size_bytes = parse_timing_directory(dirpath)
+    alloc_fn, size = parse_allocator_directory(dirpath)
     stats, all_timings, num_runs = load_aggregate_timing_data(dirpath)
     
-    # Get TSC frequency
-    tsc_freq = None
-    if test_dir:
-        tsc_freq = load_all_tsc_frequencies(test_dir)
+    if tsc_freq is None:
+        raise ValueError(f"TSC frequency not found for {dirpath}")
     
     # Ensure the directories end with path separator for consistency
     if output_dir and not output_dir.endswith(os.sep):
         output_dir += os.sep
     
-    # Convert to numpy array
-    timings = np.array(all_timings)
-    original_timings = timings.copy()
+    # Convert to numpy array and then to nanoseconds
+    timings_tsc = np.array(all_timings)
+    original_timings_tsc = timings_tsc.copy()
     
-    # Handle outliers if specified
+    # Convert to nanoseconds
+    timings_ns = tsc_to_ns(timings_tsc, tsc_freq)
+    original_timings_ns = tsc_to_ns(original_timings_tsc, tsc_freq)
+    
+    # Handle outliers if specified (working in nanoseconds)
     if outlier_percentile is not None:
-        cutoff = np.percentile(timings, outlier_percentile)
-        original_count = len(timings)
-        timings = timings[timings <= cutoff]
-        excluded_count = original_count - len(timings)
+        cutoff = np.percentile(timings_ns, outlier_percentile)
+        original_count = len(timings_ns)
+        timings_ns = timings_ns[timings_ns <= cutoff]
+        excluded_count = original_count - len(timings_ns)
     else:
         excluded_count = 0
     
-    # Always plot in cycles
-    values = timings
-    x_label = "TSC Cycles"
+    # Use nanoseconds for plotting
+    values = timings_ns
+    x_label = "Time (nanoseconds)"
     
     # Count occurrences of each unique value
     value_counts = Counter(values)
@@ -258,12 +274,14 @@ def analyze_tsc_distribution(
     
     ax.set_ylabel("Count")
     
-    # Create title
-    plot_title = "TSC Value Distribution"
+    # Create title with allocator type and function
+    plot_title = f"Time Distribution"
     if alloc_fn:
         plot_title += f" for {alloc_fn}"
-    if size_bytes:
-        plot_title += f" ({size_bytes}B)"
+        if size:
+            plot_title += f" ({size})"
+    else:
+        plot_title += f" for {allocator_type}"
     plot_title += f" [x-axis: {x_scale}]"
     plot_title += f" [y-axis: {y_scale}"
     if y_scale == 'symlog':
@@ -281,25 +299,21 @@ def analyze_tsc_distribution(
         ax.set_xticks([x_transformed[i] for i in tick_indices])
         ax.set_xticklabels([x_tick_labels[i] for i in tick_indices], rotation=45, ha='right')
     
-    # Calculate statistics on all values in cycles
-    stats_cycles = {
-        "Mean": np.mean(original_timings),
-        "Median": np.median(original_timings),
-        "Min": np.min(original_timings),
-        "Max": np.max(original_timings),
-        "Std Dev": np.std(original_timings),
-        "95th %ile": np.percentile(original_timings, 95),
-        "99th %ile": np.percentile(original_timings, 99)
+    # Calculate statistics on all values in nanoseconds
+    stats_ns = {
+        "Mean": np.mean(original_timings_ns),
+        "Median": np.median(original_timings_ns),
+        "Min": np.min(original_timings_ns),
+        "Max": np.max(original_timings_ns),
+        "Std Dev": np.std(original_timings_ns),
+        "95th %ile": np.percentile(original_timings_ns, 95),
+        "99th %ile": np.percentile(original_timings_ns, 99)
     }
     
-    # Create statistics text with both cycles and ns (if available)
+    # Create statistics text
     stats_text_lines = []
-    for k, v_cycles in stats_cycles.items():
-        if tsc_freq is not None:
-            v_ns = (v_cycles * 1e9) / tsc_freq
-            stats_text_lines.append(f"{k}: {v_cycles:.2f} cycles (~{v_ns:.2f} ns)")
-        else:
-            stats_text_lines.append(f"{k}: {v_cycles:.2f} cycles")
+    for k, v_ns in stats_ns.items():
+        stats_text_lines.append(f"{k}: {v_ns:.2f} ns")
     
     stats_text = "\n".join(stats_text_lines)
     
@@ -312,15 +326,15 @@ def analyze_tsc_distribution(
 
     # Add info box (right-aligned, below stats)
     info_text = []
-    info_text.append(f"Total samples: {len(original_timings)}")
-    info_text.append(f"Unique values: {len(np.unique(original_timings))}")
+    info_text.append(f"Total samples: {len(original_timings_ns)}")
+    info_text.append(f"Unique values: {len(np.unique(original_timings_ns))}")
     info_text.append(f"Displayed values: {len(x_plot)}")
     info_text.append(f"Runs included: {num_runs}")
     if excluded_count > 0:
         info_text.append(f"Excluded outliers: {excluded_count}\n({outlier_percentile} %ile)")
     
     # Calculate position for second text box
-    stats_lines = len(stats_cycles)
+    stats_lines = len(stats_ns)
     y_position = 0.98 - (stats_lines + 1) * 0.03  # Approximate line height
     
     ax.text(0.98, y_position, '\n'.join(info_text),
@@ -332,8 +346,8 @@ def analyze_tsc_distribution(
     
     # Add vertical lines for mean and median if appropriate
     if x_scale != 'rank' and not (x_scale == 'log' and any(v <= 0 for v in x_plot)):
-        mean_val = stats_cycles["Mean"]
-        median_val = stats_cycles["Median"]
+        mean_val = stats_ns["Mean"]
+        median_val = stats_ns["Median"]
             
         if mean_val >= min(x_plot) and mean_val <= max(x_plot):
             ax.axvline(mean_val, color='r', linestyle='--', alpha=0.7, 
@@ -349,9 +363,9 @@ def analyze_tsc_distribution(
     plt.tight_layout()
     
     # Create save path
-    save_filename = alloc_fn
-    if size_bytes != '':
-        save_filename += "-" + str(size_bytes)
+    save_filename = f"{alloc_fn}"
+    if size:
+        save_filename += f"-{size}"
     save_filename += f"-{x_scale}-{y_scale}.png"
     
     save_path = os.path.join(output_dir, save_filename)
@@ -359,56 +373,130 @@ def analyze_tsc_distribution(
 
     if show_plot:
         plt.show()
-
-    return fig, ax
-
-def analyze_all_timing_data(logs_dir="./logs", test_name=None, ignore_files=["tsc_freq.bin"], **kwargs):
-    """
-    Traverse test directories and analyze aggregated timing data.
     
-    New directory structure:
-    ./logs/<test-name>/<allocator name>[-<allocation size>]/<nth run>.bin
-    ./logs/<test-name>/<nth run>-tsc_freq.bin
+    # Create ProcessedResult for LaTeX table
+    # For SDHS, use the alloc_fn as the size since there's no separate size
+    display_size = size if size is not None else "all"
+    
+    processed_result = ProcessedResult(
+        allocator=alloc_fn if allocator_type == 'sdhs' else allocator_type,
+        size=display_size,
+        mean_ns=stats_ns["Mean"],
+        median_ns=stats_ns["Median"],
+        min_ns=stats_ns["Min"],
+        max_ns=stats_ns["Max"],
+        std_dev_ns=stats_ns["Std Dev"],
+        p95_ns=stats_ns["95th %ile"],
+        p99_ns=stats_ns["99th %ile"],
+        total_samples=len(original_timings_ns)
+    )
+
+    return fig, ax, processed_result
+
+def generate_latex_table(results: List[ProcessedResult], output_file: str):
+    """Generate a LaTeX table with the timing statistics."""
+    
+    # Sort results by allocator and then by size
+    def sort_key(result):
+        # Define custom ordering for allocators
+        allocator_order = {'arena': 0, 'malloc': 1}
+        
+        # Define custom ordering for sizes
+        size_order = {'small': 0, 'medium': 1, 'large': 2, 'all': 3}
+        
+        # For arena and malloc, use the allocator order
+        if result.allocator in ['arena', 'malloc']:
+            alloc_idx = allocator_order.get(result.allocator, 999)
+            size_idx = size_order.get(result.size, 999)
+        else:
+            # For SDHS, sort alphabetically by function name
+            alloc_idx = 1000  # Put after arena/malloc
+            size_idx = 0  # All SDHS entries have same "size"
+        
+        return (alloc_idx, size_idx, result.allocator, result.size)
+    
+    results.sort(key=sort_key)
+    
+    latex_content = r"""
+\begin{table}[htbp]
+\centering
+\caption{Memory Allocator Performance Statistics (nanoseconds)}
+\label{tab:allocator_stats}
+\begin{tabular}{|l|l|r@{\hspace{2pt}}|r@{\hspace{2pt}}|r@{\hspace{2pt}}|r@{\hspace{2pt}}|r@{\hspace{2pt}}|r@{\hspace{2pt}}|r@{\hspace{2pt}}|r|}
+\hline
+\textbf{Allocator} & \textbf{Size} & \textbf{Mean} & \textbf{Median} & \textbf{Min} & \textbf{Max} & \textbf{Std Dev} & \textbf{95th \%} & \textbf{99th \%} & \textbf{Samples} \\
+\hline"""
+
+    for result in results:
+        # Format numbers with appropriate precision
+        latex_content += f"\\hline\n"
+        latex_content += f"{result.allocator} & {result.size} & "
+        latex_content += f"{result.mean_ns:.2f} & {result.median_ns:.2f} & "
+        latex_content += f"{result.min_ns:.2f} & {result.max_ns:.2f} & "
+        latex_content += f"{result.std_dev_ns:.2f} & {result.p95_ns:.2f} & "
+        latex_content += f"{result.p99_ns:.2f} & {result.total_samples:,} \\\\\n"
+
+    latex_content += r"""
+\hline
+\end{tabular}
+\end{table}
+"""
+    
+    # Write to file
+    with open(output_file, 'w') as f:
+        f.write(latex_content)
+    
+    print(f"LaTeX table saved to: {output_file}")
+
+def analyze_all_timing_data(logs_dir="./logs", ignore_files=["tsc_freq.bin"], **kwargs):
+    """
+    Traverse the logs directory structure and analyze allocator timing data.
+    
+    Directory structure:
+    ./logs/arena/{alloc_fn}-{size}/ (where size is small, medium, large)
+    ./logs/malloc/{alloc_fn}-{size}/ (where size is small, medium, large)  
+    ./logs/sdhs/{alloc_fn}/
+    
+    TSC frequency files are located directly in the allocator directories:
+    ./logs/arena/*-tsc_freq.bin
+    ./logs/malloc/*-tsc_freq.bin
+    ./logs/sdhs/*-tsc_freq.bin
     
     Args:
         logs_dir: Root directory containing timing data
-        test_name: Optional specific test directory to analyze (if None, analyzes all)
         ignore_files: List of filenames to skip
         **kwargs: Additional arguments to pass to analyze_tsc_distribution
     
     Returns:
         dict: Summary of processing
     """
-    # scale_options = [('linear', 'linear'), ('linear', 'symlog'), ('log', 'linear'), 
-                     # ('log', 'log')]
-    scale_options = [ ('log', 'linear'), ('log', 'log') ]
+    scale_options = [('log', 'linear'), ('log', 'log')]
    
     summary = {'processed': [], 'skipped': [], 'errors': [], 'interrupted': False}
+    all_results = []  # Store all ProcessedResult objects for LaTeX table
     
     try:
-        # Determine which directories to process
-        if test_name:
-            # Process only the specified test directory
-            test_path = os.path.join(logs_dir, test_name)
-            if not os.path.isdir(test_path):
-                print(f"Error: Test directory '{test_name}' not found in {logs_dir}")
-                return summary
-            test_dirs = [(test_name, test_path)]
-        else:
-            # Process all test directories
-            test_dirs = []
-            for test_dir in os.listdir(logs_dir):
-                test_path = os.path.join(logs_dir, test_dir)
-                if os.path.isdir(test_path):
-                    test_dirs.append((test_dir, test_path))
+        # Process each allocator type
+        allocator_types = ['arena', 'malloc', 'sdhs']
         
-        # Process each test directory
-        for test_dir, test_path in test_dirs:
-            print(f"\nProcessing test: {test_dir}")
+        for allocator_type in allocator_types:
+            allocator_dir = os.path.join(logs_dir, allocator_type)
+            if not os.path.isdir(allocator_dir):
+                print(f"Warning: {allocator_type} directory not found in {logs_dir}")
+                continue
             
-            # Find allocator directories
-            for item in os.listdir(test_path):
-                item_path = os.path.join(test_path, item)
+            print(f"\nProcessing allocator: {allocator_type}")
+            
+            # Load TSC frequency for this allocator type
+            tsc_freq = load_all_tsc_frequencies(allocator_dir)
+            if tsc_freq is None:
+                print(f"    Error: No TSC frequency found for {allocator_type}")
+                summary['errors'].append(f"{allocator_type}: No TSC frequency")
+                continue
+            
+            # Find all subdirectories within the allocator directory
+            for item in os.listdir(allocator_dir):
+                item_path = os.path.join(allocator_dir, item)
                 
                 # Skip TSC frequency files
                 if item.endswith('-tsc_freq.bin'):
@@ -420,55 +508,72 @@ def analyze_all_timing_data(logs_dir="./logs", test_name=None, ignore_files=["ts
                     if not bin_files:
                         continue
                     
-                    relative_path = os.path.relpath(item_path, logs_dir)
-                    print(f"\nAnalyzing: {relative_path}")
+                    # Parse the directory name to get allocator function and size
+                    alloc_fn, size = parse_allocator_directory(item_path)
+                    
+                    # Check if we should process this combination
+                    if not should_process_directory(allocator_type, alloc_fn, size):
+                        print(f"  Skipping {item} (not in target list)")
+                        summary['skipped'].append(f"{allocator_type}/{item}")
+                        continue
+                    
+                    print(f"  Analyzing: {item}")
                     
                     # Create numbered output directory
                     output_dir = get_next_output_dir(item_path)
                     Path(output_dir).mkdir(parents=True, exist_ok=True)
-                    print(f"  Created output directory: {output_dir}")
+                    print(f"    Created output directory: {output_dir}")
                     
                     dir_processed = True
                     
-                    # Run analysis with each permutation
+                    # Run analysis with each scale combination
                     for scale in scale_options:
                         try:
                             x_scale = scale[0]
                             y_scale = scale[1]
                             # Generate descriptive label for this permutation
                             label = f"x={x_scale}, y={y_scale}"
-                            print(f"  - {label}")
+                            print(f"    - {label}")
                             
                             # Call the analysis function
-                            fig, ax = analyze_tsc_distribution(
+                            fig, ax, processed_result = analyze_tsc_distribution(
                                 dirpath=item_path,
-                                test_dir=test_path,  # For TSC frequency files
+                                allocator_type=allocator_type,
+                                tsc_freq=tsc_freq,
                                 output_dir=output_dir,
                                 x_scale=x_scale,
                                 y_scale=y_scale,
-                                # outlier_percentile=99.0,
                                 **kwargs
                             )
+                            
+                            # Store the result for the first scale option (avoid duplicates)
+                            if scale == scale_options[0]:
+                                all_results.append(processed_result)
                             
                             # Close the figure to free memory
                             plt.close(fig)
                             
                         except Exception as e:
-                            print(f"    Error with {label}: {str(e)}")
-                            summary['errors'].append(f"{relative_path} - {label}: {str(e)}")
+                            print(f"      Error with {label}: {str(e)}")
+                            summary['errors'].append(f"{allocator_type}/{item} - {label}: {str(e)}")
                             dir_processed = False
                     
                     if dir_processed:
-                        summary['processed'].append(relative_path)
+                        summary['processed'].append(f"{allocator_type}/{item}")
     
     except KeyboardInterrupt:
         summary['interrupted'] = True
         print("\n\nScript interrupted by user (Ctrl+C).")
     
+    # Generate LaTeX table if we have results
+    if all_results:
+        latex_output_file = os.path.join(logs_dir, "allocator_statistics.tex")
+        generate_latex_table(all_results, latex_output_file)
+    
     # Print summary
     print(f"\nSummary:")
     print(f"  Processed: {len(summary['processed'])} directories")
-    print(f"  Skipped: {len(summary['skipped'])} files")
+    print(f"  Skipped: {len(summary['skipped'])} directories")
     print(f"  Errors: {len(summary['errors'])}")
     if summary['interrupted']:
         print("  Script was interrupted")
@@ -478,21 +583,15 @@ def analyze_all_timing_data(logs_dir="./logs", test_name=None, ignore_files=["ts
 def main():
     import sys
     
-    # Check for command line arguments
-    if len(sys.argv) > 2:
-        print("Usage: python script.py [test_name]")
-        print("  test_name: Optional specific test directory to analyze")
+    # No longer support specifying test_name since we process all allocators
+    if len(sys.argv) > 1:
+        print("Usage: python script.py")
+        print("This script processes all allocator data in ./logs/")
         sys.exit(1)
     
-    # If a test name is provided as argument, use it
-    test_name = sys.argv[1] if len(sys.argv) == 2 else None
+    print("Analyzing all allocator data in ./logs")
     
-    if test_name:
-        print(f"Analyzing specific test: {test_name}")
-    else:
-        print("Analyzing all tests in ./logs")
-    
-    result = analyze_all_timing_data("./logs", test_name=test_name)
+    result = analyze_all_timing_data("./logs")
     
     if result['interrupted']:
         print("\nAnalysis was interrupted")
@@ -501,31 +600,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# def main():
-#     result = analyze_all_timing_data("./logs")
-#     if result['interrupted']:
-#         print("\nAnalysis was interrupted")
-#     print(f"Successfully processed: {result['processed']}")
-
-    # stats, collection = load_timing_data(filepath)
-    # tsc_freq = parse_tsc_frequency(directory)
-    # # tsc_freq = parse_tsc_frequency("./logs/ua_nmc/21/")
-    #
-    # print("TSC frequency: ", tsc_freq, '\n')
-    #
-    # print(f"Timing data for {n_bytes}B allocations with {alloc_fn}")
-    # print("\tTotal time:  ", stats.total_tsc)
-    # print("\tTotal iter:  ", stats.iter)
-    # print("\tAverage TSC: ", average_tsc(stats))
-    # print("\tAverage ns:  ", tsc_to_ns(average_tsc(stats), tsc_freq))
-    #
-    # filtered_arr = sorted(collection.arr)[:-1]
-    # print("\nTiming data collection:")
-    # print("\tCount:    ", collection.count)
-    # print("\tSum:      ", sum(filtered_arr))
-    # print("\tAvg TSC:  ", sum(filtered_arr) / collection.count, tsc_freq)
-    # print("\tAvg ns:   ", tsc_to_ns(sum(filtered_arr) / collection.count, tsc_freq))
-    # print("\tSmallest: ", sorted(collection.arr)[:10])
-    # print("\tLargest:  ", sorted(collection.arr)[-10:])
-
