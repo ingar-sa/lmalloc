@@ -58,7 +58,6 @@ struct ua__thread_arenas__ {
 	static __thread struct ua__thread_arenas__                          \
 		*ua__thread_arenas_instance__ __attribute__((used))
 
-
 #define UA_THREAD_ARENAS_EXTERN(thread_name)                   \
 	extern __thread struct ua__thread_arenas__ LM_CONCAT3( \
 		ua__thread_arenas_, thread_name, __);          \
@@ -92,7 +91,7 @@ struct ua__thread_arenas__ {
 #define UaPushStructZero(a, type) UaPushArrayZero(a, type, 1)
 
 void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
-	     size_t alignment, size_t page_sz, size_t cap, uint8_t *mem);
+	     size_t cap, uint8_t *mem);
 
 UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment);
 

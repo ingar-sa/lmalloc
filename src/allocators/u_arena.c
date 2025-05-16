@@ -22,14 +22,8 @@ static size_t arena_cache_aligned_sz(void)
 }
 
 void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
-	     size_t alignment, size_t page_sz, size_t cap, uint8_t *mem)
+	     size_t cap, uint8_t *mem)
 {
-	LmAssert(
-		LmIsPowerOfTwo(alignment) && 8 <= alignment &&
-			alignment <= page_sz,
-		"Provided alignment is not a power of two and/or aligment not in [8, %zd]",
-		page_sz);
-
 	ua->flags = 0;
 	if (contiguous)
 		UaSetIsContiguous(ua->flags);
@@ -37,7 +31,7 @@ void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
 		UaSetIsMallocd(ua->flags);
 	if (bootstrapped)
 		UaSetIsBootstrapped(ua->flags);
-	ua->alignment = alignment;
+
 	ua->cur = 0;
 	ua->cap = cap;
 	ua->mem = mem;
@@ -47,23 +41,20 @@ UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment)
 {
 	UArena *ua;
 	uint8_t *mem;
-	size_t page_sz = get_page_size();
-	size_t cacheln_sz = get_l1d_cacheln_sz();
-	size_t arena_cache_aligned_sz =
-		sizeof(UArena) + LmPaddingToAlign(sizeof(UArena), cacheln_sz);
+	size_t arena_sz = arena_cache_aligned_sz();
 
 	if (mallocd) {
 		if (contiguous) {
-			size_t allocation_sz = arena_cache_aligned_sz + cap;
+			size_t allocation_sz = arena_sz + cap;
 			ua = malloc(allocation_sz);
-			mem = (uint8_t *)ua + arena_cache_aligned_sz;
+			mem = (uint8_t *)ua + arena_sz;
 		} else {
 			ua = malloc(sizeof(UArena));
 			mem = malloc(cap);
 		}
 	} else {
 		if (contiguous) {
-			size_t allocation_sz = arena_cache_aligned_sz + cap;
+			size_t allocation_sz = arena_sz + cap;
 			if ((mem = mmap(NULL, allocation_sz,
 					PROT_READ | PROT_WRITE,
 					MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) ==
@@ -72,7 +63,7 @@ UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment)
 				return NULL;
 			}
 			ua = (UArena *)((uintptr_t)mem);
-			mem += arena_cache_aligned_sz;
+			mem += arena_sz;
 		} else {
 			ua = malloc(sizeof(UArena));
 			mem = mmap(NULL, cap, PROT_READ | PROT_WRITE,
@@ -80,7 +71,7 @@ UArena *ua_create(size_t cap, bool contiguous, bool mallocd, size_t alignment)
 		}
 	}
 
-	ua_init(ua, contiguous, mallocd, false, alignment, page_sz, cap, mem);
+	ua_init(ua, contiguous, mallocd, false, cap, mem);
 	return ua;
 }
 
@@ -128,8 +119,7 @@ UArena *ua_bootstrap(UArena *ua, UArena *new_existing, size_t cap,
 		return NULL;
 	}
 
-	size_t page_sz = get_page_size();
-	ua_init(new, false, false, true, alignment, page_sz, cap, mem);
+	ua_init(new, false, false, true, cap, mem);
 	return new;
 }
 
