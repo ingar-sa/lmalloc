@@ -54,15 +54,11 @@ int main(int argc, char **argv)
 	cjson_hooks.free_fn = cjson_free;
 	cJSON_InitHooks(&cjson_hooks);
 
-#if 0
-	// NOTE: (isa): This #if/else is just a quick way to run debug stuff instead of the main code
-	LmLogDebugR("%s", ua_info_string(cjson_arena, main_ua));
-#else
 	size_t config_file_sz = 0;
 	uint8_t *test_config_file = lm_load_file_into_memory(
 		"./configs/benchmark_config.json", &config_file_sz, main_ua);
 	cJSON *test_config_json = cJSON_Parse((char *)test_config_file);
 	result = run_tests(test_config_json);
-#endif
+
 	return result;
 }
