@@ -90,7 +90,7 @@ struct ua__thread_arenas__ {
 #define UaPushStructZero(a, type) UaPushArrayZero(a, type, 1)
 
 void ua_init(UArena *ua, bool contiguous, bool mallocd, bool bootstrapped,
-	     size_t page_sz, size_t cap, uint8_t *mem);
+	     size_t cap, uint8_t *mem);
 
 UArena *ua_create(size_t cap, bool contiguous, bool mallocd);
 
