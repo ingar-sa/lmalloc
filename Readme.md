@@ -5,8 +5,3 @@ Currently, specialized allocators are either implemented at the language level (
 the good ol' malloc & co. or mmap (there are others, but they are not frequently used.) This means that the kernel still manages the memory for the userspace allocators as if they are general heap allocations or memory mappings,
 which might incur unnecessary overhead for simple allocators like arenas. Also, if the kernel knows that some memory is used in a specific way, there might be assumptions one can make that can simplify memory management of that type.
 This project aims to investigate these questions.
-
-### Bachelor's thesis
-The research project is for me and my group's bachelor's thesis. The repository containing stuff for the thesis itself can be found here:
-
-**Bachelor repository: [Bachelor](https://github.com/ingar-sa/Bachelor)**
